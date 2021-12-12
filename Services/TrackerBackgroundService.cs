@@ -47,7 +47,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 {
                     AuctionId = lp.UId,
                     FinderType = lp.Finder,
-                    TargetPrice = lp.TargetPrice,
+                    TargetPrice = lp.TargetPrice
                 });
             }, stoppingToken, "fliptracker");
 
@@ -58,7 +58,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             }, stoppingToken, "fliptracker");
 
 
-            await Task.WhenAll(flipCons, flipEventCons);
+            await Task.WhenAny(flipCons, flipEventCons);
         }
 
         private TrackerService GetService()
