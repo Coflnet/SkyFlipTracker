@@ -62,6 +62,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
 
 
             await Task.WhenAny(flipCons, flipEventCons);
+            logger.LogError("consuming stopped :O");
         }
 
         private TrackerService GetService()
