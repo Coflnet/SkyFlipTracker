@@ -20,15 +20,17 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
     {
         private readonly TrackerDbContext db;
         private readonly TrackerService service;
+        private readonly ILogger<TrackerController> logger;
 
         /// <summary>
         /// Creates a new instance of <see cref="TrackerController"/>
         /// </summary>
         /// <param name="context"></param>
-        public TrackerController(TrackerDbContext context, TrackerService service)
+        public TrackerController(TrackerDbContext context, TrackerService service, ILogger<TrackerController> logger)
         {
             db = context;
             this.service = service;
+            this.logger = logger;
         }
 
         /// <summary>
@@ -41,6 +43,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
         [Route("flip/{AuctionId}")]
         public async Task<Flip> TrackFlip([FromBody] Flip flip, string AuctionId)
         {
+            logger.LogInformation("received flip");
             flip.AuctionId = GetId(AuctionId);
             await service.AddFlip(flip);
             return flip;

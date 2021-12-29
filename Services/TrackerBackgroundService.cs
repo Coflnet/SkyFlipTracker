@@ -19,6 +19,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
         private IConfiguration config;
         private ILogger<TrackerBackgroundService> logger;
 
+        private static Prometheus.Counter consumeCounter = Prometheus.Metrics.CreateCounter("sky_fliptracker_consume_lp","Counts the consumed low priced auctions");
+
         public TrackerBackgroundService(
             IServiceScopeFactory scopeFactory, IConfiguration config, ILogger<TrackerBackgroundService> logger)
         {
@@ -43,6 +45,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             var flipCons = Coflnet.Kafka.KafkaConsumer.Consume<LowPricedAuction>(config["KAFKA_HOST"], config["TOPICS:LOW_PRICED"], async lp =>
             {
                 var service = GetService();
+                consumeCounter.Inc();
                 await service.AddFlip(new Flip()
                 {
                     AuctionId = lp.UId,
