@@ -9,6 +9,7 @@ using Microsoft.Extensions.Configuration;
 using System;
 using Microsoft.Extensions.Logging;
 using Coflnet.Sky.SkyAuctionTracker.Controllers;
+using System.Linq;
 
 namespace Coflnet.Sky.SkyAuctionTracker.Services
 {
@@ -19,7 +20,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
         private IConfiguration config;
         private ILogger<TrackerBackgroundService> logger;
 
-        private static Prometheus.Counter consumeCounter = Prometheus.Metrics.CreateCounter("sky_fliptracker_consume_lp","Counts the consumed low priced auctions");
+        private static Prometheus.Counter consumeCounter = Prometheus.Metrics.CreateCounter("sky_fliptracker_consume_lp", "Counts the consumed low priced auctions");
 
         public TrackerBackgroundService(
             IServiceScopeFactory scopeFactory, IConfiguration config, ILogger<TrackerBackgroundService> logger)
@@ -42,17 +43,19 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 GroupId = "flip-tracker"
             };
 
-            var flipCons = Coflnet.Kafka.KafkaConsumer.Consume<LowPricedAuction>(config["KAFKA_HOST"], config["TOPICS:LOW_PRICED"], async lp =>
+
+            var flipCons = Coflnet.Kafka.KafkaConsumer.ConsumeBatch<LowPricedAuction>(config["KAFKA_HOST"], config["TOPICS:LOW_PRICED"], async lps =>
             {
-                var service = GetService();
-                consumeCounter.Inc();
-                await service.AddFlip(new Flip()
+                if(lps.Count() == 0)
+                    return;
+                await GetService().AddFlips(lps.Select(lp => new Flip()
                 {
                     AuctionId = lp.UId,
                     FinderType = lp.Finder,
                     TargetPrice = lp.TargetPrice
-                });
-            }, stoppingToken, "fliptracker");
+                }));
+                consumeCounter.Inc();
+            }, stoppingToken, "fliptracker", 50);
 
             var flipEventCons = Coflnet.Kafka.KafkaConsumer.Consume<FlipEvent>(config["KAFKA_HOST"], config["TOPICS:FLIP_EVENT"], async flipEvent =>
             {
