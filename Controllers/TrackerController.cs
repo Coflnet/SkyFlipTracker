@@ -166,6 +166,18 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
         }
 
         /// <summary>
+        /// Gets the flips for a given auctions
+        /// </summary>
+        /// <param name="auctionIds">collection of auction ids</param>
+        /// <returns></returns>
+        [HttpPost]
+        [Route("batch/flips")]
+        public async Task<List<Flip>> GetFlipsOfAuctions(List<long> auctionIds)
+        {
+            return await db.Flips.Where(flip => auctionIds.Contains(flip.AuctionId)).ToListAsync();
+        }
+
+        /// <summary>
         /// Returns how many user recently received a flip
         /// </summary>
         /// <returns></returns>
