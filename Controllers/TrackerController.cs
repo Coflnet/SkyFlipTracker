@@ -177,17 +177,6 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             return await db.Flips.Where(flip => auctionIds.Contains(flip.AuctionId)).ToListAsync();
         }
 
-        /// <summary>
-        /// Returns how many user recently received a flip
-        /// </summary>
-        /// <returns></returns>
-        [HttpGet]
-        [Route("/users/active/count")]
-        public async Task<int> GetNumberOfActiveFlipperUsers()
-        {
-            return await db.FlipEvents.Where(flipEvent => flipEvent.Type == FlipEventType.FLIP_RECEIVE && DateTime.Now.Subtract(flipEvent.Timestamp).TotalMinutes > 3)
-                .GroupBy(flipEvent => flipEvent.PlayerId).CountAsync();
-        }
 
         /// <summary>
         /// Returns the player and the amount of second he bought an auction faster than the given player
