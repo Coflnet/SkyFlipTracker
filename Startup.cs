@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Reflection;
+using System.Text.Json.Serialization;
 using Coflnet.Sky.SkyAuctionTracker.Models;
 using Coflnet.Sky.SkyAuctionTracker.Services;
 using hypixel;
@@ -33,7 +34,8 @@ namespace Coflnet.Sky.SkyAuctionTracker
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
-            services.AddControllers();
+            services.AddControllers().AddJsonOptions(options =>
+                    options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
             services.AddSwaggerGen(c =>
             {
                 c.SwaggerDoc("v1", new OpenApiInfo { Title = "SkyTracker", Version = "v1" });
