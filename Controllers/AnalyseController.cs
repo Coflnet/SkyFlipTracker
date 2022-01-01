@@ -66,7 +66,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
         [Route("/users/active/count")]
         public async Task<int> GetNumberOfActiveFlipperUsers()
         {
-            return await db.FlipEvents.Where(flipEvent => flipEvent.Type == FlipEventType.FLIP_RECEIVE && DateTime.Now.Subtract(flipEvent.Timestamp).TotalMinutes > 3)
+            var minTime =  DateTime.Now.Subtract(TimeSpan.FromMinutes(3));
+            return await db.FlipEvents.Where(flipEvent => flipEvent.Type == FlipEventType.FLIP_CLICK && flipEvent.Timestamp > minTime)
                 .GroupBy(flipEvent => flipEvent.PlayerId).CountAsync();
         }
     }
