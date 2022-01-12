@@ -31,11 +31,13 @@ namespace Coflnet.Sky.SkyAuctionTracker.Models
             {
                 entity.HasIndex(e => new { e.AuctionId, e.Type });
                 entity.HasIndex(e => e.PlayerId);
+                entity.HasIndex(e => e.Timestamp);
             });
 
             modelBuilder.Entity<Flip>(entity =>
             {
                 entity.HasIndex(e => new { e.AuctionId });
+                entity.HasIndex(e => e.Timestamp);
             });
         }
     }

@@ -4,16 +4,19 @@ using System;
 using System.Linq;
 using Microsoft.EntityFrameworkCore;
 using System.Collections.Generic;
+using Microsoft.Extensions.Logging;
 
 namespace Coflnet.Sky.SkyAuctionTracker.Services
 {
     public class TrackerService
     {
         private TrackerDbContext db;
+        private ILogger<TrackerService> logger;
 
-        public TrackerService(TrackerDbContext db)
+        public TrackerService(TrackerDbContext db, ILogger<TrackerService> logger)
         {
             this.db = db;
+            this.logger = logger;
         }
 
         public async Task<Flip> AddFlip(Flip flip)
@@ -44,14 +47,14 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     var existing = await db.Flips.Where(f => lookup.Contains(f.AuctionId)).ToListAsync();
                     var newFlips = flips.Where(f => !existing.Where(ex => f.AuctionId ==  f.AuctionId && ex.FinderType  == f.FinderType ).Any()).ToList();
                     db.Flips.AddRange(newFlips);
-                    await db.SaveChangesAsync();
+                    var count = await db.SaveChangesAsync();
                     await db.Database.CommitTransactionAsync();
+                    logger.LogInformation($"saved {count} flips");
                     break;
                 }
                 catch (Exception e)
                 {
-                    dev.Logger.Instance.Error(e,"saving flips");
-                    Console.WriteLine("saving failed");
+                    logger.LogError(e, "saving flips");
                     await Task.Delay(500);
                 }
             }
