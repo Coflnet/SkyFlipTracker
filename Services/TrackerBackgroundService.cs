@@ -21,6 +21,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
         private ILogger<TrackerBackgroundService> logger;
 
         private static Prometheus.Counter consumeCounter = Prometheus.Metrics.CreateCounter("sky_fliptracker_consume_lp", "Counts the consumed low priced auctions");
+        private static Prometheus.Counter consumeEvent = Prometheus.Metrics.CreateCounter("sky_fliptracker_consume_event", "Counts the consumed flip events");
 
         public TrackerBackgroundService(
             IServiceScopeFactory scopeFactory, IConfiguration config, ILogger<TrackerBackgroundService> logger)
@@ -46,7 +47,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
 
             var flipCons = Coflnet.Kafka.KafkaConsumer.ConsumeBatch<LowPricedAuction>(config["KAFKA_HOST"], config["TOPICS:LOW_PRICED"], async lps =>
             {
-                if(lps.Count() == 0)
+                if (lps.Count() == 0)
                     return;
                 await GetService().AddFlips(lps.Select(lp => new Flip()
                 {
@@ -57,11 +58,20 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 consumeCounter.Inc(lps.Count());
             }, stoppingToken, "fliptracker", 50);
 
-            var flipEventCons = Coflnet.Kafka.KafkaConsumer.Consume<FlipEvent>(config["KAFKA_HOST"], config["TOPICS:FLIP_EVENT"], async flipEvent =>
+            var flipEventCons = Coflnet.Kafka.KafkaConsumer.ConsumeBatch<FlipEvent>(config["KAFKA_HOST"], config["TOPICS:FLIP_EVENT"], async flipEvents =>
             {
-                TrackerService service = GetService();
-                await service.AddEvent(flipEvent);
-            }, stoppingToken, "fliptracker");
+                for (int i = 0; i < 3; i++)
+                    try
+                    {
+                        await Task.WhenAll(flipEvents.Select(async flipEvent => await GetService().AddEvent(flipEvent)));
+                        consumeEvent.Inc();
+                        return;
+                    }
+                    catch (Exception e)
+                    {
+                        logger.LogError(e, "could not save event once");
+                    }
+            }, stoppingToken, "fliptracker", 10);
 
 
             await Task.WhenAny(flipCons, flipEventCons);
