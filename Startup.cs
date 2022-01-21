@@ -77,8 +77,6 @@ namespace Coflnet.Sky.SkyAuctionTracker
                 c.RoutePrefix = "api";
             });
 
-            app.UseHttpsRedirection();
-
             app.UseRouting();
 
             app.UseAuthorization();

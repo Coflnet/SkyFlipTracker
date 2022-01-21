@@ -43,7 +43,6 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
         [Route("flip/{AuctionId}")]
         public async Task<Flip> TrackFlip([FromBody] Flip flip, string AuctionId)
         {
-            logger.LogInformation("received flip");
             flip.AuctionId = GetId(AuctionId);
             await service.AddFlip(flip);
             return flip;

@@ -54,7 +54,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     FinderType = lp.Finder,
                     TargetPrice = lp.TargetPrice
                 }));
-                consumeCounter.Inc();
+                consumeCounter.Inc(lps.Count());
             }, stoppingToken, "fliptracker", 50);
 
             var flipEventCons = Coflnet.Kafka.KafkaConsumer.Consume<FlipEvent>(config["KAFKA_HOST"], config["TOPICS:FLIP_EVENT"], async flipEvent =>
