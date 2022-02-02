@@ -37,7 +37,6 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             // make sure all migrations are applied
             await context.Database.MigrateAsync();
 
-
             var consConfig = new ConsumerConfig()
             {
                 BootstrapServers = config["KAFKA_HOST"],
@@ -64,7 +63,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     try
                     {
                         await Task.WhenAll(flipEvents.Select(async flipEvent => await GetService().AddEvent(flipEvent)));
-                        consumeEvent.Inc();
+                        consumeEvent.Inc(flipEvents.Count());
                         return;
                     }
                     catch (Exception e)
