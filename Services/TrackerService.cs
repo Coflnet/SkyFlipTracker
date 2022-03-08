@@ -21,7 +21,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
 
         public async Task<Flip> AddFlip(Flip flip)
         {
-            if (flip.Timestamp == default)
+            if (flip.Timestamp < new DateTime(2020,1,1))
             {
                 flip.Timestamp = DateTime.Now;
             }
