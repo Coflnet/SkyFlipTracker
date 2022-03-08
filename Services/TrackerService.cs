@@ -21,7 +21,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
 
         public async Task<Flip> AddFlip(Flip flip)
         {
-            if (flip.Timestamp < new DateTime(2020,1,1))
+            if (flip.Timestamp < new DateTime(2020, 1, 1))
             {
                 flip.Timestamp = DateTime.Now;
             }
@@ -30,7 +30,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             {
                 return flip;
             }
-            if(flip.FinderType == LowPricedAuction.FinderType.TFM)
+            if (flip.FinderType == LowPricedAuction.FinderType.TFM)
             {
                 logger.LogInformation($"TFM flip: {flip.AuctionId} {flip.Timestamp.Second}.{flip.Timestamp.Millisecond} \t{DateTime.Now}.{DateTime.Now.Millisecond}");
             }
@@ -41,6 +41,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
 
         public async Task AddFlips(IEnumerable<Flip> flipsToSave)
         {
+            DateTime minTime = new DateTime(2020, 0, 0);
             for (int i = 0; i < 10; i++)
             {
                 try
@@ -49,7 +50,12 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     var lookup = flips.Select(f => f.AuctionId).ToHashSet();
                     await db.Database.BeginTransactionAsync();
                     var existing = await db.Flips.Where(f => lookup.Contains(f.AuctionId)).ToListAsync();
-                    var newFlips = flips.Where(f => !existing.Where(ex => f.AuctionId ==  f.AuctionId && ex.FinderType  == f.FinderType ).Any()).ToList();
+                    var newFlips = flips.Where(f => !existing.Where(ex => f.AuctionId == f.AuctionId && ex.FinderType == f.FinderType).Any()).ToList();
+                    foreach (var item in newFlips)
+                    {
+                        if (item.Timestamp < minTime)
+                            item.Timestamp = DateTime.UtcNow;
+                    }
                     db.Flips.AddRange(newFlips);
                     var count = await db.SaveChangesAsync();
                     await db.Database.CommitTransactionAsync();
