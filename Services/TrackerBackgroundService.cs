@@ -42,22 +42,30 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 BootstrapServers = config["KAFKA_HOST"],
                 GroupId = "flip-tracker"
             };
+            Task flipCons = NewMethod(stoppingToken);
+            Task flipEventCons = NewMethod1(stoppingToken);
 
+            await Task.WhenAny(Run(flipCons, "consuming flips"), Run(flipEventCons, "flip events cons"));
+            logger.LogError("consuming stopped :O");
+             throw new Exception("at least one consuming process stopped");
+        }
 
-            var flipCons = Coflnet.Kafka.KafkaConsumer.ConsumeBatch<LowPricedAuction>(config["KAFKA_HOST"], config["TOPICS:LOW_PRICED"], async lps =>
+        private async Task Run(Task task, string message)
+        {
+            try
             {
-                if (lps.Count() == 0)
-                    return;
-                await GetService().AddFlips(lps.Select(lp => new Flip()
-                {
-                    AuctionId = lp.UId,
-                    FinderType = lp.Finder,
-                    TargetPrice = lp.TargetPrice
-                }));
-                consumeCounter.Inc(lps.Count());
-            }, stoppingToken, "fliptracker", 50);
+                await task;
+            }
+            catch (System.Exception e)
+            {
+                logger.LogError(e, message);
+                throw;
+            }
+        }
 
-            var flipEventCons = Coflnet.Kafka.KafkaConsumer.ConsumeBatch<FlipEvent>(config["KAFKA_HOST"], config["TOPICS:FLIP_EVENT"], async flipEvents =>
+        private async Task NewMethod1(CancellationToken stoppingToken)
+        {
+            await Coflnet.Kafka.KafkaConsumer.ConsumeBatch<FlipEvent>(config["KAFKA_HOST"], config["TOPICS:FLIP_EVENT"], async flipEvents =>
             {
                 for (int i = 0; i < 3; i++)
                     try
@@ -71,11 +79,22 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                         logger.LogError(e, "could not save event once");
                     }
             }, stoppingToken, "fliptracker", 10);
+        }
 
-
-            await Task.WhenAny(flipCons, flipEventCons);
-            logger.LogError("consuming stopped :O");
-            throw new Exception("at least one consuming process stopped");
+        private async Task NewMethod(CancellationToken stoppingToken)
+        {
+            await Coflnet.Kafka.KafkaConsumer.ConsumeBatch<LowPricedAuction>(config["KAFKA_HOST"], config["TOPICS:LOW_PRICED"], async lps =>
+            {
+                if (lps.Count() == 0)
+                    return;
+                await GetService().AddFlips(lps.Select(lp => new Flip()
+                {
+                    AuctionId = lp.UId,
+                    FinderType = lp.Finder,
+                    TargetPrice = lp.TargetPrice
+                }));
+                consumeCounter.Inc(lps.Count());
+            }, stoppingToken, "fliptracker", 50);
         }
 
         private TrackerService GetService()

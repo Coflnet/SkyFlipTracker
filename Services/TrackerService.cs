@@ -41,7 +41,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
 
         public async Task AddFlips(IEnumerable<Flip> flipsToSave)
         {
-            DateTime minTime = new DateTime(2020, 0, 0);
+            DateTime minTime = new DateTime(2020, 1, 1);
             for (int i = 0; i < 10; i++)
             {
                 try
