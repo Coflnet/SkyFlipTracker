@@ -36,7 +36,6 @@ namespace SkyFlipTracker.Migrations
 
                     b.Property<DateTime>("Timestamp")
                         .IsConcurrencyToken()
-                        .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("datetime(6)");
 
                     b.HasKey("Id");
