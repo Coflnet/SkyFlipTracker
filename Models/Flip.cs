@@ -17,7 +17,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Models
         public int TargetPrice { get; set; }
         [DataMember(Name = "finderType")]
         public LowPricedAuction.FinderType FinderType { get; set; }
-        [System.ComponentModel.DataAnnotations.Timestamp]
+        //[System.ComponentModel.DataAnnotations.Timestamp]
         [DataMember(Name = "timestamp")]
         public DateTime Timestamp { get; set; }
     }
