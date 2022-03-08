@@ -30,6 +30,10 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             {
                 return flip;
             }
+            if(flip.FinderType == LowPricedAuction.FinderType.TFM)
+            {
+                logger.LogInformation($"TFM flip: {flip.AuctionId} {flip.Timestamp.Second}.{flip.Timestamp.Millisecond} \t{DateTime.Now}");
+            }
             db.Flips.Add(flip);
             await db.SaveChangesAsync();
             return flip;
