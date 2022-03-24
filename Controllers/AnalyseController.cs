@@ -82,7 +82,10 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             var minTime = DateTime.Now.Subtract(TimeSpan.FromMinutes(80));
             var numeric = long.Parse(playerId);
             Console.WriteLine("checking flip timing for " + numeric);
-            var relevantFlips = await db.FlipEvents.Where(flipEvent => flipEvent.Type == FlipEventType.PURCHASE_START && flipEvent.PlayerId == numeric && flipEvent.Timestamp > minTime)
+            var relevantFlips = await db.FlipEvents.Where(flipEvent => 
+                        flipEvent.Type == FlipEventType.PURCHASE_CONFIRM 
+                        && flipEvent.PlayerId == numeric 
+                        && flipEvent.Timestamp > minTime)
                 .ToListAsync();
             if (relevantFlips.Count == 0)
                 return new SpeedCompResult();
@@ -96,8 +99,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             var avg = relevantFlips.Average(f =>
             {
                 var refClicks = clicks[f.AuctionId];
-                var time = new DateTime((long)refClicks.Average(c => c.Ticks));
-                return (time - f.Timestamp).TotalSeconds;
+                var time = new DateTime((long)refClicks.Where(c=> c < f.Timestamp + TimeSpan.FromSeconds(10)).Average(c => c.Ticks));
+                return (f.Timestamp - time).TotalSeconds;
             });
 
             return new SpeedCompResult()
