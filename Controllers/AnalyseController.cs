@@ -79,7 +79,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
         [Route("player/{playerId}/speed")]
         public async Task<SpeedCompResult> CheckPlayerSpeedAdvantage(string playerId)
         {
-            var minTime = DateTime.Now.Subtract(TimeSpan.FromMinutes(30));
+            var minTime = DateTime.Now.Subtract(TimeSpan.FromMinutes(80));
             var numeric = long.Parse(playerId);
             Console.WriteLine("checking flip timing for " + numeric);
             var relevantFlips = await db.FlipEvents.Where(flipEvent => flipEvent.Type == FlipEventType.PURCHASE_START && flipEvent.PlayerId == numeric && flipEvent.Timestamp > minTime)
