@@ -26,10 +26,10 @@ namespace Coflnet.Sky.SkyAuctionTracker.Models
     {
         FLIP_RECEIVE = 1,
         FLIP_CLICK = 2,
-        PURCHASE_START = 4,
-        PURCHASE_CONFIRM = 8,
-        AUCTION_SOLD = 16,
-        UPVOTE = 32,
-        DOWNVOTE = 64
+        PURCHASE_START = 3,
+        PURCHASE_CONFIRM = 4,
+        AUCTION_SOLD = 5,
+        UPVOTE = 6,
+        DOWNVOTE = 7
     }
 }
