@@ -66,9 +66,50 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
         [Route("/users/active/count")]
         public async Task<int> GetNumberOfActiveFlipperUsers()
         {
-            var minTime =  DateTime.Now.Subtract(TimeSpan.FromMinutes(3));
-            return await db.FlipEvents.Where(flipEvent => flipEvent.Id > db.FlipEvents.Max(f=>f.Id) - 5000 && flipEvent.Type == FlipEventType.FLIP_CLICK && flipEvent.Timestamp > minTime)
+            var minTime = DateTime.Now.Subtract(TimeSpan.FromMinutes(3));
+            return await db.FlipEvents.Where(flipEvent => flipEvent.Id > db.FlipEvents.Max(f => f.Id) - 5000 && flipEvent.Type == FlipEventType.FLIP_CLICK && flipEvent.Timestamp > minTime)
                 .GroupBy(flipEvent => flipEvent.PlayerId).CountAsync();
+        }
+
+        /// <summary>
+        /// Returns the speed advantage of a player
+        /// </summary>
+        /// <returns></returns>
+        [HttpGet]
+        [Route("player/{id}/speed")]
+        public async Task<SpeedCompResult> CheckPlayerSpeedAdvantage(long playerId)
+        {
+            var minTime = DateTime.Now.Subtract(TimeSpan.FromMinutes(30));
+            var relevantFlips = await db.FlipEvents.Where(flipEvent => flipEvent.Id > db.FlipEvents.Max(f => f.Id) - 5000 && flipEvent.Type == FlipEventType.PURCHASE_CONFIRM && flipEvent.Timestamp > minTime)
+                .ToListAsync();
+
+            var ids = relevantFlips.Select(f => f.AuctionId).ToHashSet();
+
+            var clicks = await db.FlipEvents.Where(f => ids.Contains(f.AuctionId) && f.Type == FlipEventType.FLIP_CLICK).GroupBy(f => f.AuctionId)
+                        .ToDictionaryAsync(f => f.Key, f => f.Select(f => f.Timestamp).ToList());
+
+            var avg = relevantFlips.Average(f =>
+            {
+                var refClicks = clicks[f.AuctionId];
+                var time = new DateTime((long)refClicks.Average(c=>c.Ticks));
+                return (time - f.Timestamp).TotalSeconds;
+            });
+
+            return new SpeedCompResult()
+            {
+                Clicks = clicks,
+                Buys = relevantFlips.ToDictionary(f=>f.AuctionId,f=>f.Timestamp),
+                AvgAdvantageSeconds = avg,
+                AvgAdvantage = TimeSpan.FromSeconds(avg)
+            };
+        }
+
+        public class SpeedCompResult
+        {
+            public Dictionary<long, List<DateTime>> Clicks;
+            public Dictionary<long, DateTime> Buys;
+            public TimeSpan AvgAdvantage;
+            public double AvgAdvantageSeconds;
         }
     }
 }
