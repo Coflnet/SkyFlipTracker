@@ -76,7 +76,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
         /// </summary>
         /// <returns></returns>
         [HttpGet]
-        [Route("player/{id}/speed")]
+        [Route("player/{playerId}/speed")]
         public async Task<SpeedCompResult> CheckPlayerSpeedAdvantage(long playerId)
         {
             var minTime = DateTime.Now.Subtract(TimeSpan.FromMinutes(30));
