@@ -77,15 +77,18 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
         /// <returns></returns>
         [HttpGet]
         [Route("player/{playerId}/speed")]
-        public async Task<SpeedCompResult> CheckPlayerSpeedAdvantage(long playerId)
+        public async Task<SpeedCompResult> CheckPlayerSpeedAdvantage(string playerId)
         {
             var minTime = DateTime.Now.Subtract(TimeSpan.FromMinutes(30));
-            var relevantFlips = await db.FlipEvents.Where(flipEvent => flipEvent.Type == FlipEventType.PURCHASE_START && flipEvent.PlayerId == playerId && flipEvent.Timestamp > minTime)
+            var numeric = long.Parse(playerId);
+            Console.WriteLine("checking flip timing for " + numeric);
+            var relevantFlips = await db.FlipEvents.Where(flipEvent => flipEvent.Type == FlipEventType.PURCHASE_START && flipEvent.PlayerId == numeric && flipEvent.Timestamp > minTime)
                 .ToListAsync();
             if(relevantFlips.Count == 0)
                 return new SpeedCompResult();
 
             var ids = relevantFlips.Select(f => f.AuctionId).ToHashSet();
+            Console.WriteLine("gettings clicks " + ids.Count());
 
             var clicksList = await db.FlipEvents.Where(f => ids.Contains(f.AuctionId) && f.Type == FlipEventType.FLIP_CLICK).ToListAsync();
             var clicks = clicksList.GroupBy(f => f.AuctionId)    .ToDictionary(f => f.Key, f => f.Select(f => f.Timestamp).ToList());
