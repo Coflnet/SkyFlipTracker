@@ -84,26 +84,26 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             Console.WriteLine("checking flip timing for " + numeric);
             var relevantFlips = await db.FlipEvents.Where(flipEvent => flipEvent.Type == FlipEventType.PURCHASE_START && flipEvent.PlayerId == numeric && flipEvent.Timestamp > minTime)
                 .ToListAsync();
-            if(relevantFlips.Count == 0)
+            if (relevantFlips.Count == 0)
                 return new SpeedCompResult();
 
             var ids = relevantFlips.Select(f => f.AuctionId).ToHashSet();
             Console.WriteLine("gettings clicks " + ids.Count());
 
             var clicksList = await db.FlipEvents.Where(f => ids.Contains(f.AuctionId) && f.Type == FlipEventType.FLIP_CLICK).ToListAsync();
-            var clicks = clicksList.GroupBy(f => f.AuctionId)    .ToDictionary(f => f.Key, f => f.Select(f => f.Timestamp).ToList());
+            var clicks = clicksList.GroupBy(f => f.AuctionId).ToDictionary(f => f.Key, f => f.Select(f => f.Timestamp).ToList());
 
             var avg = relevantFlips.Average(f =>
             {
                 var refClicks = clicks[f.AuctionId];
-                var time = new DateTime((long)refClicks.Average(c=>c.Ticks));
+                var time = new DateTime((long)refClicks.Average(c => c.Ticks));
                 return (time - f.Timestamp).TotalSeconds;
             });
 
             return new SpeedCompResult()
             {
                 Clicks = clicks,
-                Buys = relevantFlips.ToDictionary(f=>f.AuctionId,f=>f.Timestamp),
+                Buys = relevantFlips.ToDictionary(f => f.AuctionId, f => f.Timestamp),
                 AvgAdvantageSeconds = avg,
                 AvgAdvantage = TimeSpan.FromSeconds(avg)
             };
@@ -111,10 +111,10 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
 
         public class SpeedCompResult
         {
-            public Dictionary<long, List<DateTime>> Clicks;
-            public Dictionary<long, DateTime> Buys;
-            public TimeSpan AvgAdvantage;
-            public double AvgAdvantageSeconds;
+            public Dictionary<long, List<DateTime>> Clicks { get; set; }
+            public Dictionary<long, DateTime> Buys { get; set; }
+            public TimeSpan AvgAdvantage { get; set; }
+            public double AvgAdvantageSeconds { get; set; }
         }
     }
 }
