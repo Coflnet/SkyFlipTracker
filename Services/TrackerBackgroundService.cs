@@ -10,6 +10,7 @@ using System;
 using Microsoft.Extensions.Logging;
 using Coflnet.Sky.SkyAuctionTracker.Controllers;
 using System.Linq;
+using Coflnet.Sky.Core;
 
 namespace Coflnet.Sky.SkyAuctionTracker.Services
 {

@@ -17,7 +17,6 @@ namespace Coflnet.Sky.SkyAuctionTracker.Models
         public long AuctionId { get; set; }
         [DataMember(Name = "type")]
         public FlipEventType Type { get; set; }
-        [System.ComponentModel.DataAnnotations.Timestamp]
         [DataMember(Name = "timestamp")]
         public DateTime Timestamp { get; set; }
     }

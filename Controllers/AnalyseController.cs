@@ -6,6 +6,7 @@ using System;
 using System.Linq;
 using Microsoft.EntityFrameworkCore;
 using System.Collections.Generic;
+using Coflnet.Sky.Core;
 
 namespace Coflnet.Sky.SkyAuctionTracker.Controllers
 {

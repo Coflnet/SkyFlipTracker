@@ -3,6 +3,7 @@ using System;
 using Coflnet.Sky.SkyAuctionTracker.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,10 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace SkyFlipTracker.Migrations
 {
     [DbContext(typeof(TrackerDbContext))]
-    partial class TrackerDbContextModelSnapshot : ModelSnapshot
+    [Migration("20220327092410_removeTimestamps")]
+    partial class removeTimestamps
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -26,7 +28,6 @@ namespace SkyFlipTracker.Migrations
                         .HasColumnType("int");
 
                     b.Property<long>("AuctionId")
-                        .IsConcurrencyToken()
                         .HasColumnType("bigint");
 
                     b.Property<int>("FinderType")
@@ -54,7 +55,6 @@ namespace SkyFlipTracker.Migrations
                         .HasColumnType("int");
 
                     b.Property<long>("AuctionId")
-                        .IsConcurrencyToken()
                         .HasColumnType("bigint");
 
                     b.Property<long>("PlayerId")

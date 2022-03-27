@@ -4,7 +4,7 @@ using System.Reflection;
 using System.Text.Json.Serialization;
 using Coflnet.Sky.SkyAuctionTracker.Models;
 using Coflnet.Sky.SkyAuctionTracker.Services;
-using hypixel;
+using Coflnet.Sky.Core;
 using Jaeger.Samplers;
 using Jaeger.Senders;
 using Jaeger.Senders.Thrift;

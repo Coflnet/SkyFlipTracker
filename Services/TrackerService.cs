@@ -5,6 +5,7 @@ using System.Linq;
 using Microsoft.EntityFrameworkCore;
 using System.Collections.Generic;
 using Microsoft.Extensions.Logging;
+using Coflnet.Sky.Core;
 
 namespace Coflnet.Sky.SkyAuctionTracker.Services
 {
