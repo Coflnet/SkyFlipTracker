@@ -73,19 +73,36 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
 
         public async Task<FlipEvent> AddEvent(FlipEvent flipEvent)
         {
-            if (flipEvent.Timestamp == default)
+            return (await AddEvents(new FlipEvent[]{flipEvent})).First();
+        }
+
+        public async Task<List<FlipEvent>> AddEvents(IEnumerable<FlipEvent> flipEvents)
+        {
+            foreach (var flipEvent in flipEvents)
             {
-                flipEvent.Timestamp = DateTime.Now;
+                if (flipEvent.Timestamp == default)
+                {
+                    flipEvent.Timestamp = DateTime.UtcNow;
+                }
             }
-            var flipEventAlreadyExists = await db.FlipEvents.Where(f => f.AuctionId == flipEvent.AuctionId && f.Type == flipEvent.Type && f.PlayerId == flipEvent.PlayerId)
-                    .AnyAsync();
-            if (flipEventAlreadyExists)
+            var affectedAuctions = flipEvents.Select(f => f.AuctionId).ToHashSet();
+            var affectedPlayers = flipEvents.Select(f => f.PlayerId).ToHashSet();
+            var existing = await db.FlipEvents.Where(f => affectedAuctions.Contains(f.AuctionId) && affectedPlayers.Contains(f.PlayerId))
+                    .ToListAsync();
+            var result = new List<FlipEvent>();
+            foreach (var flipEvent in flipEvents)
             {
-                return flipEvent;
+                var eventAlreadyExists = existing.Where(f => f.AuctionId == flipEvent.AuctionId && f.Type == flipEvent.Type && f.PlayerId == flipEvent.PlayerId).FirstOrDefault();
+                if (eventAlreadyExists != null)
+                {
+                    result.Add(eventAlreadyExists);
+                    continue;
+                }
+                db.FlipEvents.Add(flipEvent);
+
             }
-            db.FlipEvents.Add(flipEvent);
             await db.SaveChangesAsync();
-            return flipEvent;
+            return result;
         }
     }
 }

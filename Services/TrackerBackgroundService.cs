@@ -71,7 +71,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 for (int i = 0; i < 3; i++)
                     try
                     {
-                        await Task.WhenAll(flipEvents.Select(async flipEvent => await GetService().AddEvent(flipEvent)));
+                        await GetService().AddEvents(flipEvents);
                         consumeEvent.Inc(flipEvents.Count());
                         return;
                     }
@@ -79,7 +79,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     {
                         logger.LogError(e, "could not save event once");
                     }
-            }, stoppingToken, "fliptracker", 10);
+            }, stoppingToken, "fliptracker", 15);
         }
 
         private async Task NewMethod(CancellationToken stoppingToken)
