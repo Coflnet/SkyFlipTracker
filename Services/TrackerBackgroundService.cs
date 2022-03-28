@@ -100,7 +100,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     {
                         logger.LogError(e, "could not save event once");
                     }
-            }, stoppingToken, "fliptracker", 80);
+            }, stoppingToken, "fliptracker", 180);
         }
 
         private async Task NewMethod(CancellationToken stoppingToken)
