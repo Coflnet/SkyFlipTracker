@@ -45,8 +45,12 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             };
             Task flipCons = NewMethod(stoppingToken);
             Task flipEventCons = NewMethod1(stoppingToken);
+            var sellCons = SoldAuction(stoppingToken);
 
-            await Task.WhenAny(Run(flipCons, "consuming flips"), Run(flipEventCons, "flip events cons"));
+            await Task.WhenAny(
+                Run(flipCons, "consuming flips"), 
+                Run(flipEventCons, "flip events cons"),
+                Run(sellCons, "sells con"));
             logger.LogError("consuming stopped :O");
              throw new Exception("at least one consuming process stopped");
         }
@@ -80,6 +84,23 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                         logger.LogError(e, "could not save event once");
                     }
             }, stoppingToken, "fliptracker", 15);
+        }
+        private async Task SoldAuction(CancellationToken stoppingToken)
+        {
+            await Coflnet.Kafka.KafkaConsumer.ConsumeBatch<SaveAuction>(config["KAFKA_HOST"], config["TOPICS:SOLD_AUCTION"], async flipEvents =>
+            {
+                for (int i = 0; i < 3; i++)
+                    try
+                    {
+                        await GetService().AddSells(flipEvents);
+                        consumeEvent.Inc(flipEvents.Count());
+                        return;
+                    }
+                    catch (Exception e)
+                    {
+                        logger.LogError(e, "could not save event once");
+                    }
+            }, stoppingToken, "fliptracker", 80);
         }
 
         private async Task NewMethod(CancellationToken stoppingToken)

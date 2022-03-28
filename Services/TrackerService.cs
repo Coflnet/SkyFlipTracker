@@ -104,5 +104,41 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             await db.SaveChangesAsync();
             return result;
         }
+
+        internal async Task AddSells(IEnumerable<SaveAuction> sells)
+        {
+            var lookup = sells.Select(s=>s.UId).ToHashSet();
+            var existing = await db.FlipEvents.Where(e=>lookup.Contains(e.AuctionId) && e.Type == FlipEventType.AUCTION_SOLD).Select(e=>e.AuctionId).ToListAsync();
+            var found = await db.Flips.Where(e=>lookup.Contains(e.AuctionId)).Select(e=>e.AuctionId).ToListAsync();
+            foreach (var item in sells)
+            {
+                if(!item.Bin || item.Bids.Count == 0)
+                    continue;
+                if(!found.Contains(item.UId))
+                    continue;
+                if(!existing.Contains(item.UId))
+                    db.FlipEvents.Add(new FlipEvent(){
+                        AuctionId = item.UId,
+                        PlayerId = GetId(item.Bids.MaxBy(b=>b.Amount).Bidder),
+                        Timestamp = item.Bids.MaxBy(b=>b.Amount).Timestamp,
+                        Type = FlipEventType.AUCTION_SOLD
+                    });
+            }
+            var count = await db.SaveChangesAsync();
+            Console.WriteLine($"Saved sells {count}");
+        }
+
+        internal long GetId(string uuid)
+        {
+            if (uuid.Length > 17)
+                uuid = uuid.Substring(0, 17);
+            var builder = new System.Text.StringBuilder(uuid);
+            builder.Remove(12, 1);
+            builder.Remove(16, uuid.Length - 17);
+            var id = Convert.ToInt64(builder.ToString(), 16);
+            if (id == 0)
+                id = 1; // allow uId == 0 to be false if not calculated
+            return id;
+        }
     }
 }
