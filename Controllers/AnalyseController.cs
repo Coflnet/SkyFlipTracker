@@ -80,7 +80,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
         [Route("player/{playerId}/speed")]
         public async Task<SpeedCompResult> CheckPlayerSpeedAdvantage(string playerId)
         {
-            var minTime = DateTime.Now.Subtract(TimeSpan.FromMinutes(80));
+            var minTime = DateTime.Now.Subtract(TimeSpan.FromMinutes(120));
             var numeric = long.Parse(playerId);
             Console.WriteLine("checking flip timing for " + numeric);
             var relevantFlips = await db.FlipEvents.Where(flipEvent => 
@@ -96,18 +96,20 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
 
             var receiveList = await db.FlipEvents.Where(f => ids.Contains(f.AuctionId) && f.PlayerId == numeric && f.Type == FlipEventType.FLIP_CLICK).ToDictionaryAsync(f=>f.AuctionId);
             
-            var avg = relevantFlips.Where(f=>receiveList.ContainsKey(f.AuctionId)).Average(f =>
+            var timeDif = relevantFlips.Where(f=>receiveList.ContainsKey(f.AuctionId)).Select(f =>
             {
                 var receive = receiveList[f.AuctionId];
                 return (receive.Timestamp - f.Timestamp).TotalSeconds;
             });
+            var avg = timeDif.Where(d=>d<8).Average();
 
             return new SpeedCompResult()
             {
                // Clicks = clicks,
                 Buys = relevantFlips.ToDictionary(f => f.AuctionId, f => f.Timestamp),
                 AvgAdvantageSeconds = avg,
-                AvgAdvantage = TimeSpan.FromSeconds(avg)
+                AvgAdvantage = TimeSpan.FromSeconds(avg),
+                Penalty = TimeSpan.FromSeconds(avg) - TimeSpan.FromSeconds(2.9)
             };
         }
 
@@ -116,6 +118,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             public Dictionary<long, List<DateTime>> Clicks { get; set; }
             public Dictionary<long, DateTime> Buys { get; set; }
             public TimeSpan AvgAdvantage { get; set; }
+            public TimeSpan Penalty { get; set; }
             public double AvgAdvantageSeconds { get; set; }
         }
     }
