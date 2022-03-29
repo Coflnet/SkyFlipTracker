@@ -7,6 +7,7 @@ using System.Linq;
 using Microsoft.EntityFrameworkCore;
 using System.Collections.Generic;
 using Coflnet.Sky.Core;
+using Coflnet.Sky.SkyAuctionTracker.Services;
 
 namespace Coflnet.Sky.SkyAuctionTracker.Controllers
 {
@@ -19,15 +20,19 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
     {
         private readonly TrackerDbContext db;
         private readonly ILogger<AnalyseController> logger;
+        private readonly TrackerService service;
 
         /// <summary>
         /// Creates a new instance of <see cref="TrackerController"/>
         /// </summary>
         /// <param name="context"></param>
-        public AnalyseController(TrackerDbContext context, ILogger<AnalyseController> logger)
+        /// <param name="logger"></param>
+        /// <param name="service"></param>
+        public AnalyseController(TrackerDbContext context, ILogger<AnalyseController> logger, TrackerService service)
         {
             db = context;
             this.logger = logger;
+            this.service = service;
         }
 
         /// <summary>
@@ -81,7 +86,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
         public async Task<SpeedCompResult> CheckPlayerSpeedAdvantage(string playerId)
         {
             var minTime = DateTime.Now.Subtract(TimeSpan.FromMinutes(120));
-            var numeric = long.Parse(playerId);
+            if(!long.TryParse(playerId, out long numeric))
+                numeric = service.GetId(playerId);
             Console.WriteLine("checking flip timing for " + numeric);
             var relevantFlips = await db.FlipEvents.Where(flipEvent => 
                         flipEvent.Type == FlipEventType.AUCTION_SOLD 
