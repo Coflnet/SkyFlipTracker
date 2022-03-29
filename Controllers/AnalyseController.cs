@@ -107,9 +107,10 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             {
                // Clicks = clicks,
                 Buys = relevantFlips.ToDictionary(f => f.AuctionId, f => f.Timestamp),
+                Timings = timeDif,
                 AvgAdvantageSeconds = avg,
                 AvgAdvantage = TimeSpan.FromSeconds(avg),
-                Penalty = TimeSpan.FromSeconds(avg) - TimeSpan.FromSeconds(2.9)
+                Penalty = TimeSpan.FromSeconds(avg) - TimeSpan.FromSeconds(2.9),
             };
         }
 
@@ -120,6 +121,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             public TimeSpan AvgAdvantage { get; set; }
             public TimeSpan Penalty { get; set; }
             public double AvgAdvantageSeconds { get; set; }
+            public IEnumerable<double> Timings { get; set; }
         }
     }
 }
