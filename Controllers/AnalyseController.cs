@@ -84,7 +84,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             var numeric = long.Parse(playerId);
             Console.WriteLine("checking flip timing for " + numeric);
             var relevantFlips = await db.FlipEvents.Where(flipEvent => 
-                        flipEvent.Type == FlipEventType.PURCHASE_CONFIRM 
+                        flipEvent.Type == FlipEventType.AUCTION_SOLD 
                         && flipEvent.PlayerId == numeric 
                         && flipEvent.Timestamp > minTime)
                 .ToListAsync();
@@ -94,19 +94,17 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             var ids = relevantFlips.Select(f => f.AuctionId).ToHashSet();
             Console.WriteLine("gettings clicks " + ids.Count());
 
-            var clicksList = await db.FlipEvents.Where(f => ids.Contains(f.AuctionId) && f.Type == FlipEventType.FLIP_CLICK).ToListAsync();
-            var clicks = clicksList.GroupBy(f => f.AuctionId).ToDictionary(f => f.Key, f => f.Select(f => f.Timestamp).ToList());
-
-            var avg = relevantFlips.Average(f =>
+            var receiveList = await db.FlipEvents.Where(f => ids.Contains(f.AuctionId) && f.PlayerId == numeric && f.Type == FlipEventType.FLIP_CLICK).ToDictionaryAsync(f=>f.AuctionId);
+            
+            var avg = relevantFlips.Where(f=>receiveList.ContainsKey(f.AuctionId)).Average(f =>
             {
-                var refClicks = clicks[f.AuctionId];
-                var time = new DateTime((long)refClicks.Where(c=> c < f.Timestamp + TimeSpan.FromSeconds(10)).Average(c => c.Ticks));
-                return (f.Timestamp - time).TotalSeconds;
+                var receive = receiveList[f.AuctionId];
+                return (receive.Timestamp - f.Timestamp).TotalSeconds;
             });
 
             return new SpeedCompResult()
             {
-                Clicks = clicks,
+               // Clicks = clicks,
                 Buys = relevantFlips.ToDictionary(f => f.AuctionId, f => f.Timestamp),
                 AvgAdvantageSeconds = avg,
                 AvgAdvantage = TimeSpan.FromSeconds(avg)
