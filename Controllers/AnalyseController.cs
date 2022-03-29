@@ -85,7 +85,6 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
         [Route("/player/{playerId}/speed")]
         public async Task<SpeedCompResult> CheckPlayerSpeedAdvantage(string playerId)
         {
-            Console.WriteLine("retrieving " + playerId);
             var minTime = DateTime.Now.Subtract(TimeSpan.FromMinutes(120));
             if(!long.TryParse(playerId, out long numeric))
                 numeric = service.GetId(playerId);
@@ -113,10 +112,10 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             return new SpeedCompResult()
             {
                // Clicks = clicks,
-                Buys = relevantFlips.ToDictionary(f => f.AuctionId, f => f.Timestamp),
+                Buys = relevantFlips.GroupBy(f=>f.AuctionId).Select(f=>f.First()).ToDictionary(f => f.AuctionId, f => f.Timestamp),
                 Timings = timeDif,
                 AvgAdvantageSeconds = avg,
-                Penalty = avg - 2.9,
+                Penalty = avg - 2.8,
             };
         }
 
