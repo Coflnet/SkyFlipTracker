@@ -82,9 +82,10 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
         /// </summary>
         /// <returns></returns>
         [HttpGet]
-        [Route("player/{playerId}/speed")]
+        [Route("/player/{playerId}/speed")]
         public async Task<SpeedCompResult> CheckPlayerSpeedAdvantage(string playerId)
         {
+            Console.WriteLine("retrieving " + playerId);
             var minTime = DateTime.Now.Subtract(TimeSpan.FromMinutes(120));
             if(!long.TryParse(playerId, out long numeric))
                 numeric = service.GetId(playerId);
@@ -95,7 +96,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
                         && flipEvent.Timestamp > minTime)
                 .ToListAsync();
             if (relevantFlips.Count == 0)
-                return new SpeedCompResult();
+                return new SpeedCompResult(){Penalty = -1};
 
             var ids = relevantFlips.Select(f => f.AuctionId).ToHashSet();
             Console.WriteLine("gettings clicks " + ids.Count());
@@ -115,8 +116,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
                 Buys = relevantFlips.ToDictionary(f => f.AuctionId, f => f.Timestamp),
                 Timings = timeDif,
                 AvgAdvantageSeconds = avg,
-                AvgAdvantage = TimeSpan.FromSeconds(avg),
-                Penalty = TimeSpan.FromSeconds(avg) - TimeSpan.FromSeconds(2.9),
+                Penalty = avg - 2.9,
             };
         }
 
@@ -124,8 +124,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
         {
             public Dictionary<long, List<DateTime>> Clicks { get; set; }
             public Dictionary<long, DateTime> Buys { get; set; }
-            public TimeSpan AvgAdvantage { get; set; }
-            public TimeSpan Penalty { get; set; }
+            public double Penalty { get; set; }
             public double AvgAdvantageSeconds { get; set; }
             public IEnumerable<double> Timings { get; set; }
         }
