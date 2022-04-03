@@ -86,37 +86,44 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
         public async Task<SpeedCompResult> CheckPlayerSpeedAdvantage(string playerId)
         {
             var minTime = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(120));
-            if(!long.TryParse(playerId, out long numeric))
+            if (!long.TryParse(playerId, out long numeric))
                 numeric = service.GetId(playerId);
             Console.WriteLine("checking flip timing for " + numeric);
-            var relevantFlips = await db.FlipEvents.Where(flipEvent => 
-                        flipEvent.Type == FlipEventType.AUCTION_SOLD 
-                        && flipEvent.PlayerId == numeric 
+            var relevantFlips = await db.FlipEvents.Where(flipEvent =>
+                        flipEvent.Type == FlipEventType.AUCTION_SOLD
+                        && flipEvent.PlayerId == numeric
                         && flipEvent.Timestamp > minTime)
                 .ToListAsync();
             if (relevantFlips.Count == 0)
-                return new SpeedCompResult(){Penalty = -1};
+                return new SpeedCompResult() { Penalty = -1 };
 
             var ids = relevantFlips.Select(f => f.AuctionId).ToHashSet();
             Console.WriteLine("gettings clicks " + ids.Count());
 
             var receiveList = await db.FlipEvents.Where(f => ids.Contains(f.AuctionId) && f.PlayerId == numeric && f.Type == FlipEventType.FLIP_CLICK)
-                                .GroupBy(f=>f.AuctionId).Select(f=>f.First()).ToDictionaryAsync(f=>f.AuctionId);
-            
-            var timeDif = relevantFlips.Where(f=>receiveList.ContainsKey(f.AuctionId)).Select(f =>
+                                .GroupBy(f => f.AuctionId).Select(f => f.First()).ToDictionaryAsync(f => f.AuctionId);
+
+            var timeDif = relevantFlips.Where(f => receiveList.ContainsKey(f.AuctionId)).Select(f =>
+              {
+                  var receive = receiveList[f.AuctionId];
+                  return (receive.Timestamp - f.Timestamp).TotalSeconds;
+              });
+            double avg = 0;
+            var penaltiy = avg - 2.8;
+            if (timeDif.Count() != 0)
             {
-                var receive = receiveList[f.AuctionId];
-                return (receive.Timestamp - f.Timestamp).TotalSeconds;
-            });
-            var avg = timeDif.Count() == 0 ? 0 : timeDif.Where(d=>d<8).Average();
+
+                avg = timeDif.Where(d => d < 8).Average();
+                penaltiy = avg - 2.8 + timeDif.Where(d => d > 3.2).Count() * 0.2;
+            }
 
             return new SpeedCompResult()
             {
-               // Clicks = clicks,
-                Buys = relevantFlips.GroupBy(f=>f.AuctionId).Select(f=>f.First()).ToDictionary(f => f.AuctionId, f => f.Timestamp),
+                // Clicks = clicks,
+                Buys = relevantFlips.GroupBy(f => f.AuctionId).Select(f => f.First()).ToDictionary(f => f.AuctionId, f => f.Timestamp),
                 Timings = timeDif,
                 AvgAdvantageSeconds = avg,
-                Penalty = avg - 2.8,
+                Penalty = penaltiy,
             };
         }
 
