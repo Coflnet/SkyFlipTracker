@@ -100,8 +100,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             var ids = relevantFlips.Select(f => f.AuctionId).ToHashSet();
             Console.WriteLine("gettings clicks " + ids.Count());
 
-            var receiveList = await db.FlipEvents.Where(f => ids.Contains(f.AuctionId) && f.PlayerId == numeric && f.Type == FlipEventType.FLIP_CLICK)
-                                .GroupBy(f => f.AuctionId).Select(f => f.First()).ToDictionaryAsync(f => f.AuctionId);
+            var receiveList = await db.FlipEvents.Where(f => ids.Contains(f.AuctionId) && f.PlayerId == numeric && (f.Type == FlipEventType.FLIP_CLICK || f.Type == FlipEventType.PURCHASE_START))
+                                .GroupBy(f => f.AuctionId).Select(f => f.OrderBy(f=>f.Timestamp).First()).ToDictionaryAsync(f => f.AuctionId);
 
             var timeDif = relevantFlips.Where(f => receiveList.ContainsKey(f.AuctionId)).Select(f =>
               {
@@ -114,7 +114,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             {
 
                 avg = timeDif.Where(d => d < 8).Average();
-                penaltiy = avg - 2.8 + Math.Min(timeDif.Where(d => d > 3.2).Count(), 5) * 0.2;
+                penaltiy = avg - 2.9 + Math.Min(timeDif.Where(d => d > 3.23).Count(), 5) * 0.2;
             }
 
             return new SpeedCompResult()
