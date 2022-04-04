@@ -114,7 +114,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             {
 
                 avg = timeDif.Where(d => d < 8).Average();
-                penaltiy = avg - 2.8 + Math.Min(timeDif.Where(d => d > 3.23).Count(), 5) * 0.2;
+                penaltiy = avg - 2.50 + Math.Min(timeDif.Where(d => d > 2.7).Count(), 5) * 0.15;
             }
 
             return new SpeedCompResult()
