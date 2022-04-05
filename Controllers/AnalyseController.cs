@@ -132,7 +132,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
 
         private static double GetSpeedPenalty(TimeSpan maxAge, IEnumerable<(double TotalSeconds, TimeSpan age)> tooFast)
         {
-            return tooFast.Sum(f => (1f - f.age / (maxAge / 2)) * 0.12);
+            return tooFast.Sum(f => (1f - (maxAge - f.age) / (maxAge / 3)) * 0.12);
         }
 
         public class SpeedCompResult
