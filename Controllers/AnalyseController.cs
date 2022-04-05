@@ -85,7 +85,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
         [Route("/player/{playerId}/speed")]
         public async Task<SpeedCompResult> CheckPlayerSpeedAdvantage(string playerId)
         {
-            var minTime = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(80));
+            var maxAge = TimeSpan.FromMinutes(80);
+            var minTime = DateTime.UtcNow.Subtract(maxAge);
             if (!long.TryParse(playerId, out long numeric))
                 numeric = service.GetId(playerId);
             Console.WriteLine("checking flip timing for " + numeric);
@@ -106,25 +107,32 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             var timeDif = relevantFlips.Where(f => receiveList.ContainsKey(f.AuctionId)).Select(f =>
               {
                   var receive = receiveList[f.AuctionId];
-                  return (receive.Timestamp - f.Timestamp).TotalSeconds;
+                  return ((receive.Timestamp - f.Timestamp).TotalSeconds, age : receive.Timestamp - minTime);
               });
             double avg = 0;
             var penaltiy = avg - 2.8;
             if (timeDif.Count() != 0)
             {
 
-                avg = timeDif.Where(d => d < 8).Average();
-                penaltiy = avg - 2.50 + Math.Min(timeDif.Where(d => d > 2.7).Count(), 5) * 0.15;
+                avg = timeDif.Where(d => d.TotalSeconds < 8).Average(d => d.TotalSeconds);
+                var tooFast = timeDif.Where(d => d.TotalSeconds > 2.7);
+                var speedPenalty = GetSpeedPenalty(maxAge, tooFast);
+                penaltiy = avg - 2.55 + speedPenalty;
             }
 
             return new SpeedCompResult()
             {
                 // Clicks = clicks,
                 Buys = relevantFlips.GroupBy(f => f.AuctionId).Select(f => f.First()).ToDictionary(f => f.AuctionId, f => f.Timestamp),
-                Timings = timeDif,
+                Timings = timeDif.Select(d=>d.TotalSeconds),
                 AvgAdvantageSeconds = avg,
                 Penalty = penaltiy,
             };
+        }
+
+        private static double GetSpeedPenalty(TimeSpan maxAge, IEnumerable<(double TotalSeconds, TimeSpan age)> tooFast)
+        {
+            return tooFast.Sum(f => (1f - f.age / (maxAge / 2)) * 0.12);
         }
 
         public class SpeedCompResult
