@@ -102,29 +102,29 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             Console.WriteLine("gettings clicks " + ids.Count());
 
             var receiveList = await db.FlipEvents.Where(f => ids.Contains(f.AuctionId) && f.PlayerId == numeric && f.Type == FlipEventType.FLIP_RECEIVE)
-                                .GroupBy(f => f.AuctionId).Select(f => f.OrderBy(f=>f.Timestamp).First()).ToDictionaryAsync(f => f.AuctionId);
+                                .GroupBy(f => f.AuctionId).Select(f => f.OrderBy(f => f.Timestamp).First()).ToDictionaryAsync(f => f.AuctionId);
 
             var timeDif = relevantFlips.Where(f => receiveList.ContainsKey(f.AuctionId)).Select(f =>
               {
                   var receive = receiveList[f.AuctionId];
-                  return ((receive.Timestamp - f.Timestamp).TotalSeconds, age : receive.Timestamp - minTime);
+                  return ((receive.Timestamp - f.Timestamp).TotalSeconds, age: receive.Timestamp - minTime);
               });
             double avg = 0;
             var penaltiy = avg - 2.8;
             if (timeDif.Count() != 0)
             {
 
-                avg = timeDif.Where(d => d.TotalSeconds < 8).Average(d => d.TotalSeconds);
+                avg = timeDif.Where(d => d.TotalSeconds < 8).Average(d => (1f - (maxAge - d.age) / (maxAge / 3) * (d.TotalSeconds - 2.55)));
                 var tooFast = timeDif.Where(d => d.TotalSeconds > 2.7);
                 var speedPenalty = GetSpeedPenalty(maxAge, tooFast);
-                penaltiy = avg - 2.55 + speedPenalty;
+                penaltiy = avg + speedPenalty;
             }
 
             return new SpeedCompResult()
             {
                 // Clicks = clicks,
                 Buys = relevantFlips.GroupBy(f => f.AuctionId).Select(f => f.First()).ToDictionary(f => f.AuctionId, f => f.Timestamp),
-                Timings = timeDif.Select(d=>d.TotalSeconds),
+                Timings = timeDif.Select(d => d.TotalSeconds),
                 AvgAdvantageSeconds = avg,
                 Penalty = penaltiy,
             };
