@@ -83,9 +83,12 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
         /// <returns></returns>
         [HttpGet]
         [Route("/player/{playerId}/speed")]
-        public async Task<SpeedCompResult> CheckPlayerSpeedAdvantage(string playerId)
+        public async Task<SpeedCompResult> CheckPlayerSpeedAdvantage(string playerId, DateTime when = default)
         {
             var maxAge = TimeSpan.FromMinutes(5);
+            var maxTime = DateTime.UtcNow;
+            if(when != default)
+                maxTime = when;
             var minTime = DateTime.UtcNow.Subtract(maxAge);
             if (!long.TryParse(playerId, out long numeric))
                 numeric = service.GetId(playerId);
@@ -93,7 +96,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             var relevantFlips = await db.FlipEvents.Where(flipEvent =>
                         flipEvent.Type == FlipEventType.AUCTION_SOLD
                         && flipEvent.PlayerId == numeric
-                        && flipEvent.Timestamp > minTime)
+                        && flipEvent.Timestamp > minTime
+                        && flipEvent.Timestamp <= maxTime)
                 .ToListAsync();
             if (relevantFlips.Count == 0)
                 return new SpeedCompResult() { Penalty = -1 };
@@ -119,6 +123,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
                 Timings = timeDif.Select(d => d.TotalSeconds),
                 AvgAdvantageSeconds = avg,
                 Penalty = penaltiy,
+                Times = timeDif,
             };
         }
 
@@ -140,7 +145,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
 
         private static double GetSpeedPenalty(TimeSpan maxAge, IEnumerable<(double TotalSeconds, TimeSpan age)> tooFast)
         {
-            var shrink = 3;
+            var shrink = 1;
             return tooFast.Where(f=>f.age * shrink < maxAge).Select(f => (maxAge - f.age * shrink) / (maxAge) * 0.12).Where(d => d > 0).Sum();
         }
 
@@ -151,6 +156,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             public double Penalty { get; set; }
             public double AvgAdvantageSeconds { get; set; }
             public IEnumerable<double> Timings { get; set; }
+            public IEnumerable<(double TotalSeconds, TimeSpan age)> Times { get; internal set; }
         }
     }
 }
