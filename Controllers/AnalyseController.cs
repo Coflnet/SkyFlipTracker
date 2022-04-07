@@ -85,7 +85,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
         [Route("/player/{playerId}/speed")]
         public async Task<SpeedCompResult> CheckPlayerSpeedAdvantage(string playerId)
         {
-            var maxAge = TimeSpan.FromMinutes(80);
+            var maxAge = TimeSpan.FromMinutes(5);
             var minTime = DateTime.UtcNow.Subtract(maxAge);
             if (!long.TryParse(playerId, out long numeric))
                 numeric = service.GetId(playerId);
