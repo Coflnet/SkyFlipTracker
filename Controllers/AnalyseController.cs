@@ -123,7 +123,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
                 Timings = timeDif.Select(d => d.TotalSeconds),
                 AvgAdvantageSeconds = avg,
                 Penalty = penaltiy,
-                Times = timeDif,
+                Times = timeDif.Select(t=>new Timing(){age= t.age.ToString(),TotalSeconds = t.TotalSeconds}),
             };
         }
 
@@ -156,7 +156,13 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             public double Penalty { get; set; }
             public double AvgAdvantageSeconds { get; set; }
             public IEnumerable<double> Timings { get; set; }
-            public IEnumerable<(double TotalSeconds, TimeSpan age)> Times { get; internal set; }
+            public IEnumerable<Timing> Times { get; set; }
+        }
+
+        public class Timing 
+        {
+            public double TotalSeconds {get;set;}
+            public string age {get;set;}
         }
     }
 }
