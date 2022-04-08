@@ -111,7 +111,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             var timeDif = relevantFlips.Where(f => receiveList.ContainsKey(f.AuctionId)).Select(f =>
             {
                 var receive = receiveList[f.AuctionId];
-                return ((receive.Timestamp - f.Timestamp).TotalSeconds, age: receive.Timestamp - minTime);
+                return ((receive.Timestamp - f.Timestamp).TotalSeconds, age: maxTime - receive.Timestamp);
             });
             double avg = 0;
             double penaltiy = GetPenalty(maxAge, timeDif, ref avg);
