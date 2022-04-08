@@ -89,7 +89,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             var maxTime = DateTime.UtcNow;
             if(when != default)
                 maxTime = when;
-            var minTime = DateTime.UtcNow.Subtract(maxAge);
+            var minTime = maxTime.Subtract(maxAge);
             if (!long.TryParse(playerId, out long numeric))
                 numeric = service.GetId(playerId);
             Console.WriteLine("checking flip timing for " + numeric);
