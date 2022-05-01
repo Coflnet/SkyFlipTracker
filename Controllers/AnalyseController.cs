@@ -132,8 +132,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             var penaltiy = avg - 2.8;
             if (timeDif.Count() != 0)
             {
-
-                avg = timeDif.Where(d => d.TotalSeconds < 8).Average(d => (maxAge - d.age) / (maxAge) * (d.TotalSeconds - 3.05));
+                avg = timeDif.Where(d => d.TotalSeconds < 8 && d.TotalSeconds > 1).Average(d => (maxAge - d.age) / (maxAge) * (d.TotalSeconds - 3.05));
                 var tooFast = timeDif.Where(d => d.TotalSeconds > 3.3);
                 var speedPenalty = GetSpeedPenalty(maxAge, tooFast);
                 Console.WriteLine(avg + " " + speedPenalty);
@@ -146,7 +145,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
         private static double GetSpeedPenalty(TimeSpan maxAge, IEnumerable<(double TotalSeconds, TimeSpan age)> tooFast)
         {
             var shrink = 1;
-            return tooFast.Where(f=>f.age * shrink < maxAge).Select(f => (maxAge - f.age * shrink) / (maxAge) * 0.12).Where(d => d > 0).Sum();
+            return tooFast.Where(f=>f.age * shrink < maxAge).Select(f => (maxAge - f.age * shrink) / (maxAge) * 0.18).Where(d => d > 0).Sum();
         }
 
         public class SpeedCompResult
