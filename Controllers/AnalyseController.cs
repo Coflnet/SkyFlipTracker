@@ -85,14 +85,15 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
         [Route("/player/{playerId}/speed")]
         public async Task<SpeedCompResult> CheckPlayerSpeedAdvantage(string playerId, DateTime when = default, int minutes = 20)
         {
+            var longMacroMultiplier = 6;
             var maxAge = TimeSpan.FromMinutes(minutes);
             var maxTime = DateTime.UtcNow;
             if (when != default)
                 maxTime = when;
-            var minTime = maxTime.Subtract(maxAge);
+            var minTime = maxTime.Subtract(maxAge * longMacroMultiplier);
             if (!long.TryParse(playerId, out long numeric))
                 numeric = service.GetId(playerId);
-            Console.WriteLine("checking flip timing for " + numeric);
+
             var relevantFlips = await db.FlipEvents.Where(flipEvent =>
                         flipEvent.Type == FlipEventType.AUCTION_SOLD
                         && flipEvent.PlayerId == numeric
@@ -114,7 +115,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
                 return ((receive.Timestamp - f.Timestamp).TotalSeconds, age: maxTime - receive.Timestamp);
             });
             double avg = 0;
-            double penaltiy = GetPenalty(maxAge, timeDif, ref avg);
+            double penaltiy = GetPenalty(maxAge, timeDif.Where(t=>t.age < maxAge), ref avg);
+            penaltiy += GetSpeedPenalty(maxAge * longMacroMultiplier, timeDif.Where(t=>t.TotalSeconds > 3.35), 0.5);
 
             return new SpeedCompResult()
             {
@@ -144,10 +146,10 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             return penaltiy;
         }
 
-        private static double GetSpeedPenalty(TimeSpan maxAge, IEnumerable<(double TotalSeconds, TimeSpan age)> tooFast)
+        private static double GetSpeedPenalty(TimeSpan maxAge, IEnumerable<(double TotalSeconds, TimeSpan age)> tooFast, double v = 0.2)
         {
             var shrink = 1;
-            return tooFast.Where(f => f.age * shrink < maxAge).Select(f => (maxAge - f.age * shrink) / (maxAge) * 0.2).Where(d => d > 0).Sum();
+            return tooFast.Where(f => f.age * shrink < maxAge).Select(f => (maxAge - f.age * shrink) / (maxAge) * v).Where(d => d > 0).Sum();
         }
 
         public class SpeedCompResult
