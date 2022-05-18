@@ -136,7 +136,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             {
                 var relevant = timeDif.Where(d => d.TotalSeconds < 8 && d.TotalSeconds > 1);
                 if (relevant.Count() > 0)
-                    avg = relevant.Average(d => (maxAge - d.age) / (maxAge) * (d.TotalSeconds - 3.05));
+                    avg = relevant.Average(d => (maxAge - d.age) / (maxAge) * (d.TotalSeconds - 3.06));
                 var tooFast = timeDif.Where(d => d.TotalSeconds > 3.3);
                 var speedPenalty = GetSpeedPenalty(maxAge, tooFast);
                 Console.WriteLine(avg + " " + speedPenalty);
