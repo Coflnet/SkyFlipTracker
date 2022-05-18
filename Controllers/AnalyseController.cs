@@ -131,7 +131,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
 
         public static double GetPenalty(TimeSpan maxAge, IEnumerable<(double TotalSeconds, TimeSpan age)> timeDif, ref double avg)
         {
-            var penaltiy = avg - 2.8;
+            var penaltiy = 0d;
             if (timeDif.Count() != 0)
             {
                 var relevant = timeDif.Where(d => d.TotalSeconds < 8 && d.TotalSeconds > 1);
