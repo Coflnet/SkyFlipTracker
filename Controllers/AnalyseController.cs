@@ -85,7 +85,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
         [Route("/player/{playerId}/speed")]
         public async Task<SpeedCompResult> CheckPlayerSpeedAdvantage(string playerId, DateTime when = default, int minutes = 20)
         {
-            var longMacroMultiplier = 6;
+            var longMacroMultiplier = 30;
             var maxAge = TimeSpan.FromMinutes(minutes);
             var maxTime = DateTime.UtcNow;
             if (when != default)
@@ -108,15 +108,17 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
 
             var receiveList = await db.FlipEvents.Where(f => ids.Contains(f.AuctionId) && f.PlayerId == numeric && f.Type == FlipEventType.FLIP_RECEIVE)
                                 .GroupBy(f => f.AuctionId).Select(f => f.OrderBy(f => f.Timestamp).First()).ToDictionaryAsync(f => f.AuctionId);
+            var relevantTfm = await db.Flips.Where(f => ids.Contains(f.AuctionId) && f.FinderType == LowPricedAuction.FinderType.TFM)
+                                .GroupBy(f => f.AuctionId).Select(f => f.OrderBy(f => f.Timestamp).First()).ToDictionaryAsync(f => f.AuctionId);
 
-            var timeDif = relevantFlips.Where(f => receiveList.ContainsKey(f.AuctionId)).Select(f =>
+            var timeDif = relevantFlips.Where(f => receiveList.ContainsKey(f.AuctionId) && !relevantTfm.ContainsKey(f.AuctionId)).Select(f =>
             {
                 var receive = receiveList[f.AuctionId];
                 return ((receive.Timestamp - f.Timestamp).TotalSeconds, age: maxTime - receive.Timestamp);
             });
             double avg = 0;
-            double penaltiy = GetPenalty(maxAge, timeDif.Where(t=>t.age < maxAge), ref avg);
-            penaltiy += GetSpeedPenalty(maxAge * longMacroMultiplier, timeDif.Where(t=>t.TotalSeconds > 3.35), 0.5);
+            double penaltiy = GetPenalty(maxAge, timeDif.Where(t => t.age < maxAge), ref avg);
+            penaltiy += GetSpeedPenalty(maxAge * longMacroMultiplier, timeDif.Where(t => t.TotalSeconds > 3.35), 0.5);
 
             return new SpeedCompResult()
             {
@@ -166,6 +168,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
         {
             public double TotalSeconds { get; set; }
             public string age { get; set; }
+            public bool Tfm { get; set; }
         }
     }
 }
