@@ -77,26 +77,31 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
                 .GroupBy(flipEvent => flipEvent.PlayerId).CountAsync();
         }
 
+
         /// <summary>
-        /// Returns the speed advantage of a player
+        /// Returns the speed advantage of a list of players (coresponding to the same account)
         /// </summary>
-        /// <returns></returns>
-        [HttpGet]
-        [Route("/player/{playerId}/speed")]
-        public async Task<SpeedCompResult> CheckPlayerSpeedAdvantage(string playerId, DateTime when = default, int minutes = 20)
+        [HttpPost]
+        [Route("/players/speed")]
+        public async Task<SpeedCompResult> CheckMultiAccountSpeed([FromBody] SpeedCheckRequest request)
         {
             var longMacroMultiplier = 30;
-            var maxAge = TimeSpan.FromMinutes(minutes);
+            var maxAge = TimeSpan.FromMinutes(request.minutes);
             var maxTime = DateTime.UtcNow;
-            if (when != default)
-                maxTime = when;
+            if (request.when != default)
+                maxTime = request.when;
             var minTime = maxTime.Subtract(maxAge * longMacroMultiplier);
-            if (!long.TryParse(playerId, out long numeric))
-                numeric = service.GetId(playerId);
+
+            var numeric = request.PlayerIds.Select(playerId =>
+            {
+                if (!long.TryParse(playerId, out long val))
+                    val = service.GetId(playerId);
+                return val;
+            });
 
             var relevantFlips = await db.FlipEvents.Where(flipEvent =>
                         flipEvent.Type == FlipEventType.AUCTION_SOLD
-                        && flipEvent.PlayerId == numeric
+                        && numeric.Contains(flipEvent.PlayerId)
                         && flipEvent.Timestamp > minTime
                         && flipEvent.Timestamp <= maxTime)
                 .ToListAsync();
@@ -106,7 +111,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             var ids = relevantFlips.Select(f => f.AuctionId).ToHashSet();
             Console.WriteLine("gettings clicks " + ids.Count());
 
-            var receiveList = await db.FlipEvents.Where(f => ids.Contains(f.AuctionId) && f.PlayerId == numeric && f.Type == FlipEventType.FLIP_RECEIVE)
+            var receiveList = await db.FlipEvents.Where(f => ids.Contains(f.AuctionId) && numeric.Contains(f.PlayerId) && f.Type == FlipEventType.FLIP_RECEIVE)
                                 .GroupBy(f => f.AuctionId).Select(f => f.OrderBy(f => f.Timestamp).First()).ToDictionaryAsync(f => f.AuctionId);
             var relevantTfm = await db.Flips.Where(f => ids.Contains(f.AuctionId) && f.FinderType == LowPricedAuction.FinderType.TFM)
                                 .GroupBy(f => f.AuctionId).Select(f => f.OrderBy(f => f.Timestamp).First()).ToDictionaryAsync(f => f.AuctionId);
@@ -129,6 +134,22 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
                 Penalty = penaltiy,
                 Times = timeDif.Select(t => new Timing() { age = t.age.ToString(), TotalSeconds = t.TotalSeconds }),
             };
+        }
+
+        /// <summary>
+        /// Returns the speed advantage of a player
+        /// </summary>
+        /// <returns></returns>
+        [HttpGet]
+        [Route("/player/{playerId}/speed")]
+        public async Task<SpeedCompResult> CheckPlayerSpeedAdvantage(string playerId, DateTime when = default, int minutes = 20)
+        {
+            return await CheckMultiAccountSpeed(new SpeedCheckRequest()
+            {
+                minutes = minutes,
+                PlayerIds = new string[] { playerId },
+                when = when
+            });
         }
 
         public static double GetPenalty(TimeSpan maxAge, IEnumerable<(double TotalSeconds, TimeSpan age)> timeDif, ref double avg)
