@@ -86,7 +86,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
         public async Task<SpeedCompResult> CheckMultiAccountSpeed([FromBody] SpeedCheckRequest request)
         {
             var longMacroMultiplier = 30;
-            var maxAge = TimeSpan.FromMinutes(request.minutes);
+            var maxAge = TimeSpan.FromMinutes(request.minutes == 0 ? 20 : request.minutes);
             var maxTime = DateTime.UtcNow;
             if (request.when != default)
                 maxTime = request.when;
