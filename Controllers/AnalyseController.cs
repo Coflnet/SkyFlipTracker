@@ -22,6 +22,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
         private readonly ILogger<AnalyseController> logger;
         private readonly TrackerService service;
 
+        private static HashSet<string> BadPlayers = new() {"dffa84d869684e81894ea2a355c40118"};
+
         /// <summary>
         /// Creates a new instance of <see cref="TrackerController"/>
         /// </summary>
@@ -125,9 +127,13 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             double penaltiy = GetPenalty(maxAge, timeDif.Where(t => t.age < maxAge), ref avg);
             penaltiy += GetSpeedPenalty(maxAge * longMacroMultiplier, timeDif.Where(t => t.TotalSeconds > 3.35), 0.5);
 
+            var badIds = request.PlayerIds.Where(p=>BadPlayers.Contains(p));
+            penaltiy += badIds.Count();
+
             return new SpeedCompResult()
             {
                 // Clicks = clicks,
+                BadIds = badIds,
                 Buys = relevantFlips.GroupBy(f => f.AuctionId).Select(f => f.First()).ToDictionary(f => f.AuctionId, f => f.Timestamp),
                 Timings = timeDif.Select(d => d.TotalSeconds),
                 AvgAdvantageSeconds = avg,
@@ -183,6 +189,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             public double AvgAdvantageSeconds { get; set; }
             public IEnumerable<double> Timings { get; set; }
             public IEnumerable<Timing> Times { get; set; }
+            public IEnumerable<string> BadIds { get; set; }
         }
 
         public class Timing
