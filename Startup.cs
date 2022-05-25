@@ -55,7 +55,7 @@ namespace Coflnet.Sky.SkyAuctionTracker
             services.AddDbContext<TrackerDbContext>(
                 dbContextOptions => dbContextOptions
                     .UseMySql(Configuration["DB_CONNECTION"], serverVersion, 
-                     opt=>opt.CommandTimeout(5).EnableRetryOnFailure(3))
+                     opt=>opt.CommandTimeout(5))
                     
                     .EnableSensitiveDataLogging() // <-- These two calls are optional but help
                     .EnableDetailedErrors()       // <-- with debugging (remove for production).
