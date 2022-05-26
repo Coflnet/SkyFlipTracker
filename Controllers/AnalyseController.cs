@@ -128,7 +128,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             penaltiy += GetSpeedPenalty(maxAge * longMacroMultiplier, timeDif.Where(t => t.TotalSeconds > 3.35), 0.5);
 
             var badIds = request.PlayerIds.Where(p=>BadPlayers.Contains(p));
-            penaltiy += badIds.Count();
+            penaltiy += (8 * badIds.Count());
 
             return new SpeedCompResult()
             {
