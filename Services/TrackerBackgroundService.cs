@@ -33,26 +33,28 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
         }
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            using var scope = scopeFactory.CreateScope();
-            var context = scope.ServiceProvider.GetRequiredService<TrackerDbContext>();
-            // make sure all migrations are applied
-            await context.Database.MigrateAsync();
+            using (var scope = scopeFactory.CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<TrackerDbContext>();
+                // make sure all migrations are applied
+                await context.Database.MigrateAsync();
+            }
 
             var consConfig = new ConsumerConfig()
             {
                 BootstrapServers = config["KAFKA_HOST"],
                 GroupId = "flip-tracker"
             };
-            Task flipCons = NewMethod(stoppingToken);
-            Task flipEventCons = NewMethod1(stoppingToken);
+            Task flipCons = ConsumeFlips(stoppingToken);
+            Task flipEventCons = ConsumeEvents(stoppingToken);
             var sellCons = SoldAuction(stoppingToken);
 
             await Task.WhenAny(
-                Run(flipCons, "consuming flips"), 
+                Run(flipCons, "consuming flips"),
                 Run(flipEventCons, "flip events cons"),
                 Run(sellCons, "sells con"));
             logger.LogError("consuming stopped :O");
-             throw new Exception("at least one consuming process stopped");
+            throw new Exception("at least one consuming process stopped");
         }
 
         private async Task Run(Task task, string message)
@@ -68,14 +70,16 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             }
         }
 
-        private async Task NewMethod1(CancellationToken stoppingToken)
+        private async Task ConsumeEvents(CancellationToken stoppingToken)
         {
             await Coflnet.Kafka.KafkaConsumer.ConsumeBatch<FlipEvent>(config["KAFKA_HOST"], config["TOPICS:FLIP_EVENT"], async flipEvents =>
             {
                 for (int i = 0; i < 3; i++)
                     try
                     {
-                        await GetService().AddEvents(flipEvents);
+                        using var scope = scopeFactory.CreateScope();
+                        var service = scope.ServiceProvider.GetRequiredService<TrackerService>();
+                        await service.AddEvents(flipEvents);
                         consumeEvent.Inc(flipEvents.Count());
                         return;
                     }
@@ -92,7 +96,9 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 for (int i = 0; i < 3; i++)
                     try
                     {
-                        await GetService().AddSells(flipEvents);
+                        using var scope = scopeFactory.CreateScope();
+                        var service = scope.ServiceProvider.GetRequiredService<TrackerService>();
+                        await service.AddSells(flipEvents);
                         consumeEvent.Inc(flipEvents.Count());
                         return;
                     }
@@ -103,13 +109,16 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             }, stoppingToken, "fliptracker", 180);
         }
 
-        private async Task NewMethod(CancellationToken stoppingToken)
+        private async Task ConsumeFlips(CancellationToken stoppingToken)
         {
             await Coflnet.Kafka.KafkaConsumer.ConsumeBatch<LowPricedAuction>(config["KAFKA_HOST"], config["TOPICS:LOW_PRICED"], async lps =>
             {
                 if (lps.Count() == 0)
                     return;
-                await GetService().AddFlips(lps.Select(lp => new Flip()
+
+                using var scope = scopeFactory.CreateScope();
+                var service = scope.ServiceProvider.GetRequiredService<TrackerService>();
+                await service.AddFlips(lps.Select(lp => new Flip()
                 {
                     AuctionId = lp.UId,
                     FinderType = lp.Finder,
@@ -119,9 +128,5 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             }, stoppingToken, "fliptracker", 50);
         }
 
-        private TrackerService GetService()
-        {
-            return scopeFactory.CreateScope().ServiceProvider.GetRequiredService<TrackerService>();
-        }
     }
 }

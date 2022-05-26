@@ -1,11 +1,11 @@
-using System.Threading.Tasks;
-using Coflnet.Sky.SkyAuctionTracker.Models;
 using System;
-using System.Linq;
-using Microsoft.EntityFrameworkCore;
 using System.Collections.Generic;
-using Microsoft.Extensions.Logging;
+using System.Linq;
+using System.Threading.Tasks;
 using Coflnet.Sky.Core;
+using Coflnet.Sky.SkyAuctionTracker.Models;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace Coflnet.Sky.SkyAuctionTracker.Services
 {
@@ -43,13 +43,13 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
         public async Task AddFlips(IEnumerable<Flip> flipsToSave)
         {
             DateTime minTime = new DateTime(2020, 1, 1);
+            await db.Database.BeginTransactionAsync();
             for (int i = 0; i < 10; i++)
             {
                 try
                 {
                     var flips = flipsToSave.ToList();
                     var lookup = flips.Select(f => f.AuctionId).ToHashSet();
-                    await db.Database.BeginTransactionAsync();
                     var existing = await db.Flips.Where(f => lookup.Contains(f.AuctionId)).ToListAsync();
                     var newFlips = flips.Where(f => !existing.Where(ex => f.AuctionId == f.AuctionId && ex.FinderType == f.FinderType).Any()).ToList();
                     foreach (var item in newFlips)
@@ -73,7 +73,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
 
         public async Task<FlipEvent> AddEvent(FlipEvent flipEvent)
         {
-            return (await AddEvents(new FlipEvent[]{flipEvent})).First();
+            return (await AddEvents(new FlipEvent[] { flipEvent })).First();
         }
 
         public async Task<List<FlipEvent>> AddEvents(IEnumerable<FlipEvent> flipEvents)
@@ -88,7 +88,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             var affectedAuctions = flipEvents.Select(f => f.AuctionId).ToHashSet();
             var affectedPlayers = flipEvents.Select(f => f.PlayerId).ToHashSet();
             var existing = await db.FlipEvents.Where(f => affectedAuctions.Contains(f.AuctionId) && affectedPlayers.Contains(f.PlayerId))
-                    .ToListAsync();
+                .ToListAsync();
             var result = new List<FlipEvent>();
             foreach (var flipEvent in flipEvents)
             {
@@ -107,21 +107,22 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
 
         internal async Task AddSells(IEnumerable<SaveAuction> sells)
         {
-            var lookup = sells.Select(s=>s.UId).ToHashSet();
-            var existing = await db.FlipEvents.Where(e=>lookup.Contains(e.AuctionId) && e.Type == FlipEventType.AUCTION_SOLD).Select(e=>e.AuctionId).ToListAsync();
-            var found = await db.Flips.Where(e=>lookup.Contains(e.AuctionId)).Select(e=>e.AuctionId).ToListAsync();
+            var lookup = sells.Select(s => s.UId).ToHashSet();
+            var existing = await db.FlipEvents.Where(e => lookup.Contains(e.AuctionId) && e.Type == FlipEventType.AUCTION_SOLD).Select(e => e.AuctionId).ToListAsync();
+            var found = await db.Flips.Where(e => lookup.Contains(e.AuctionId)).Select(e => e.AuctionId).ToListAsync();
             foreach (var item in sells)
             {
-                if(!item.Bin || item.Bids.Count == 0)
+                if (!item.Bin || item.Bids.Count == 0)
                     continue;
-                if(!found.Contains(item.UId))
+                if (!found.Contains(item.UId))
                     continue;
-                if(!existing.Contains(item.UId))
-                    db.FlipEvents.Add(new FlipEvent(){
+                if (!existing.Contains(item.UId))
+                    db.FlipEvents.Add(new FlipEvent()
+                    {
                         AuctionId = item.UId,
-                        PlayerId = GetId(item.Bids.MaxBy(b=>b.Amount).Bidder),
-                        Timestamp = item.Bids.MaxBy(b=>b.Amount).Timestamp,
-                        Type = FlipEventType.AUCTION_SOLD
+                            PlayerId = GetId(item.Bids.MaxBy(b => b.Amount).Bidder),
+                            Timestamp = item.Bids.MaxBy(b => b.Amount).Timestamp,
+                            Type = FlipEventType.AUCTION_SOLD
                     });
             }
             var count = await db.SaveChangesAsync();
