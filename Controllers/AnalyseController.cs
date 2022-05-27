@@ -22,7 +22,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
         private readonly ILogger<AnalyseController> logger;
         private readonly TrackerService service;
 
-        private static HashSet<string> BadPlayers = new() { "dffa84d869684e81894ea2a355c40118" };
+        private static HashSet<string> BadPlayers = new() { "dffa84d869684e81894ea2a355c40118", "64a885a1ea864abc94bb89dab9afd926" };
 
         /// <summary>
         /// Creates a new instance of <see cref="TrackerController"/>
