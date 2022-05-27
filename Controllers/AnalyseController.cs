@@ -102,8 +102,12 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
 
             var ids = relevantBuys.Select(f => f.AuctionId).ToHashSet();
 
-            var receiveMost = await db.FlipEvents.Where(f => ids.Contains(f.AuctionId) && f.Type == FlipEventType.FLIP_RECEIVE)
-                                .GroupBy(f => f.PlayerId).OrderBy(f=>f.Count()).FirstOrDefaultAsync();
+            var interestingList = await db.FlipEvents.Where(f => ids.Contains(f.AuctionId) && f.Type == FlipEventType.FLIP_RECEIVE)
+                                .ToListAsync();
+
+            var receiveMost = interestingList.GroupBy(f => f.PlayerId).OrderBy(f => f.Count()).FirstOrDefault();
+            if (receiveMost == null)
+                return new AltResult();
 
             return new AltResult()
             {
