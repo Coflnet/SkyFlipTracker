@@ -22,7 +22,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
         private readonly ILogger<AnalyseController> logger;
         private readonly TrackerService service;
 
-        private static HashSet<string> BadPlayers = new() {"dffa84d869684e81894ea2a355c40118"};
+        private static HashSet<string> BadPlayers = new() { "dffa84d869684e81894ea2a355c40118" };
 
         /// <summary>
         /// Creates a new instance of <see cref="TrackerController"/>
@@ -81,6 +81,47 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
 
 
         /// <summary>
+        /// Returns how many user recently received a flip
+        /// </summary>
+        /// <returns></returns>
+        [HttpGet]
+        [Route("/player/{playerId}/alternative")]
+        public async Task<AltResult> GetAlt(string toCheck)
+        {
+            if (!long.TryParse(toCheck, out long numericId))
+                numericId = service.GetId(toCheck);
+            var minTime = DateTime.UtcNow - TimeSpan.FromDays(1);
+            var relevantBuys = await db.FlipEvents.Where(flipEvent =>
+                        flipEvent.Type == FlipEventType.AUCTION_SOLD
+                        && numericId == flipEvent.PlayerId
+                        && flipEvent.Timestamp > minTime
+                        && flipEvent.Timestamp <= DateTime.Now)
+                .ToListAsync();
+            if (relevantBuys.Count == 0)
+                return new AltResult();
+
+            var ids = relevantBuys.Select(f => f.AuctionId).ToHashSet();
+
+            var receiveMost = await db.FlipEvents.Where(f => ids.Contains(f.AuctionId) && f.Type == FlipEventType.FLIP_RECEIVE)
+                                .GroupBy(f => f.PlayerId).OrderBy(f=>f.Count()).FirstOrDefaultAsync();
+
+            return new AltResult()
+            {
+                PlayerId = receiveMost.Key,
+                Bought = receiveMost,
+                TargetBought = relevantBuys
+            };
+        }
+
+        public class AltResult
+        {
+            public long PlayerId { get; set; }
+            public IGrouping<long, FlipEvent> Bought { get; set; }
+            public IEnumerable<FlipEvent> TargetBought { get; set; }
+        }
+
+
+        /// <summary>
         /// Returns the speed advantage of a list of players (coresponding to the same account)
         /// </summary>
         [HttpPost]
@@ -127,7 +168,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             double penaltiy = GetPenalty(maxAge, timeDif.Where(t => t.age < maxAge), ref avg);
             penaltiy += GetSpeedPenalty(maxAge * longMacroMultiplier, timeDif.Where(t => t.TotalSeconds > 3.35 && t.TotalSeconds < 6), 0.5);
 
-            var badIds = request.PlayerIds.Where(p=>BadPlayers.Contains(p));
+            var badIds = request.PlayerIds.Where(p => BadPlayers.Contains(p));
             penaltiy += (8 * badIds.Count());
 
             return new SpeedCompResult()
