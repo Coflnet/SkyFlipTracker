@@ -54,13 +54,14 @@ namespace Coflnet.Sky.SkyAuctionTracker
             // Replace 'YourDbContext' with the name of your own DbContext derived class.
             services.AddDbContext<TrackerDbContext>(
                 dbContextOptions => dbContextOptions
-                    .UseMySql(Configuration["DB_CONNECTION"], serverVersion, 
-                     opt=>opt.CommandTimeout(5))
-                    
+                    .UseMySql(Configuration["DB_CONNECTION"], serverVersion,
+                     opt => opt.CommandTimeout(5))
+
                     .EnableSensitiveDataLogging() // <-- These two calls are optional but help
                     .EnableDetailedErrors()       // <-- with debugging (remove for production).
             );
             services.AddHostedService<TrackerBackgroundService>();
+            services.AddSingleton<Coflnet.Sky.Api.Client.Api.IAuctionsApi>(conf => new Coflnet.Sky.Api.Client.Api.AuctionsApi(Configuration["API_BASE_URL"]));
             services.AddJaeger();
             services.AddTransient<TrackerService>();
         }

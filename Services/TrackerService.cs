@@ -1,11 +1,14 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
+using Coflnet.Sky.Api.Client.Api;
 using Coflnet.Sky.Core;
 using Coflnet.Sky.SkyAuctionTracker.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using RestSharp;
 
 namespace Coflnet.Sky.SkyAuctionTracker.Services
 {
@@ -13,11 +16,13 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
     {
         private TrackerDbContext db;
         private ILogger<TrackerService> logger;
+        private IAuctionsApi auctionsApi;
 
-        public TrackerService(TrackerDbContext db, ILogger<TrackerService> logger)
+        public TrackerService(TrackerDbContext db, ILogger<TrackerService> logger, IAuctionsApi api)
         {
             this.db = db;
             this.logger = logger;
+            this.auctionsApi = api;
         }
 
         public async Task<Flip> AddFlip(Flip flip)
@@ -120,13 +125,57 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     db.FlipEvents.Add(new FlipEvent()
                     {
                         AuctionId = item.UId,
-                            PlayerId = GetId(item.Bids.MaxBy(b => b.Amount).Bidder),
-                            Timestamp = item.Bids.MaxBy(b => b.Amount).Timestamp,
-                            Type = FlipEventType.AUCTION_SOLD
+                        PlayerId = GetId(item.Bids.MaxBy(b => b.Amount).Bidder),
+                        Timestamp = item.Bids.MaxBy(b => b.Amount).Timestamp,
+                        Type = FlipEventType.AUCTION_SOLD
                     });
             }
             var count = await db.SaveChangesAsync();
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await TfmSellCallback(sells);
+                }
+                catch (System.Exception error)
+                {
+                    dev.Logger.Instance.Error(error, "TFM sell callback failed");
+                }
+            });
+
             Console.WriteLine($"Saved sells {count}");
+        }
+
+        private async Task TfmSellCallback(IEnumerable<SaveAuction> sells)
+        {
+            var uids = sells.Where(s => s.FlatenedNBT.Where(n => n.Key == "uid").Any()).ToDictionary(s => s.FlatenedNBT.Where(n => n.Key == "uid").Select(n => n.Value).FirstOrDefault());
+            var exists = await auctionsApi.ApiAuctionsUidsSoldPostAsync(new Api.Client.Model.InventoryBatchLookup() { Uuids = uids.Keys.ToList() });
+            var soldAuctions = exists.Select(item => new { sell = uids.GetValueOrDefault(item.Key), buy = item.Value.Where(v => v.Uuid != uids.GetValueOrDefault(item.Key)?.Uuid).FirstOrDefault() }).Where(item => item.buy != null).ToList();
+            var soldUids = soldAuctions.Select(u => GetId(u.buy.Uuid)).ToHashSet();
+            var flipsSoldFromTfm = await db.Flips.Where(f => soldUids.Contains(f.AuctionId) && f.FinderType == LowPricedAuction.FinderType.TFM).ToListAsync();
+
+            var result = flipsSoldFromTfm.Select(f =>
+            {
+                var match = soldAuctions.Where(s => GetId(s.buy.Uuid) == f.AuctionId).FirstOrDefault();
+                return new
+                {
+                    foundTime = f.Timestamp,
+                    sell = new { uuid = match?.sell?.Uuid, sellPrice = match?.sell?.HighestBidAmount },
+                    originAuction = match?.buy?.Uuid,
+                };
+            }).ToList();
+
+            if (result.Count == 0)
+                return; // nothing to do
+
+            var client = new RestClient("https://tfm.thom.club");
+            var request = new RestRequest("/flip_sold", Method.POST);
+            request.AddJsonBody(result);
+            var token = new CancellationTokenSource(10000).Token;
+            var response = await client.ExecuteAsync(request, token);
+
+            Console.WriteLine($"TFM sell response ({response.StatusCode}) sent {result.Count}: {response.Content}");
+            //   Console.WriteLine(Newtonsoft.Json.JsonConvert.SerializeObject(soldAuctions, Newtonsoft.Json.Formatting.Indented));
         }
 
         internal long GetId(string uuid)
