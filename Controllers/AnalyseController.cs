@@ -168,7 +168,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             });
             double avg = 0;
             double penaltiy = GetPenalty(maxAge, timeDif.Where(t => t.age < maxAge), ref avg);
-            penaltiy += GetSpeedPenalty(maxAge * shortMacroMultiplier, timeDif.Where(t => t.TotalSeconds > 3.35 && t.TotalSeconds < 4 && t.age < maxAge * shortMacroMultiplier), 0.3);
+            var antiMacro = GetSpeedPenalty(maxAge * shortMacroMultiplier, timeDif.Where(t => t.TotalSeconds > 3.35 && t.TotalSeconds < 4 && t.age < maxAge * shortMacroMultiplier), 0.3);
+            penaltiy = Math.Max(penaltiy, 0) + antiMacro;
 
             var badIds = request.PlayerIds.Where(p => BadPlayers.Contains(p));
             penaltiy += (8 * badIds.Count());
