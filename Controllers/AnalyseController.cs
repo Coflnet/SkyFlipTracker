@@ -129,6 +129,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
         public async Task<SpeedCompResult> CheckMultiAccountSpeed([FromBody] SpeedCheckRequest request)
         {
             var longMacroMultiplier = 30;
+            // extended time that supposed macroers will be delayed over.
+            var shortMacroMultiplier = 6;
             var maxAge = TimeSpan.FromMinutes(request.minutes == 0 ? 20 : request.minutes);
             var maxTime = DateTime.UtcNow;
             if (request.when != default)
@@ -166,7 +168,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             });
             double avg = 0;
             double penaltiy = GetPenalty(maxAge, timeDif.Where(t => t.age < maxAge), ref avg);
-            penaltiy += GetSpeedPenalty(maxAge * longMacroMultiplier, timeDif.Where(t => t.TotalSeconds > 3.35 && t.TotalSeconds < 4), 0.5);
+            penaltiy += GetSpeedPenalty(maxAge * shortMacroMultiplier, timeDif.Where(t => t.TotalSeconds > 3.35 && t.TotalSeconds < 4 && t.age < maxAge * shortMacroMultiplier), 0.3);
 
             var badIds = request.PlayerIds.Where(p => BadPlayers.Contains(p));
             penaltiy += (8 * badIds.Count());
