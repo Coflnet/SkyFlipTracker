@@ -23,6 +23,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
         private readonly TrackerService service;
 
         private static HashSet<string> BadPlayers = new() { "dffa84d869684e81894ea2a355c40118" };
+        private static HashSet<string> CoolMacroers = new() { "0a86231badba4dbdbe12a3e4a8838f80" };
 
         /// <summary>
         /// Creates a new instance of <see cref="TrackerController"/>
@@ -168,11 +169,12 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             });
             double avg = 0;
             double penaltiy = GetPenalty(maxAge, timeDif.Where(t => t.age < maxAge), ref avg);
-            var antiMacro = GetSpeedPenalty(maxAge * shortMacroMultiplier, timeDif.Where(t => t.TotalSeconds > 3.35 && t.TotalSeconds < 4 && t.age < maxAge * shortMacroMultiplier), 0.3);
+            var antiMacro = GetSpeedPenalty(maxAge * shortMacroMultiplier, timeDif.Where(t => t.TotalSeconds > 3.37 && t.TotalSeconds < 4 && t.age < maxAge * shortMacroMultiplier), 0.4);
             penaltiy = Math.Max(penaltiy, 0) + antiMacro;
 
             var badIds = request.PlayerIds.Where(p => BadPlayers.Contains(p));
             penaltiy += (8 * badIds.Count());
+            penaltiy += (request.PlayerIds.Where(p => CoolMacroers.Contains(p)).Any() ? 0.4 : 0);
 
             return new SpeedCompResult()
             {
@@ -209,7 +211,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             {
                 var relevant = timeDif.Where(d => d.TotalSeconds < 8 && d.TotalSeconds > 1);
                 if (relevant.Count() > 0)
-                    avg = relevant.Average(d => (maxAge - d.age) / (maxAge) * (d.TotalSeconds - 3.06));
+                    avg = relevant.Average(d => (maxAge - d.age) / (maxAge) * (d.TotalSeconds - 3.055));
                 var tooFast = timeDif.Where(d => d.TotalSeconds > 3.3);
                 var speedPenalty = GetSpeedPenalty(maxAge, tooFast);
                 Console.WriteLine(avg + " " + speedPenalty);
