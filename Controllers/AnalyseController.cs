@@ -174,7 +174,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
 
             var badIds = request.PlayerIds.Where(p => BadPlayers.Contains(p));
             penaltiy += (8 * badIds.Count());
-            penaltiy += (request.PlayerIds.Where(p => CoolMacroers.Contains(p)).Any() ? 0.4 : 0);
+            penaltiy += (request.PlayerIds.Where(p => CoolMacroers.Contains(p)).Any() ? 0.312345 : 0);
 
             return new SpeedCompResult()
             {
