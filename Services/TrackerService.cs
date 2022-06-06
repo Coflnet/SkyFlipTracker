@@ -153,7 +153,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             var soldAuctions = exists.Select(item => new { sell = uids.GetValueOrDefault(item.Key), buy = item.Value.Where(v => v.Uuid != uids.GetValueOrDefault(item.Key)?.Uuid)
                                     .OrderByDescending(u=>u.Timestamp).FirstOrDefault() }).Where(item => item.buy != null).ToList();
             var soldUids = soldAuctions.Select(u => GetId(u.buy.Uuid)).ToHashSet();
-            var flipsSoldFromTfm = await db.Flips.Where(f => soldUids.Contains(f.AuctionId) && f.FinderType == LowPricedAuction.FinderType.TFM).ToListAsync();
+            var flipsSoldFromTfm = soldUids.Select(f=>new Flip() { AuctionId = f, FinderType = LowPricedAuction.FinderType.TFM }).ToList();
+            //var flipsSoldFromTfm = await db.Flips.Where(f => soldUids.Contains(f.AuctionId) && f.FinderType == LowPricedAuction.FinderType.TFM).ToListAsync();
 
             var result = flipsSoldFromTfm.Select(f =>
             {
