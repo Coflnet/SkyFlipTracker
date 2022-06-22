@@ -155,7 +155,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
                 return new SpeedCompResult() { Penalty = -1 };
 
             var ids = relevantFlips.Select(f => f.AuctionId).ToHashSet();
-            Console.WriteLine("gettings clicks " + ids.Count());
+
+            int escrowedUserCount = await GetEscrowedUserCount(maxAge, maxTime, numeric, relevantFlips);
 
             var receiveList = await db.FlipEvents.Where(f => ids.Contains(f.AuctionId) && numeric.Contains(f.PlayerId) && f.Type == FlipEventType.FLIP_RECEIVE)
                                 .GroupBy(f => f.AuctionId).Select(f => f.OrderBy(f => f.Timestamp).First()).ToDictionaryAsync(f => f.AuctionId);
@@ -171,6 +172,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             double penaltiy = GetPenalty(maxAge, timeDif.Where(t => t.age < maxAge), ref avg);
             var antiMacro = GetSpeedPenalty(maxAge * shortMacroMultiplier, timeDif.Where(t => t.TotalSeconds > 3.37 && t.TotalSeconds < 4 && t.age < maxAge * shortMacroMultiplier), 0.4);
             penaltiy = Math.Max(penaltiy, 0) + antiMacro;
+            if (antiMacro > 0)
+                penaltiy += 0.03 * escrowedUserCount;
 
             var badIds = request.PlayerIds.Where(p => BadPlayers.Contains(p));
             penaltiy += (8 * badIds.Count());
@@ -185,7 +188,17 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
                 AvgAdvantageSeconds = avg,
                 Penalty = penaltiy,
                 Times = timeDif.Select(t => new Timing() { age = t.age.ToString(), TotalSeconds = t.TotalSeconds }),
+                OutspeedUserCount = escrowedUserCount
             };
+        }
+
+        private async Task<int> GetEscrowedUserCount(TimeSpan maxAge, DateTime maxTime, IEnumerable<long> numeric, List<FlipEvent> relevantFlips)
+        {
+            var escrowRelevantTimeMin = maxTime - (maxAge / 2);
+            var recentIds = relevantFlips.Where(f => f.Timestamp > escrowRelevantTimeMin && f.Timestamp < maxTime).Select(f => f.AuctionId).ToHashSet();
+            var escrowState = await db.FlipEvents.Where(f => recentIds.Contains(f.AuctionId)).ToListAsync();
+            var escrowedUserCount = escrowState.Where(s => !numeric.Contains(s.PlayerId) && s.Type == FlipEventType.FLIP_CLICK && s.Timestamp < relevantFlips.Where(f => f.AuctionId == s.AuctionId).Select(f => f.Timestamp).FirstOrDefault() + TimeSpan.FromSeconds(5)).Count();
+            return escrowedUserCount;
         }
 
         /// <summary>
@@ -236,6 +249,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             public IEnumerable<double> Timings { get; set; }
             public IEnumerable<Timing> Times { get; set; }
             public IEnumerable<string> BadIds { get; set; }
+            public int OutspeedUserCount { get; internal set; }
         }
 
         public class Timing
