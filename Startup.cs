@@ -64,6 +64,7 @@ namespace Coflnet.Sky.SkyAuctionTracker
             services.AddSingleton<Coflnet.Sky.Api.Client.Api.IAuctionsApi>(conf => new Coflnet.Sky.Api.Client.Api.AuctionsApi(Configuration["API_BASE_URL"]));
             services.AddJaeger();
             services.AddTransient<TrackerService>();
+            services.AddSingleton<FlipSumaryEventProducer>();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
