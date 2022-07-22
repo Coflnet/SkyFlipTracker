@@ -173,8 +173,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             var antiMacro = GetSpeedPenalty(maxAge * shortMacroMultiplier, timeDif.Where(t => t.TotalSeconds > 3.37 && t.TotalSeconds < 4 && t.age < maxAge * shortMacroMultiplier), 0.2);
             penaltiy = Math.Max(penaltiy, 0) + antiMacro;
             if (antiMacro > 0)
-                penaltiy += 0.01 * escrowedUserCount;
-            penaltiy += 0.01 * escrowedUserCount;
+                penaltiy += 0.02 * escrowedUserCount;
+            penaltiy += 0.02 * escrowedUserCount;
 
             var badIds = request.PlayerIds.Where(p => BadPlayers.Contains(p));
             penaltiy += (8 * badIds.Count());
@@ -198,7 +198,13 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             var escrowRelevantTimeMin = maxTime - (maxAge);
             var recentIds = relevantFlips.Where(f => f.Timestamp > escrowRelevantTimeMin && f.Timestamp < maxTime).Select(f => f.AuctionId).ToHashSet();
             var escrowState = await db.FlipEvents.Where(f => recentIds.Contains(f.AuctionId)).ToListAsync();
-            var escrowedUserCount = escrowState.Where(s => !numeric.Contains(s.PlayerId) && s.Type == FlipEventType.FLIP_CLICK && s.Timestamp < relevantFlips.Where(f => f.AuctionId == s.AuctionId).Select(f => f.Timestamp).FirstOrDefault() + TimeSpan.FromSeconds(4)).Count();
+            var escrowedUserCount = escrowState.Where(s =>
+            {
+                var sellTimestamp = relevantFlips.Where(f => f.AuctionId == s.AuctionId).Select(f => f.Timestamp).FirstOrDefault();
+                return !numeric.Contains(s.PlayerId) && s.Type == FlipEventType.FLIP_CLICK
+                        && s.Timestamp < sellTimestamp + TimeSpan.FromSeconds(4)
+                        && s.Timestamp > sellTimestamp + TimeSpan.FromSeconds(2.5);
+            }).Count();
             return escrowedUserCount;
         }
 
@@ -225,7 +231,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             {
                 var relevant = timeDif.Where(d => d.TotalSeconds < 8 && d.TotalSeconds > 1);
                 if (relevant.Count() > 0)
-                    avg = relevant.Average(d => (maxAge - d.age) / (maxAge) * (d.TotalSeconds - 3.03));
+                    avg = relevant.Average(d => (maxAge - d.age) / (maxAge) * (d.TotalSeconds - 3.0));
                 var tooFast = timeDif.Where(d => d.TotalSeconds > 3.3);
                 var speedPenalty = GetSpeedPenalty(maxAge, tooFast);
                 Console.WriteLine(avg + " " + speedPenalty);
