@@ -171,6 +171,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             double avg = 0;
             double penaltiy = GetPenalty(maxAge, timeDif.Where(t => t.age < maxAge), ref avg);
             var antiMacro = GetSpeedPenalty(maxAge * shortMacroMultiplier, timeDif.Where(t => t.TotalSeconds > 3.37 && t.TotalSeconds < 4 && t.age < maxAge * shortMacroMultiplier), 0.2);
+            antiMacro += GetSpeedPenalty(maxAge * shortMacroMultiplier, timeDif.Where(t => t.TotalSeconds > 3.5 && t.TotalSeconds < 4 && t.age < maxAge * shortMacroMultiplier), 0.8);
             penaltiy = Math.Max(penaltiy, 0) + antiMacro;
             if (antiMacro > 0)
                 penaltiy += 0.02 * escrowedUserCount;

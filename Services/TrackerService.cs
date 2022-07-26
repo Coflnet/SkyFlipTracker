@@ -203,7 +203,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     Buy = buy,
                     Sell = item.sell,
                     Finder = finders.Where(f => f.AuctionId == item.sell.UId).FirstOrDefault(),
-                    Profit = (int)(item.sell.HighestBidAmount - buy.HighestBidAmount),
+                    Profit = (int)(item.sell.HighestBidAmount - buy?.HighestBidAmount ?? 0),
                 });
             }
         }
