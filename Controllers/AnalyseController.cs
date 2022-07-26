@@ -24,6 +24,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
 
         private static HashSet<string> BadPlayers = new() { "dffa84d869684e81894ea2a355c40118" };
         private static HashSet<string> CoolMacroers = new() { "0a86231badba4dbdbe12a3e4a8838f80" };
+        private static HashSet<string> BadMacroers = new() { "935b362c94f04a54b8faea59fe1a2879" };
 
         /// <summary>
         /// Creates a new instance of <see cref="TrackerController"/>
@@ -180,6 +181,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             var badIds = request.PlayerIds.Where(p => BadPlayers.Contains(p));
             penaltiy += (8 * badIds.Count());
             penaltiy += (request.PlayerIds.Where(p => CoolMacroers.Contains(p)).Any() ? 0.312345 : 0);
+           	penaltiy += (request.PlayerIds.Where(p => BadMacroers.Contains(p)).Any() ? 1.969420 : 0);
+
 
             return new SpeedCompResult()
             {
