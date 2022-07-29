@@ -202,7 +202,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
         private static double GetShortTermAntiMacroDelay(TimeSpan maxAge, IEnumerable<(double TotalSeconds, TimeSpan age)> timeDif, List<(double TotalSeconds, TimeSpan age)> macroedFlips)
         {
             var antiMacro = GetSpeedPenalty(maxAge * shortMacroMultiplier, timeDif.Where(t => t.TotalSeconds > 3.37 && t.TotalSeconds < 4 && t.age < maxAge * shortMacroMultiplier), 0.2);
-            antiMacro += GetSpeedPenalty(maxAge * shortMacroMultiplier, macroedFlips, 0.8);
+            antiMacro += GetSpeedPenalty(maxAge * shortMacroMultiplier, macroedFlips, 0.5);
             return antiMacro;
         }
 
