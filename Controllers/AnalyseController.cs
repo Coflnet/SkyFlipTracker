@@ -175,15 +175,16 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             };
         }
 
-        private static double CalculatePenalty(SpeedCheckRequest request, TimeSpan maxAge, IEnumerable<(double TotalSeconds, TimeSpan age)> timeDif, int escrowedUserCount, ref double avg, double antiMacro, IEnumerable<string> badIds)
+        public static double CalculatePenalty(SpeedCheckRequest request, TimeSpan maxAge, IEnumerable<(double TotalSeconds, TimeSpan age)> timeDif, int escrowedUserCount, ref double avg, double antiMacro, IEnumerable<string> badIds)
         {
             var penaltiy = 0d;
-            if (timeDif.Count() != 0)
+            var relevantTimings = timeDif.Where(t => t.age < maxAge).ToList();
+            if (relevantTimings.Count() != 0)
             {
-                var relevant = timeDif.Where(d => d.TotalSeconds < 8 && d.TotalSeconds > 1);
+                var relevant = relevantTimings.Where(d => d.TotalSeconds < 8 && d.TotalSeconds > 1);
                 if (relevant.Count() > 0)
                     avg = relevant.Average(d => (maxAge - d.age) / (maxAge) * (d.TotalSeconds - 3.0));
-                var tooFast = timeDif.Where(d => d.TotalSeconds > 3.3);
+                var tooFast = relevantTimings.Where(d => d.TotalSeconds > 3.3);
                 var speedPenalty = GetSpeedPenalty(maxAge, tooFast);
                 penaltiy = avg + speedPenalty;
             }
