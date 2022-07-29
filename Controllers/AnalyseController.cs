@@ -213,7 +213,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             {
                 var longTermFlips = await GetRelevantFlips(maxTime, maxTime - shadowTiming, numeric);
                 var longTermTimeDif = await GetTimings(maxTime, numeric, longTermFlips);
-                macroedTimeDif = longTermTimeDif.Select(f => new MacroedFlip() { TotalSeconds = f.TotalSeconds, BuyTime = DateTime.Now - f.age });
+                macroedTimeDif = longTermTimeDif.Where(t=>t.TotalSeconds > 3.51 && t.TotalSeconds < 4).Select(f => new MacroedFlip() { TotalSeconds = f.TotalSeconds, BuyTime = DateTime.Now - f.age });
             }
 
             return macroedTimeDif;
