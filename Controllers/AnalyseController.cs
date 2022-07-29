@@ -22,8 +22,13 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
         private readonly ILogger<AnalyseController> logger;
         private readonly TrackerService service;
 
-        private static HashSet<string> BadPlayers = new() { "dffa84d869684e81894ea2a355c40118" };
-        private static HashSet<string> CoolMacroers = new() { "0a86231badba4dbdbe12a3e4a8838f80" };
+        private static readonly HashSet<string> BadPlayers = new() { "dffa84d869684e81894ea2a355c40118" };
+        private static readonly HashSet<string> CoolMacroers = new() { "0a86231badba4dbdbe12a3e4a8838f80" };
+
+        private static readonly TimeSpan shadowTiming = TimeSpan.FromDays(2);
+        private static readonly int longMacroMultiplier = 30;
+        // extended time that supposed macroers will be delayed over.
+        private static readonly int shortMacroMultiplier = 6;
 
         /// <summary>
         /// Creates a new instance of <see cref="TrackerController"/>
@@ -129,9 +134,6 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
         [Route("/players/speed")]
         public async Task<SpeedCompResult> CheckMultiAccountSpeed([FromBody] SpeedCheckRequest request)
         {
-            var longMacroMultiplier = 30;
-            // extended time that supposed macroers will be delayed over.
-            var shortMacroMultiplier = 6;
             var maxAge = TimeSpan.FromMinutes(request.minutes == 0 ? 20 : request.minutes);
             var maxTime = DateTime.UtcNow;
             if (request.when != default)
@@ -145,18 +147,81 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
                 return val;
             });
 
-            var relevantFlips = await db.FlipEvents.Where(flipEvent =>
-                        flipEvent.Type == FlipEventType.AUCTION_SOLD
-                        && numeric.Contains(flipEvent.PlayerId)
-                        && flipEvent.Timestamp > minTime
-                        && flipEvent.Timestamp <= maxTime)
-                .ToListAsync();
+            var relevantFlips = await GetRelevantFlips(maxTime, minTime, numeric);
             if (relevantFlips.Count == 0)
                 return new SpeedCompResult() { Penalty = -1 };
-
-            var ids = relevantFlips.Select(f => f.AuctionId).ToHashSet();
+            IEnumerable<(double TotalSeconds, TimeSpan age)> timeDif = await GetTimings(maxTime, numeric, relevantFlips);
 
             int escrowedUserCount = await GetEscrowedUserCount(maxAge, maxTime, numeric, relevantFlips);
+            double avg = 0;
+            var macroedFlips = timeDif.Where(t => t.TotalSeconds > 3.5 && t.TotalSeconds < 4).ToList();
+            var macroedTimeDif = await GetMacroedFlipsLongTerm(shadowTiming, maxTime, numeric, macroedFlips);
+            double antiMacro = GetShortTermAntiMacroDelay(maxAge, timeDif, macroedFlips.Where(t => t.age < maxAge * shortMacroMultiplier).ToList());
+
+            var badIds = request.PlayerIds.Where(p => BadPlayers.Contains(p));
+            double penaltiy = CalculatePenalty(request, maxAge, timeDif, escrowedUserCount, ref avg, antiMacro, badIds);
+
+            return new SpeedCompResult()
+            {
+                // Clicks = clicks,
+                BadIds = badIds,
+                Buys = relevantFlips.GroupBy(f => f.AuctionId).Select(f => f.First()).ToDictionary(f => f.AuctionId, f => f.Timestamp),
+                Timings = timeDif.Select(d => d.TotalSeconds),
+                AvgAdvantageSeconds = avg,
+                Penalty = penaltiy,
+                Times = timeDif.Select(t => new Timing() { age = t.age.ToString(), TotalSeconds = t.TotalSeconds }),
+                OutspeedUserCount = escrowedUserCount,
+                MacroedFlips = macroedTimeDif
+            };
+        }
+
+        private static double CalculatePenalty(SpeedCheckRequest request, TimeSpan maxAge, IEnumerable<(double TotalSeconds, TimeSpan age)> timeDif, int escrowedUserCount, ref double avg, double antiMacro, IEnumerable<string> badIds)
+        {
+            var penaltiy = 0d;
+            if (timeDif.Count() != 0)
+            {
+                var relevant = timeDif.Where(d => d.TotalSeconds < 8 && d.TotalSeconds > 1);
+                if (relevant.Count() > 0)
+                    avg = relevant.Average(d => (maxAge - d.age) / (maxAge) * (d.TotalSeconds - 3.0));
+                var tooFast = timeDif.Where(d => d.TotalSeconds > 3.3);
+                var speedPenalty = GetSpeedPenalty(maxAge, tooFast);
+                penaltiy = avg + speedPenalty;
+            }
+
+            penaltiy = Math.Max(penaltiy, 0) + antiMacro;
+            if (antiMacro > 0)
+                penaltiy += 0.02 * escrowedUserCount;
+            penaltiy += 0.02 * escrowedUserCount;
+
+            penaltiy += (8 * badIds.Count());
+            penaltiy += (request.PlayerIds.Where(p => CoolMacroers.Contains(p)).Any() ? 0.312345 : 0);
+            return penaltiy;
+        }
+
+        private static double GetShortTermAntiMacroDelay(TimeSpan maxAge, IEnumerable<(double TotalSeconds, TimeSpan age)> timeDif, List<(double TotalSeconds, TimeSpan age)> macroedFlips)
+        {
+            var antiMacro = GetSpeedPenalty(maxAge * shortMacroMultiplier, timeDif.Where(t => t.TotalSeconds > 3.37 && t.TotalSeconds < 4 && t.age < maxAge * shortMacroMultiplier), 0.2);
+            antiMacro += GetSpeedPenalty(maxAge * shortMacroMultiplier, macroedFlips, 0.8);
+            return antiMacro;
+        }
+
+        private async Task<IEnumerable<MacroedFlip>> GetMacroedFlipsLongTerm(TimeSpan shadowTiming, DateTime maxTime, IEnumerable<long> numeric, List<(double TotalSeconds, TimeSpan age)> macroedFlips)
+        {
+            IEnumerable<MacroedFlip> macroedTimeDif = new List<MacroedFlip>();
+            if (macroedFlips.Count > 0)
+            {
+                var longTermFlips = await GetRelevantFlips(maxTime, maxTime - shadowTiming, numeric);
+                var longTermTimeDif = await GetTimings(maxTime, numeric, longTermFlips);
+                macroedTimeDif = longTermTimeDif.Select(f => new MacroedFlip() { TotalSeconds = f.TotalSeconds, BuyTime = DateTime.Now - f.age });
+            }
+
+            return macroedTimeDif;
+        }
+
+        private async Task<IEnumerable<(double TotalSeconds, TimeSpan age)>> GetTimings(DateTime maxTime, IEnumerable<long> numeric, List<FlipEvent> relevantFlips)
+        {
+            var ids = relevantFlips.Select(f => f.AuctionId).ToHashSet();
+
 
             var receiveList = await db.FlipEvents.Where(f => ids.Contains(f.AuctionId) && numeric.Contains(f.PlayerId) && f.Type == FlipEventType.FLIP_RECEIVE)
                                 .GroupBy(f => f.AuctionId).Select(f => f.OrderBy(f => f.Timestamp).First()).ToDictionaryAsync(f => f.AuctionId);
@@ -168,30 +233,17 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
                 var receive = receiveList[f.AuctionId];
                 return ((receive.Timestamp - f.Timestamp).TotalSeconds, age: maxTime - receive.Timestamp);
             });
-            double avg = 0;
-            double penaltiy = GetPenalty(maxAge, timeDif.Where(t => t.age < maxAge), ref avg);
-            var antiMacro = GetSpeedPenalty(maxAge * shortMacroMultiplier, timeDif.Where(t => t.TotalSeconds > 3.37 && t.TotalSeconds < 4 && t.age < maxAge * shortMacroMultiplier), 0.2);
-            antiMacro += GetSpeedPenalty(maxAge * shortMacroMultiplier, timeDif.Where(t => t.TotalSeconds > 3.5 && t.TotalSeconds < 4 && t.age < maxAge * shortMacroMultiplier), 0.8);
-            penaltiy = Math.Max(penaltiy, 0) + antiMacro;
-            if (antiMacro > 0)
-                penaltiy += 0.02 * escrowedUserCount;
-            penaltiy += 0.02 * escrowedUserCount;
+            return timeDif;
+        }
 
-            var badIds = request.PlayerIds.Where(p => BadPlayers.Contains(p));
-            penaltiy += (8 * badIds.Count());
-            penaltiy += (request.PlayerIds.Where(p => CoolMacroers.Contains(p)).Any() ? 0.312345 : 0);
-
-            return new SpeedCompResult()
-            {
-                // Clicks = clicks,
-                BadIds = badIds,
-                Buys = relevantFlips.GroupBy(f => f.AuctionId).Select(f => f.First()).ToDictionary(f => f.AuctionId, f => f.Timestamp),
-                Timings = timeDif.Select(d => d.TotalSeconds),
-                AvgAdvantageSeconds = avg,
-                Penalty = penaltiy,
-                Times = timeDif.Select(t => new Timing() { age = t.age.ToString(), TotalSeconds = t.TotalSeconds }),
-                OutspeedUserCount = escrowedUserCount
-            };
+        private async Task<List<FlipEvent>> GetRelevantFlips(DateTime maxTime, DateTime minTime, IEnumerable<long> numeric)
+        {
+            return await db.FlipEvents.Where(flipEvent =>
+                                    flipEvent.Type == FlipEventType.AUCTION_SOLD
+                                    && numeric.Contains(flipEvent.PlayerId)
+                                    && flipEvent.Timestamp > minTime
+                                    && flipEvent.Timestamp <= maxTime)
+                            .ToListAsync();
         }
 
         private async Task<int> GetEscrowedUserCount(TimeSpan maxAge, DateTime maxTime, IEnumerable<long> numeric, List<FlipEvent> relevantFlips)
@@ -257,7 +309,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             public IEnumerable<double> Timings { get; set; }
             public IEnumerable<Timing> Times { get; set; }
             public IEnumerable<string> BadIds { get; set; }
-            public int OutspeedUserCount { get; internal set; }
+            public int OutspeedUserCount { get; set; }
+            public IEnumerable<MacroedFlip> MacroedFlips { get; set; }
         }
 
         public class Timing
@@ -265,6 +318,12 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             public double TotalSeconds { get; set; }
             public string age { get; set; }
             public bool Tfm { get; set; }
+        }
+
+        public class MacroedFlip
+        {
+            public double TotalSeconds { get; set; }
+            public DateTime BuyTime { get; set; }
         }
     }
 }
