@@ -22,7 +22,10 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
         private readonly ILogger<AnalyseController> logger;
         private readonly TrackerService service;
 
-        private static readonly HashSet<string> BadPlayers = new() { "dffa84d869684e81894ea2a355c40118" };
+        private static readonly HashSet<string> BadPlayers = new() {
+            "dffa84d869684e81894ea2a355c40118", // macroed for days
+            "d472ab290c0f4cbbaccefdce90176d32" // See https://discord.com/channels/267680588666896385/1006897388641853470/1011757951087820911
+        };
         private static readonly HashSet<string> CoolMacroers = new() { "0a86231badba4dbdbe12a3e4a8838f80" };
 
         private static readonly TimeSpan shadowTiming = TimeSpan.FromDays(2);
@@ -213,7 +216,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             {
                 var longTermFlips = await GetRelevantFlips(maxTime, maxTime - shadowTiming, numeric);
                 var longTermTimeDif = await GetTimings(maxTime, numeric, longTermFlips);
-                macroedTimeDif = longTermTimeDif.Where(t=>t.TotalSeconds > 3.51 && t.TotalSeconds < 4).Select(f => new MacroedFlip() { TotalSeconds = f.TotalSeconds, BuyTime = DateTime.Now - f.age });
+                macroedTimeDif = longTermTimeDif.Where(t => t.TotalSeconds > 3.51 && t.TotalSeconds < 4).Select(f => new MacroedFlip() { TotalSeconds = f.TotalSeconds, BuyTime = DateTime.Now - f.age });
             }
 
             return macroedTimeDif;
