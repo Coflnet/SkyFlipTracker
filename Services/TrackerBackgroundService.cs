@@ -122,7 +122,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 {
                     AuctionId = lp.UId,
                     FinderType = lp.Finder,
-                    TargetPrice = lp.TargetPrice
+                    TargetPrice = (int)(int.MaxValue < lp.TargetPrice ? lp.TargetPrice : int.MaxValue)
                 }));
                 consumeCounter.Inc(lps.Count());
             }, stoppingToken, "fliptracker", 50);
