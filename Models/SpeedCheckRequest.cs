@@ -7,6 +7,6 @@ namespace Coflnet.Sky.SkyAuctionTracker.Models
     {
         public IEnumerable<string> PlayerIds { get; set; }
         public DateTime when { get; set; } = default;
-        public int minutes { get; set; } = 20;
+        public int minutes { get; set; } = 15;
     }
 }
