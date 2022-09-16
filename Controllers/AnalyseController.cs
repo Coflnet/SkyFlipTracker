@@ -242,12 +242,13 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
 
         private async Task<List<FlipEvent>> GetRelevantFlips(DateTime maxTime, DateTime minTime, IEnumerable<long> numeric)
         {
-            return await db.FlipEvents.Where(flipEvent =>
+            var fullList= await db.FlipEvents.Where(flipEvent =>
                                     flipEvent.Type == FlipEventType.AUCTION_SOLD
                                     && numeric.Contains(flipEvent.PlayerId)
                                     && flipEvent.Timestamp > minTime
                                     && flipEvent.Timestamp <= maxTime)
                             .ToListAsync();
+            return fullList.GroupBy(f => f.AuctionId).Select(f => f.First()).ToList();
         }
 
         private async Task<int> GetEscrowedUserCount(TimeSpan maxAge, DateTime maxTime, IEnumerable<long> numeric, List<FlipEvent> relevantFlips)
