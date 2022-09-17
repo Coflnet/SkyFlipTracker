@@ -184,7 +184,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             var relevantTimings = timeDif.Where(t => t.age < maxAge).ToList();
             if (relevantTimings.Count() != 0)
             {
-                var relevant = relevantTimings.Where(d => d.TotalSeconds < 8 && d.TotalSeconds > 1);
+                var relevant = relevantTimings.Where(d => d.TotalSeconds < 3.9 && d.TotalSeconds > 1);
                 if (relevant.Count() > 0)
                     avg = relevant.Average(d => (maxAge - d.age) / (maxAge) * (d.TotalSeconds - 3.0));
                 var tooFast = relevantTimings.Where(d => d.TotalSeconds > 3.3);
