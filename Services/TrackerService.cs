@@ -186,7 +186,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 return; // nothing to do
 
             var client = new RestClient("https://tfm.thom.club");
-            var request = new RestRequest("/flip_sold", Method.POST);
+            var request = new RestRequest("/flip_sold", Method.Post);
             request.AddJsonBody(result);
             var token = new CancellationTokenSource(10000).Token;
             var response = await client.ExecuteAsync(request, token);
