@@ -29,7 +29,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
         private static readonly HashSet<string> CoolMacroers = new() { "0a86231badba4dbdbe12a3e4a8838f80" };
 
         private static readonly TimeSpan shadowTiming = TimeSpan.FromDays(2);
-        private static readonly int longMacroMultiplier = 30;
+        private static readonly int longMacroMultiplier = 80;
         // extended time that supposed macroers will be delayed over.
         private static readonly int shortMacroMultiplier = 6;
 
@@ -137,7 +137,9 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
         [Route("/players/speed")]
         public async Task<SpeedCompResult> CheckMultiAccountSpeed([FromBody] SpeedCheckRequest request)
         {
-            var maxAge = TimeSpan.FromMinutes(request.minutes == 0 ? 15 : request.minutes);
+            if(request.minutes >300)
+                throw new Exception("to long time span");
+            var maxAge = TimeSpan.FromMinutes(request.minutes <= 0 ? 15 : request.minutes);
             var maxTime = DateTime.UtcNow;
             if (request.when != default)
                 maxTime = request.when;
