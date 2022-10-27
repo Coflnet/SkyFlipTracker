@@ -179,7 +179,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
                 OutspeedUserCount = escrowedUserCount,
                 MacroedFlips = macroedTimeDif,
                 BoughtWorth = flipworth,
-                TopBuySpeed = timeDif.Max(d => d.TotalSeconds)
+                TopBuySpeed = timeDif.Any() ? timeDif.Max(d => d.TotalSeconds) : 0
             };
         }
 
