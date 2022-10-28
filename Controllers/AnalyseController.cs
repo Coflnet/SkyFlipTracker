@@ -204,7 +204,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             {
                 var relevant = relevantTimings.Where(d => d.TotalSeconds < 3.9 && d.TotalSeconds > 1);
                 if (relevant.Count() > 0)
-                    avg = relevant.Average(d => (maxAge - d.age) / (maxAge) * (d.TotalSeconds - 3.0));
+                    avg = GetAverageAdvantage(baseMaxAge, maxAge, relevant);
                 var recentTooFast = relevantTimings.Where(t => t.age < baseMaxAge).Where(d => d.TotalSeconds > 3.3);
                 var speedPenalty = GetSpeedPenalty(maxAge, recentTooFast);
                 penaltiy = avg + speedPenalty;
@@ -218,6 +218,18 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             penaltiy += (8 * badIds.Count());
             penaltiy += (request.PlayerIds.Where(p => CoolMacroers.Contains(p)).Any() ? 0.312345 : 0);
             return penaltiy;
+        }
+        /// <summary>
+        /// Calculates the average speed advantage, first drops of sharply within baseMaxAge but includes all flips until maxAge at 50%
+        /// </summary>
+        /// <param name="baseMaxAge"></param>
+        /// <param name="maxAge"></param>
+        /// <param name="relevant"></param>
+        /// <returns></returns>
+        private static double GetAverageAdvantage(TimeSpan baseMaxAge, TimeSpan maxAge, IEnumerable<(double TotalSeconds, TimeSpan age)> relevant)
+        {
+            return (relevant.Average(d => (maxAge - d.age) / (maxAge) * (d.TotalSeconds - 3.0)) / 2
+                + relevant.Where(t => t.age < baseMaxAge).Select(d => (baseMaxAge - d.age) / (baseMaxAge) * (d.TotalSeconds - 3.0)).DefaultIfEmpty(0).Average() / 2);
         }
 
         private static double GetShortTermAntiMacroDelay(TimeSpan maxAge, IEnumerable<(double TotalSeconds, TimeSpan age)> timeDif, List<(double TotalSeconds, TimeSpan age)> macroedFlips)
