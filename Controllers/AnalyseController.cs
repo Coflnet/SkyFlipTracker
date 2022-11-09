@@ -26,7 +26,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             "dffa84d869684e81894ea2a355c40118", // macroed for days
             "d472ab290c0f4cbbaccefdce90176d32" // See https://discord.com/channels/267680588666896385/1006897388641853470/1011757951087820911
         };
-        private static readonly HashSet<string> CoolMacroers = new() { "0a86231badba4dbdbe12a3e4a8838f80" };
+        private static readonly HashSet<string> CoolMacroers = new() { };
 
         private static readonly TimeSpan shadowTiming = TimeSpan.FromDays(2);
         private static readonly int longMacroMultiplier = 80;
