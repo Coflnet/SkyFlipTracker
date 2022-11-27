@@ -228,8 +228,9 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
         /// <returns></returns>
         private static double GetAverageAdvantage(TimeSpan baseMaxAge, TimeSpan maxAge, IEnumerable<(double TotalSeconds, TimeSpan age)> relevant)
         {
-            return (relevant.Average(d => (maxAge - d.age) / (maxAge) * (d.TotalSeconds - 3.0)) / 2
-                + relevant.Where(t => t.age < baseMaxAge).Select(d => (baseMaxAge - d.age) / (baseMaxAge) * (d.TotalSeconds - 3.0)).DefaultIfEmpty(0).Average() / 2);
+            var targetSpeed = 3.02;
+            return (relevant.Average(d => (maxAge - d.age) / (maxAge) * (d.TotalSeconds - targetSpeed)) / 2
+                + relevant.Where(t => t.age < baseMaxAge).Select(d => (baseMaxAge - d.age) / (baseMaxAge) * (d.TotalSeconds - targetSpeed)).DefaultIfEmpty(0).Average() / 2);
         }
 
         private static double GetShortTermAntiMacroDelay(TimeSpan maxAge, IEnumerable<(double TotalSeconds, TimeSpan age)> timeDif, List<(double TotalSeconds, TimeSpan age)> macroedFlips)
