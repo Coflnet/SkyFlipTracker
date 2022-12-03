@@ -11,7 +11,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Models
         /// <summary>
         /// The most likely alt
         /// </summary>
-        public long PlayerId { get; set; }
+        public string PlayerId { get; set; }
         /// <summary>
         /// How many flips where sent to the supposed alt
         /// </summary>

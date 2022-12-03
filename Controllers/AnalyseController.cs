@@ -120,7 +120,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
 
             return new AltResult()
             {
-                PlayerId = receiveMost.Key,
+                PlayerId = receiveMost.Key.ToString(),
                 TargetReceived = receiveMost.Count(),
                 BoughtCount = relevantBuys.Count(),
                 SentOut = receiveMost,
