@@ -97,10 +97,10 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
         /// <returns></returns>
         [HttpGet]
         [Route("/player/{playerId}/alternative")]
-        public async Task<AltResult> GetAlt(string toCheck)
+        public async Task<AltResult> GetAlt(string playerId)
         {
-            if (!long.TryParse(toCheck, out long numericId))
-                numericId = service.GetId(toCheck);
+            if (!long.TryParse(playerId, out long numericId))
+                numericId = service.GetId(playerId);
             var minTime = DateTime.UtcNow - TimeSpan.FromDays(1);
             var relevantBuys = await db.FlipEvents.Where(flipEvent =>
                         flipEvent.Type == FlipEventType.AUCTION_SOLD
@@ -112,11 +112,12 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
                 return new AltResult();
 
             var ids = relevantBuys.Select(f => f.AuctionId).ToHashSet();
+            var buyTimes = relevantBuys.ToDictionary(f => f.AuctionId, f => f.Timestamp);
 
             var interestingList = await db.FlipEvents.Where(f => ids.Contains(f.AuctionId) && f.Type == FlipEventType.FLIP_RECEIVE)
                                 .ToListAsync();
 
-            var receiveMost = interestingList.GroupBy(f => f.PlayerId).OrderByDescending(f => f.Count()).FirstOrDefault();
+            var receiveMost = interestingList.Where(f=>f.Timestamp - TimeSpan.FromSeconds(4.5) < buyTimes[f.AuctionId]).GroupBy(f => f.PlayerId).OrderByDescending(f => f.Count()).FirstOrDefault();
             if (receiveMost == null)
                 return new AltResult();
 
