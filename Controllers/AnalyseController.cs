@@ -97,15 +97,18 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
         /// <returns></returns>
         [HttpGet]
         [Route("/player/{playerId}/alternative")]
-        public async Task<AltResult> GetAlt(string playerId)
+        public async Task<AltResult> GetAlt(string playerId, double days = 1, DateTime when = default)
         {
             if (!long.TryParse(playerId, out long numericId))
                 numericId = service.GetId(playerId);
-            var minTime = DateTime.UtcNow - TimeSpan.FromDays(1);
+            if(when == default)
+                when = DateTime.UtcNow;
+            var minTime = when - TimeSpan.FromDays(days);
             var relevantBuys = await db.FlipEvents.Where(flipEvent =>
                         flipEvent.Type == FlipEventType.AUCTION_SOLD
                         && numericId == flipEvent.PlayerId
                         && flipEvent.Timestamp > minTime
+                        && flipEvent.Timestamp < when
                         && flipEvent.Timestamp <= DateTime.Now)
                 .ToListAsync();
             if (relevantBuys.Count == 0)

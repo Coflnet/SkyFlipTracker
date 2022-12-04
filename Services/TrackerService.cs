@@ -155,6 +155,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
         {
             var uids = sells.Where(s => s.FlatenedNBT.Where(n => n.Key == "uid").Any()).ToDictionary(s => s.FlatenedNBT.Where(n => n.Key == "uid").Select(n => n.Value).FirstOrDefault());
             var exists = await auctionsApi.ApiAuctionsUidsSoldPostAsync(new Api.Client.Model.InventoryBatchLookup() { Uuids = uids.Keys.ToList() });
+            if(exists.Count == 0)
+                return;
             var soldAuctions = exists.Select(item => new
             {
                 sell = uids.GetValueOrDefault(item.Key),
