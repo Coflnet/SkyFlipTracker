@@ -143,6 +143,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             if (request.minutes > 300)
                 throw new Exception("to long time span");
             var maxAge = TimeSpan.FromMinutes(request.minutes <= 0 ? 15 : request.minutes);
+            var badIds = request.PlayerIds.Where(p => BadPlayers.Contains(p));
             var maxTime = DateTime.UtcNow;
             if (request.when != default)
                 maxTime = request.when;
@@ -157,7 +158,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
 
             var relevantFlips = await GetRelevantFlips(maxTime, minTime, numeric);
             if (relevantFlips.Count == 0)
-                return new SpeedCompResult() { Penalty = -1 };
+                return new SpeedCompResult() { Penalty = badIds.Any() ? 8 : -1, BadIds = badIds };
             IEnumerable<(double TotalSeconds, TimeSpan age)> timeDif = await GetTimings(maxTime, numeric, relevantFlips);
 
             int escrowedUserCount = await GetEscrowedUserCount(maxAge, maxTime, numeric, relevantFlips);
@@ -166,7 +167,6 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             var macroedTimeDif = await GetMacroedFlipsLongTerm(shadowTiming, maxTime, numeric, macroedFlips);
             double antiMacro = GetShortTermAntiMacroDelay(maxAge, timeDif, macroedFlips.Where(t => t.age < maxAge * shortMacroMultiplier).ToList());
 
-            var badIds = request.PlayerIds.Where(p => BadPlayers.Contains(p));
             double penaltiy = CalculatePenalty(request, maxAge, timeDif, escrowedUserCount, ref avg, antiMacro, badIds);
             int flipworth = await GetBoughtFlipsWorth(maxAge, maxTime, relevantFlips);
 
