@@ -25,6 +25,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
         private static readonly HashSet<string> BadPlayers = new() {
             "dffa84d869684e81894ea2a355c40118", // macroed for days
             "700ccbf05bc947bc9bfe4152b08a7e17", // skipped delay -- aka space
+            "799dae2ecbb94c6ebf642727947b64d2", // ^ alt
             "d1acafbfd04644cdaabcffe508829c47", // skipped delay -- aka aestic
             "c051226ddfc643a6b49b5074ecd3a658", // ^ alt
             "d472ab290c0f4cbbaccefdce90176d32" // See https://discord.com/channels/267680588666896385/1006897388641853470/1011757951087820911
