@@ -135,12 +135,15 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                         Type = FlipEventType.AUCTION_SOLD
                     });
             }
+            logger.LogInformation($"saving sells {sells.Count()}");
             var count = await db.SaveChangesAsync();
+            var toTrack = sells.ToList();
+            await Task.Delay(2000);
             _ = Task.Run(async () =>
             {
                 try
                 {
-                    await TfmSellCallback(sells);
+                    await TfmSellCallback(toTrack);
                 }
                 catch (System.Exception error)
                 {
@@ -153,14 +156,15 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
 
         private async Task TfmSellCallback(IEnumerable<SaveAuction> sells)
         {
-            var uids = sells.Where(s => s.FlatenedNBT.Where(n => n.Key == "uid").Any()).ToDictionary(s => s.FlatenedNBT.Where(n => n.Key == "uid").Select(n => n.Value).FirstOrDefault());
-            var exists = await auctionsApi.ApiAuctionsUidsSoldPostAsync(new Api.Client.Model.InventoryBatchLookup() { Uuids = uids.Keys.ToList() });
+            var sellLookup = sells.Where(s => s.FlatenedNBT.Where(n => n.Key == "uid").Any())
+                                .ToDictionary(s => s.FlatenedNBT.Where(n => n.Key == "uid").Select(n => n.Value).FirstOrDefault());
+            var exists = await auctionsApi.ApiAuctionsUidsSoldPostAsync(new Api.Client.Model.InventoryBatchLookup() { Uuids = sellLookup.Keys.ToList() });
             if(exists.Count == 0)
                 return;
             var soldAuctions = exists.Select(item => new
             {
-                sell = uids.GetValueOrDefault(item.Key),
-                buy = item.Value.Where(v => v.Uuid != uids.GetValueOrDefault(item.Key)?.Uuid && v.Timestamp < uids.GetValueOrDefault(item.Key)?.End)
+                sell = sellLookup.GetValueOrDefault(item.Key),
+                buy = item.Value.Where(v => v.Uuid != sellLookup.GetValueOrDefault(item.Key)?.Uuid && v.Timestamp < sellLookup.GetValueOrDefault(item.Key)?.End)
                                     .OrderByDescending(u => u.Timestamp).FirstOrDefault()
             }).Where(item => item.buy != null).ToList();
             var soldUids = soldAuctions.Select(u => GetId(u.buy.Uuid)).ToHashSet();
@@ -207,6 +211,24 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     Finder = finders.Where(f => f.AuctionId == item.sell.UId).FirstOrDefault(),
                     Profit = (int)(item.sell.HighestBidAmount - buy?.HighestBidAmount ?? 0),
                 });
+                var sell = item.sell;
+                var flip = new PastFlip()
+                {
+                    Flipper = Guid.Parse(sell.AuctioneerId),
+                    ItemName = item.sell.ItemName,
+                    ItemTag = sell.Tag,
+                    ItemTier = sell.Tier,
+                    Profit = (int)(item.sell.HighestBidAmount - buy?.HighestBidAmount ?? 0),
+                    SellPrice = item.sell.HighestBidAmount,
+                    SellTime = item.sell.End,
+                    PurchaseCost = buy.HighestBidAmount,
+                    PurchaseTime = buy.End,
+                    Uid = item.sell.UId,
+                    PurchaseAuctionId = GetId(buy.Uuid),
+                    SellAuctionId = GetId(sell.Uuid),
+                    Version = 1,
+                };
+                logger.LogInformation($"saving flip {Newtonsoft.Json.JsonConvert.SerializeObject(flip, Newtonsoft.Json.Formatting.Indented)}");
             }
         }
 
