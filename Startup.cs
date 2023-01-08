@@ -62,7 +62,7 @@ namespace Coflnet.Sky.SkyAuctionTracker
             );
             services.AddHostedService<TrackerBackgroundService>();
             services.AddSingleton<Coflnet.Sky.Api.Client.Api.IAuctionsApi>(conf => new Coflnet.Sky.Api.Client.Api.AuctionsApi(Configuration["API_BASE_URL"]));
-            services.AddJaeger();
+            services.AddJaeger(Configuration);
             services.AddTransient<TrackerService>();
             services.AddSingleton<FlipSumaryEventProducer>();
         }
