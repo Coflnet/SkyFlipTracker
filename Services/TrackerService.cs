@@ -216,9 +216,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
 
 
             // Console.WriteLine(Newtonsoft.Json.JsonConvert.SerializeObject(soldAuctions, Newtonsoft.Json.Formatting.Indented));
-            foreach (var item in soldAuctions)
+            await Parallel.ForEachAsync(soldAuctions, async (item, token) =>
             {
-                var token = new CancellationTokenSource(10000).Token;
                 var buy = await auctionsApi.ApiAuctionAuctionUuidGetAsync(item.buy.Uuid, 0, token);
                 flipSumaryEventProducer.Produce(new FlipSumaryEvent()
                 {
@@ -266,7 +265,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     Console.WriteLine($"Failed to save flip {item.buy.Uuid} -> {item.sell.Uuid} {Newtonsoft.Json.JsonConvert.SerializeObject(item.sell, Newtonsoft.Json.Formatting.Indented)}");
                     throw;
                 }
-            }
+            });
         }
 
         internal long GetId(string uuid)
