@@ -193,7 +193,7 @@ public class ProfitChangeService
     private static string GetCorrectKey(KeyValuePair<string, string> gem, Dictionary<string, string> flat)
     {
         var type = gem.Key.Split("_")[0];
-        if (type == "UNIVERSAL" || type == "COMBAT" || type == "DEFENSIVE")
+        if (type == "UNIVERSAL" || type == "COMBAT" || type == "DEFENSIVE" || type == "MINING")
             type = flat.Where(f => f.Key == gem.Key + "_gem").FirstOrDefault().Value;
         return type;
     }

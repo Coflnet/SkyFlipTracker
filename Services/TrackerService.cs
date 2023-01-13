@@ -9,6 +9,7 @@ using Coflnet.Sky.SkyAuctionTracker.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using System.Diagnostics;
 
 namespace Coflnet.Sky.SkyAuctionTracker.Services
 {
@@ -21,6 +22,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
         private IServiceScopeFactory scopeFactory;
         private ProfitChangeService profitChangeService;
         private FlipStorageService flipStorageService;
+        private ActivitySource activitySource;
 
         public TrackerService(
             TrackerDbContext db,
@@ -29,7 +31,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             FlipSumaryEventProducer flipSumaryEventProducer,
             IServiceScopeFactory scopeFactory,
             ProfitChangeService profitChangeService,
-            FlipStorageService flipStorageService)
+            FlipStorageService flipStorageService,
+            ActivitySource activitySource)
         {
             this.db = db;
             this.logger = logger;
@@ -38,6 +41,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             this.scopeFactory = scopeFactory;
             this.profitChangeService = profitChangeService;
             this.flipStorageService = flipStorageService;
+            this.activitySource = activitySource;
         }
 
         public async Task<Flip> AddFlip(Flip flip)
@@ -155,6 +159,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
 
         private async Task IndexCassandra(IEnumerable<SaveAuction> sells)
         {
+            using var activity = activitySource.StartActivity("IndexCassandra", ActivityKind.Server);
             try
             {
                 await TfmSellCallback(sells);
@@ -172,11 +177,11 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     return;
                 }
                 dev.Logger.Instance.Error(error, "cassandra index failed");
-                await Task.Delay(1000);
+                await Task.Delay(500);
                 if (sells.Count() > 1)
                 {
-                    await TfmSellCallback(sells.Take(sells.Count() / 2));
-                    await TfmSellCallback(sells.Skip(sells.Count() / 2));
+                    await IndexCassandra(sells.Take(sells.Count() / 2));
+                    await IndexCassandra(sells.Skip(sells.Count() / 2));
                 }
                 else
                     throw error;
@@ -254,7 +259,6 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     if (flip.ProfitChanges.Count() > 2 && flip.Profit != 0 || flip.ProfitChanges.Any(c => c.Label.Contains("drill_part")) || flip.ItemTag.Contains("_WITHER"))
                     {
                         logger.LogInformation($"saving flip {Newtonsoft.Json.JsonConvert.SerializeObject(flip, Newtonsoft.Json.Formatting.Indented)}");
-                        await Task.Delay(20000);
                     }
                 }
                 catch (System.Exception)

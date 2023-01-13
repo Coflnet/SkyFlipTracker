@@ -30,13 +30,15 @@ public class FlipStorageService
         this.config = config;
     }
 
-    public async Task<ISession> GetSession(string keyspace = "flips")
+    public async Task<ISession> GetSession(string keyspace = null)
     {
         if (_session != null)
             return _session;
         await sessionOpenLock.WaitAsync();
         if (_session != null)
             return _session;
+        if(keyspace == null)
+            keyspace = config["CASSANDRA:KEYSPACE"];
         try
         {
             var cluster = Cluster.Builder()
