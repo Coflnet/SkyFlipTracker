@@ -9,7 +9,6 @@ using Coflnet.Sky.SkyAuctionTracker.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using RestSharp;
 
 namespace Coflnet.Sky.SkyAuctionTracker.Services
 {
@@ -20,14 +19,25 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
         private IAuctionsApi auctionsApi;
         private FlipSumaryEventProducer flipSumaryEventProducer;
         private IServiceScopeFactory scopeFactory;
+        private ProfitChangeService profitChangeService;
+        private FlipStorageService flipStorageService;
 
-        public TrackerService(TrackerDbContext db, ILogger<TrackerService> logger, IAuctionsApi api, FlipSumaryEventProducer flipSumaryEventProducer, IServiceScopeFactory scopeFactory)
+        public TrackerService(
+            TrackerDbContext db,
+            ILogger<TrackerService> logger,
+            IAuctionsApi api,
+            FlipSumaryEventProducer flipSumaryEventProducer,
+            IServiceScopeFactory scopeFactory,
+            ProfitChangeService profitChangeService,
+            FlipStorageService flipStorageService)
         {
             this.db = db;
             this.logger = logger;
             this.auctionsApi = api;
             this.flipSumaryEventProducer = flipSumaryEventProducer;
             this.scopeFactory = scopeFactory;
+            this.profitChangeService = profitChangeService;
+            this.flipStorageService = flipStorageService;
         }
 
         public async Task<Flip> AddFlip(Flip flip)
@@ -138,28 +148,50 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             logger.LogInformation($"saving sells {sells.Count()}");
             var count = await db.SaveChangesAsync();
             var toTrack = sells.ToList();
-            await Task.Delay(2000);
-            _ = Task.Run(async () =>
-            {
-                try
-                {
-                    await TfmSellCallback(toTrack);
-                }
-                catch (System.Exception error)
-                {
-                    dev.Logger.Instance.Error(error, "TFM sell callback failed");
-                }
-            });
 
+            await IndexCassandra(toTrack);
             Console.WriteLine($"Saved sells {count}");
+        }
+
+        private async Task IndexCassandra(IEnumerable<SaveAuction> sells)
+        {
+            try
+            {
+                await TfmSellCallback(sells);
+                return;
+            }
+            catch (System.Exception error)
+            {
+                if (error.Message.Contains("with the same key has already been added."))
+                {
+                    foreach (var item in sells)
+                    {
+                        await TfmSellCallback(new SaveAuction[] { item });
+                    }
+                    logger.LogInformation($"saved sells {sells.Count()} one by one because dupplicate");
+                    return;
+                }
+                dev.Logger.Instance.Error(error, "cassandra index failed");
+                await Task.Delay(1000);
+                if (sells.Count() > 1)
+                {
+                    await TfmSellCallback(sells.Take(sells.Count() / 2));
+                    await TfmSellCallback(sells.Skip(sells.Count() / 2));
+                }
+                else
+                    throw error;
+            }
         }
 
         private async Task TfmSellCallback(IEnumerable<SaveAuction> sells)
         {
             var sellLookup = sells.Where(s => s.FlatenedNBT.Where(n => n.Key == "uid").Any())
+                                .GroupBy(s => new { uid = s.FlatenedNBT.Where(n => n.Key == "uid").First(), s.End }).Select(g => g.First())
                                 .ToDictionary(s => s.FlatenedNBT.Where(n => n.Key == "uid").Select(n => n.Value).FirstOrDefault());
             var exists = await auctionsApi.ApiAuctionsUidsSoldPostAsync(new Api.Client.Model.InventoryBatchLookup() { Uuids = sellLookup.Keys.ToList() });
-            if(exists.Count == 0)
+            if (exists == null)
+                throw new Exception("Could not reach api to load purchases");
+            if (exists.Count == 0)
                 return;
             var soldAuctions = exists.Select(item => new
             {
@@ -177,31 +209,11 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 finders = await dbScoped.Flips.Where(f => soldUids.Contains(f.AuctionId)).ToListAsync();
             }
 
-            var result = flipsSoldFromTfm.Select(f =>
-            {
-                var match = soldAuctions.Where(s => GetId(s.buy.Uuid) == f.AuctionId).FirstOrDefault();
-                return new
-                {
-                    foundTime = f.Timestamp,
-                    sell = new { uuid = match?.sell?.Uuid, sellPrice = match?.sell?.HighestBidAmount },
-                    originAuction = match?.buy?.Uuid,
-                };
-            }).ToList();
 
-            if (result.Count == 0)
-                return; // nothing to do
-
-            var client = new RestClient("https://tfm.thom.club");
-            var request = new RestRequest("/flip_sold", Method.Post);
-            request.AddJsonBody(result);
-            var token = new CancellationTokenSource(10000).Token;
-            var response = await client.ExecuteAsync(request, token);
-
-            Console.WriteLine($"TFM sell response ({response.StatusCode}) sent {result.Count}: {response.Content}");
             // Console.WriteLine(Newtonsoft.Json.JsonConvert.SerializeObject(soldAuctions, Newtonsoft.Json.Formatting.Indented));
             foreach (var item in soldAuctions)
             {
-                token = new CancellationTokenSource(10000).Token;
+                var token = new CancellationTokenSource(10000).Token;
                 var buy = await auctionsApi.ApiAuctionAuctionUuidGetAsync(item.buy.Uuid, 0, token);
                 flipSumaryEventProducer.Produce(new FlipSumaryEvent()
                 {
@@ -211,24 +223,45 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     Finder = finders.Where(f => f.AuctionId == item.sell.UId).FirstOrDefault(),
                     Profit = (int)(item.sell.HighestBidAmount - buy?.HighestBidAmount ?? 0),
                 });
-                var sell = item.sell;
-                var flip = new PastFlip()
+                try
                 {
-                    Flipper = Guid.Parse(sell.AuctioneerId),
-                    ItemName = item.sell.ItemName,
-                    ItemTag = sell.Tag,
-                    ItemTier = sell.Tier,
-                    Profit = (int)(item.sell.HighestBidAmount - buy?.HighestBidAmount ?? 0),
-                    SellPrice = item.sell.HighestBidAmount,
-                    SellTime = item.sell.End,
-                    PurchaseCost = buy.HighestBidAmount,
-                    PurchaseTime = buy.End,
-                    Uid = item.sell.UId,
-                    PurchaseAuctionId = GetId(buy.Uuid),
-                    SellAuctionId = GetId(sell.Uuid),
-                    Version = 1,
-                };
-                logger.LogInformation($"saving flip {Newtonsoft.Json.JsonConvert.SerializeObject(flip, Newtonsoft.Json.Formatting.Indented)}");
+                    var sell = item.sell;
+                    var flipFound = finders.Where(f => f.AuctionId == item.sell.UId).OrderByDescending(f => f.Timestamp).FirstOrDefault();
+                    var changes = await profitChangeService.GetChanges(buy, sell).ToListAsync();
+                    var profit = (long)(item.sell.HighestBidAmount - buy?.HighestBidAmount ?? 0) + changes.Sum(c => c.Amount);
+                    if (sell.End - buy.End > TimeSpan.FromDays(14))
+                        profit = 0; // no flip if it took more than 2 weeks
+                    var flip = new PastFlip()
+                    {
+                        Flipper = Guid.Parse(sell.AuctioneerId),
+                        ItemName = item.sell.ItemName,
+                        ItemTag = sell.Tag,
+                        ItemTier = sell.Tier,
+                        Profit = profit,
+                        SellPrice = item.sell.HighestBidAmount,
+                        SellTime = item.sell.End,
+                        PurchaseCost = buy.HighestBidAmount,
+                        PurchaseTime = buy.End,
+                        Uid = item.sell.UId,
+                        PurchaseAuctionId = Guid.Parse(buy.Uuid),
+                        SellAuctionId = Guid.Parse(sell.Uuid),
+                        Version = 1,
+                        TargetPrice = flipFound?.TargetPrice ?? 0,
+                        FinderType = flipFound?.FinderType ?? LowPricedAuction.FinderType.UNKOWN,
+                        ProfitChanges = changes
+                    };
+                    await flipStorageService.SaveFlip(flip);
+                    if (flip.ProfitChanges.Count() > 2 && flip.Profit != 0 || flip.ProfitChanges.Any(c => c.Label.Contains("drill_part")) || flip.ItemTag.Contains("_WITHER"))
+                    {
+                        logger.LogInformation($"saving flip {Newtonsoft.Json.JsonConvert.SerializeObject(flip, Newtonsoft.Json.Formatting.Indented)}");
+                        await Task.Delay(20000);
+                    }
+                }
+                catch (System.Exception)
+                {
+                    Console.WriteLine($"Failed to save flip {item.buy.Uuid} -> {item.sell.Uuid} {Newtonsoft.Json.JsonConvert.SerializeObject(item.sell, Newtonsoft.Json.Formatting.Indented)}");
+                    throw;
+                }
             }
         }
 

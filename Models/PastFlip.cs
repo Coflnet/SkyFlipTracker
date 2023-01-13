@@ -25,12 +25,12 @@ public class PastFlip
     /// Hypixel item tag
     /// </summary>
     public string ItemTag { get; set; }
-    public long PurchaseAuctionId { get; set; }
+    public Guid PurchaseAuctionId { get; set; }
     public long PurchaseCost { get; set; }
     public DateTime PurchaseTime { get; set; }
     public long TargetPrice { get; set; }
     public LowPricedAuction.FinderType FinderType { get; set; }
-    public long SellAuctionId { get; set; }
+    public Guid SellAuctionId { get; set; }
     public long SellPrice { get; set; }
     [Cassandra.Mapping.Attributes.ClusteringKey(0)]
     public DateTime SellTime { get; set; }
@@ -101,5 +101,31 @@ public class PastFlip
         /// </summary>
         [Key(3)]
         public long ContextItemId { get; set; }
+
+        /// <summary>
+        /// Creates a new profit change
+        /// </summary>
+        /// <param name="label"></param>
+        /// <param name="amount"></param>
+        public ProfitChange(string label, long amount)
+        {
+            Label = label;
+            Timestamp = default;
+            Amount = amount;
+        }
+        /// <summary>
+        /// Creates a new profit change
+        /// </summary>
+        /// <param name="label"></param>
+        /// <param name="amount"></param>
+        public ProfitChange(string label, double amount) : this(label, (long)amount)
+        {
+        }
+        /// <summary>
+        /// Creates a new profit change
+        /// </summary>
+        public ProfitChange()
+        {
+        }
     }
 }
