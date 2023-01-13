@@ -107,7 +107,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                         logger.LogError(e, "could not save event once");
                         await Task.Delay(1000);
                     }
-            }, stoppingToken, "fliptracker", 40);
+            }, stoppingToken, "fliptracker", 10);
         }
 
         private async Task ConsumeFlips(CancellationToken stoppingToken)
