@@ -3,6 +3,8 @@ using System;
 using System.Runtime.Serialization;
 using System.Text.Json.Serialization;
 using Coflnet.Sky.Core;
+using MessagePack;
+using System.Collections.Generic;
 
 namespace Coflnet.Sky.SkyAuctionTracker.Models
 {

@@ -21,16 +21,18 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
         private readonly TrackerDbContext db;
         private readonly TrackerService service;
         private readonly ILogger<TrackerController> logger;
+        private readonly FlipStorageService flipStorageService;
 
         /// <summary>
         /// Creates a new instance of <see cref="TrackerController"/>
         /// </summary>
         /// <param name="context"></param>
-        public TrackerController(TrackerDbContext context, TrackerService service, ILogger<TrackerController> logger)
+        public TrackerController(TrackerDbContext context, TrackerService service, ILogger<TrackerController> logger, FlipStorageService flipStorageService)
         {
             db = context;
             this.service = service;
             this.logger = logger;
+            this.flipStorageService = flipStorageService;
         }
 
         /// <summary>
@@ -194,6 +196,18 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
                 return new ValueTuple<long, double>(0, 0);
 
             return new ValueTuple<long, double>(flipSoldEvent.PlayerId, (flipSoldEvent.Timestamp - flipClickEvent.Timestamp).TotalSeconds);
+        }
+
+
+        [HttpGet]
+        [Route("/flips/{PlayerId}")]
+        public async Task<IEnumerable<PastFlip>> GetFlipsOfPlayer(Guid PlayerId, DateTime from, DateTime to)
+        {
+            if(from == DateTime.MinValue)
+                from = DateTime.Now.AddYears(-1);
+            if(to == DateTime.MinValue)
+                to = DateTime.Now;
+            return await flipStorageService.GetFlips(PlayerId, from, to);
         }
 
         private long GetId(string uuid)

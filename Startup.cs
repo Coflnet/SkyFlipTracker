@@ -1,24 +1,23 @@
-using System;
+global using System;
+global using System.Collections.Generic;
+global using System.Linq;
 using System.IO;
 using System.Reflection;
 using System.Text.Json.Serialization;
 using Coflnet.Sky.SkyAuctionTracker.Models;
 using Coflnet.Sky.SkyAuctionTracker.Services;
 using Coflnet.Sky.Core;
-using Jaeger.Samplers;
-using Jaeger.Senders;
-using Jaeger.Senders.Thrift;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 using Microsoft.OpenApi.Models;
-using OpenTracing;
-using OpenTracing.Util;
+using Coflnet.Sky.Crafts.Client.Api;
+using Coflnet.Sky.Api.Client.Api;
 using Prometheus;
+using Coflnet.Sky.Items.Client.Api;
 
 namespace Coflnet.Sky.SkyAuctionTracker
 {
@@ -61,7 +60,13 @@ namespace Coflnet.Sky.SkyAuctionTracker
                     .EnableDetailedErrors()       // <-- with debugging (remove for production).
             );
             services.AddHostedService<TrackerBackgroundService>();
-            services.AddSingleton<Coflnet.Sky.Api.Client.Api.IAuctionsApi>(conf => new Coflnet.Sky.Api.Client.Api.AuctionsApi(Configuration["API_BASE_URL"]));
+            services.AddSingleton<IAuctionsApi>(conf => new AuctionsApi(Configuration["API_BASE_URL"]));
+            services.AddSingleton<IPricesApi>(conf => new PricesApi(Configuration["API_BASE_URL"]));
+            services.AddSingleton<ICraftsApi>(conf => new CraftsApi(Configuration["CRAFTS_BASE_URL"]));
+            services.AddSingleton<IItemsApi>(conf => new ItemsApi(Configuration["ITEMS_BASE_URL"]));
+            services.AddSingleton<Crafts.Client.Api.IKatApi>(conf => new Crafts.Client.Api.KatApi(Configuration["CRAFTS_BASE_URL"]));
+            services.AddSingleton<ProfitChangeService>();
+            services.AddSingleton<FlipStorageService>();
             services.AddJaeger(Configuration);
             services.AddTransient<TrackerService>();
             services.AddSingleton<FlipSumaryEventProducer>();
