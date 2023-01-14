@@ -217,7 +217,10 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
 
 
             // Console.WriteLine(Newtonsoft.Json.JsonConvert.SerializeObject(soldAuctions, Newtonsoft.Json.Formatting.Indented));
-            await Parallel.ForEachAsync(soldAuctions, async (item, token) =>
+            await Parallel.ForEachAsync(soldAuctions, new ParallelOptions(){
+                MaxDegreeOfParallelism = 2,
+                CancellationToken = new CancellationTokenSource(20000).Token
+            }, async (item, token) =>
             {
                 var buy = await auctionsApi.ApiAuctionAuctionUuidGetAsync(item.buy.Uuid, 0, token);
                 flipSumaryEventProducer.Produce(new FlipSumaryEvent()
