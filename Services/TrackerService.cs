@@ -205,19 +205,20 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 buy = item.Value.Where(v => v.Uuid != sellLookup.GetValueOrDefault(item.Key)?.Uuid && v.Timestamp < sellLookup.GetValueOrDefault(item.Key)?.End)
                                     .OrderByDescending(u => u.Timestamp).FirstOrDefault()
             }).Where(item => item.buy != null).ToList();
-            var soldUids = soldAuctions.Select(u => GetId(u.buy.Uuid)).ToHashSet();
-            var flipsSoldFromTfm = soldUids.Select(f => new Flip() { AuctionId = f, FinderType = LowPricedAuction.FinderType.TFM }).ToList();
+            var purchaseUid = soldAuctions.Select(u => GetId(u.buy.Uuid)).ToHashSet();
+            var flipsSoldFromTfm = purchaseUid.Select(f => new Flip() { AuctionId = f, FinderType = LowPricedAuction.FinderType.TFM }).ToList();
 
             List<Flip> finders = new();
             using (var scope = scopeFactory.CreateScope())
             using (var dbScoped = scope.ServiceProvider.GetRequiredService<TrackerDbContext>())
             {
-                finders = await dbScoped.Flips.Where(f => soldUids.Contains(f.AuctionId)).ToListAsync();
+                finders = await dbScoped.Flips.Where(f => purchaseUid.Contains(f.AuctionId)).ToListAsync();
             }
 
 
             // Console.WriteLine(Newtonsoft.Json.JsonConvert.SerializeObject(soldAuctions, Newtonsoft.Json.Formatting.Indented));
-            await Parallel.ForEachAsync(soldAuctions, new ParallelOptions(){
+            await Parallel.ForEachAsync(soldAuctions, new ParallelOptions()
+            {
                 MaxDegreeOfParallelism = 2,
                 CancellationToken = new CancellationTokenSource(20000).Token
             }, async (item, token) =>
@@ -228,13 +229,13 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     Flipper = item.sell.AuctioneerId,
                     Buy = buy,
                     Sell = item.sell,
-                    Finder = finders.Where(f => f.AuctionId == item.sell.UId).FirstOrDefault(),
+                    Finder = finders.Where(f => f.AuctionId == GetId(item.buy.Uuid)).FirstOrDefault(),
                     Profit = (int)(item.sell.HighestBidAmount - buy?.HighestBidAmount ?? 0),
                 });
                 try
                 {
                     var sell = item.sell;
-                    var flipFound = finders.Where(f => f.AuctionId == item.sell.UId).OrderByDescending(f => f.Timestamp).FirstOrDefault();
+                    var flipFound = finders.Where(f => f.AuctionId == GetId(buy.Uuid)).OrderByDescending(f => f.Timestamp).FirstOrDefault();
                     var changes = await profitChangeService.GetChanges(buy, sell).ToListAsync();
                     var profit = (long)(item.sell.HighestBidAmount - buy?.HighestBidAmount ?? 0) + changes.Sum(c => c.Amount);
                     if (sell.End - buy.End > TimeSpan.FromDays(14))
@@ -259,7 +260,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                         ProfitChanges = changes
                     };
                     await flipStorageService.SaveFlip(flip);
-                    if (flip.ProfitChanges.Count() > 2 && flip.Profit != 0 && !flip.ProfitChanges.Any(c=>c.Label.StartsWith("crafting material")) || flip.ProfitChanges.Any(c => c.Label.Contains("drill_part")))
+                    if (flip.ProfitChanges.Count() > 2 && flip.Profit != 0 && !flip.ProfitChanges.Any(c => c.Label.StartsWith("crafting material")) || flip.ProfitChanges.Any(c => c.Label.Contains("drill_part")))
                     {
                         logger.LogInformation($"saving flip {Newtonsoft.Json.JsonConvert.SerializeObject(flip, Newtonsoft.Json.Formatting.Indented)}");
                     }
