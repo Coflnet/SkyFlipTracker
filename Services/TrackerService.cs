@@ -259,7 +259,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                         ProfitChanges = changes
                     };
                     await flipStorageService.SaveFlip(flip);
-                    if (flip.ProfitChanges.Count() > 2 && flip.Profit != 0 || flip.ProfitChanges.Any(c => c.Label.Contains("drill_part")) || flip.ItemTag.Contains("_WITHER"))
+                    if (flip.ProfitChanges.Count() > 2 && flip.Profit != 0 && !flip.ProfitChanges.Any(c=>c.Label.StartsWith("crafting material")) || flip.ProfitChanges.Any(c => c.Label.Contains("drill_part")))
                     {
                         logger.LogInformation($"saving flip {Newtonsoft.Json.JsonConvert.SerializeObject(flip, Newtonsoft.Json.Formatting.Indented)}");
                     }
