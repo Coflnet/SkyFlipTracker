@@ -138,8 +138,8 @@ public class ProfitChangeService
         if (buy.Tier.HasValue && ((int)buy.Tier.Value - 1) < (int)sell.Tier)
             if (sell.Tag.StartsWith("PET_"))
             {
-                if (sell.FlatenedNBT.Where(l => l.Key == "heldItem" && l.Value == "TIER_BOOST").Any())
-                    yield return await CostOf("TIER_BOOST", "tier Boost cost");
+                if (sell.FlatenedNBT.Where(l => l.Key == "heldItem" && l.Value == "PET_ITEM_TIER_BOOST").Any())
+                    yield return await CostOf("PET_ITEM_TIER_BOOST", "tier Boost cost");
                 else
                 {
                     for (int i = ((int)buy.Tier.Value); i < (int)sell.Tier - 1; i++)
