@@ -117,7 +117,7 @@ public class ProfitChangeService
             }
         }
 
-        if(sell.FlatenedNBT.ContainsKey("ability_scroll"))
+        if (sell.FlatenedNBT.ContainsKey("ability_scroll"))
         {
             var scrollsOnPurchase = buy.FlatNbt.Where(l => l.Key == "ability_scroll").SelectMany(l => l.Value.Split(' ')).ToList();
             var scrollsOnSell = sell.FlatenedNBT.Where(l => l.Key == "ability_scroll").SelectMany(l => l.Value.Split(' ')).ToList();
@@ -134,7 +134,6 @@ public class ProfitChangeService
                 buy.Tier = tier;
             logger.LogInformation($"upgraded rarity to {buy.Tier} of {buy.Uuid} due to pet tier");
         }
-
         if (buy.Tier.HasValue && ((int)buy.Tier.Value - 1) < (int)sell.Tier)
             if (sell.Tag.StartsWith("PET_"))
             {
@@ -142,15 +141,18 @@ public class ProfitChangeService
                     yield return await CostOf("PET_ITEM_TIER_BOOST", "tier Boost cost");
                 else
                 {
-                    for (int i = ((int)buy.Tier.Value); i < (int)sell.Tier - 1; i++)
+                    Console.WriteLine($"buy tier {(int)buy.Tier.Value - 1} {buy.Tier} sell tier {(int)sell.Tier} {sell.Tier}");
+                    for (int i = ((int)buy.Tier.Value - 1); i < (int)sell.Tier; i++)
                     {
                         var allCosts = await katApi.KatAllGetAsync(0, default);
                         if (allCosts == null)
                             throw new Exception("could not get kat costs from crafts api");
-                        Console.WriteLine($"kat upgrade cost {(Tier)i}({i})");
-                        var cost = allCosts.Where(c => ((int)c.CoreData.BaseRarity) == i && c.CoreData.ItemTag == sell.Tag).FirstOrDefault();
+                        var cost = allCosts.Where(c => ((int)c.TargetRarity) > i + 1 && c.CoreData.ItemTag == sell.Tag)
+                                    .OrderBy(c => c.TargetRarity).FirstOrDefault();
+                        Console.WriteLine($"kat upgrade cost {(Tier)i}({i}) {cost?.TargetRarity}");
                         var upgradeCost = cost?.UpgradeCost;
-                        var materialTitle = $"Kat materials for {(Tier)i + 1}";
+                        var tierName = (i == (int)Tier.SPECIAL - 1) ? sell.Tier.ToString() : ((Tier)i + 2).ToString();
+                        var materialTitle = $"Kat materials for {tierName}";
                         if (cost == null)
                         {
                             // approximate cost with raw
@@ -161,9 +163,11 @@ public class ProfitChangeService
                             upgradeCost = raw.Cost;
                             yield return await CostOf(raw.Material, materialTitle, raw.Amount);
                         }
-                        yield return new($"Kat cost for {(Tier)i + 1}", (long)-upgradeCost);
+                        yield return new($"Kat cost for {tierName}", (long)-upgradeCost);
                         if (cost?.MaterialCost > 0)
                             yield return new(materialTitle, (long)-cost.MaterialCost);
+                        if (i == (int)Tier.SPECIAL - 1)
+                            break;
                     }
                 }
             }

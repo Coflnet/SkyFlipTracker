@@ -41,13 +41,48 @@ public class ProfitChangeTests
         Console.WriteLine(JsonConvert.SerializeObject(KatResponse()));
         service = new ProfitChangeService(null, katMock.Object, null, null, null);
         var changes = await service.GetChanges(buy, sell).ToListAsync();
-        Assert.AreEqual(3 * 2 + 1, changes.Count);
+        Assert.AreEqual(4 * 2 + 1, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
         Assert.AreEqual(-20, changes[0].Amount);
         Assert.AreEqual(-100_000, changes[1].Amount, changes[1].Label);
         Assert.AreEqual("Kat materials for EPIC", changes[2].Label);
         Assert.AreEqual(-50, changes[2].Amount);
+        var index = 1;
+        foreach (var item in changes.Where((x, i) => i % 2 == 1).Take(3))
+        {
+            Assert.AreEqual("Kat cost for " + (Core.Tier.RARE + index++), item.Label);
+        }
+        Assert.AreEqual("Kat materials for " + Core.Tier.MYTHIC, changes.Last().Label);
         Console.WriteLine(JsonConvert.SerializeObject(changes, Formatting.Indented));
-        Assert.AreEqual(-41100170, changes.Sum(c => c.Amount));
+        Assert.AreEqual(-42100220, changes.Sum(c => c.Amount));
+    }
+
+    [Test]
+    public async Task EnderDragonSingleLevel()
+    {
+        var buy = new ColorSaveAuction()
+        {
+            Uuid = Guid.NewGuid().ToString("N"),
+            Tag = "PET_ENDER_DRAGON",
+            HighestBidAmount = 1000,
+            FlatNbt = new(),
+            Tier = Api.Client.Model.Tier.EPIC
+        };
+        var sell = new Coflnet.Sky.Core.SaveAuction()
+        {
+            Uuid = Guid.NewGuid().ToString("N"),
+            Tag = "PET_ENDER_DRAGON",
+            HighestBidAmount = 2000,
+            FlatenedNBT = new(),
+            Tier = Core.Tier.LEGENDARY
+        };
+        var katMock = new Mock<Crafts.Client.Api.IKatApi>();
+        katMock.Setup(k => k.KatAllGetAsync(0, default)).ReturnsAsync(KatResponse("PET_ENDER_DRAGON"));
+        service = new ProfitChangeService(null, katMock.Object, null, null, null);
+        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        Assert.AreEqual(3, changes.Count);
+        Assert.AreEqual(-40, changes[0].Amount);
+        Assert.AreEqual(-40000000, changes[1].Amount, changes[1].Label);
+        Assert.AreEqual("Kat materials for LEGENDARY", changes[2].Label);
     }
 
     [Test]
@@ -66,7 +101,7 @@ public class ProfitChangeTests
             Uuid = Guid.NewGuid().ToString("N"),
             Tag = "PET_ENDERMAN",
             HighestBidAmount = 1000,
-            FlatenedNBT = new(){{"heldItem", "PET_ITEM_TIER_BOOST"}},
+            FlatenedNBT = new() { { "heldItem", "PET_ITEM_TIER_BOOST" } },
             Tier = Core.Tier.MYTHIC
         };
         var pricesApi = new Mock<Api.Client.Api.IPricesApi>();
@@ -116,7 +151,7 @@ public class ProfitChangeTests
         Assert.AreEqual(-600000020, changes.Sum(c => c.Amount));
     }
 
-    private List<KatUpgradeResult> KatResponse()
+    private List<KatUpgradeResult> KatResponse(string petTag = "PET_ENDERMAN")
     {
         var all = new List<KatUpgradeResult>()
         {
@@ -176,7 +211,7 @@ public class ProfitChangeTests
         foreach (var item in all)
         {
             var tagProp = item.CoreData.GetType().GetProperty("ItemTag");
-            tagProp.SetValue(item.CoreData, "PET_ENDERMAN");
+            tagProp.SetValue(item.CoreData, petTag);
             var materialCostProp = item.GetType().GetProperty("MaterialCost");
             materialCostProp.SetValue(item, 50);
             var upgradeCost = item.GetType().GetProperty("UpgradeCost");
