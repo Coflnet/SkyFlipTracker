@@ -153,7 +153,7 @@ public class ProfitChangeService
                         var upgradeCost = cost?.UpgradeCost;
                         var tierName = (i == (int)Tier.SPECIAL - 1) ? sell.Tier.ToString() : ((Tier)i + 2).ToString();
                         var materialTitle = $"Kat materials for {tierName}";
-                        if (cost == null)
+                        if (cost == null || cost.MaterialCost >= int.MaxValue)
                         {
                             // approximate cost with raw
                             var rawCost = await katApi.KatRawGetAsync();
