@@ -103,7 +103,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
         {
             if (!long.TryParse(playerId, out long numericId))
                 numericId = service.GetId(playerId);
-            if(when == default)
+            if (when == default)
                 when = DateTime.UtcNow;
             var minTime = when - TimeSpan.FromDays(days);
             var relevantBuys = await db.FlipEvents.Where(flipEvent =>
@@ -164,7 +164,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             var relevantFlips = await GetRelevantFlips(maxTime, minTime, numeric);
             if (relevantFlips.Count == 0)
                 return new SpeedCompResult() { Penalty = badIds.Any() ? 8 : -1, BadIds = badIds };
-            IEnumerable<(double TotalSeconds, TimeSpan age)> timeDif = await GetTimings(maxTime, numeric, relevantFlips);
+            IEnumerable<(double TotalSeconds, TimeSpan age)> timeDif = (await GetTimings(maxTime, numeric, relevantFlips)).Where(t => t.TotalSeconds < 4);
 
             int escrowedUserCount = await GetEscrowedUserCount(maxAge, maxTime, numeric, relevantFlips);
             double avg = 0;
