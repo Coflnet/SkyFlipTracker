@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using Coflnet.Sky.Api.Client.Api;
 using Coflnet.Sky.Crafts.Client.Api;
 using Coflnet.Sky.Items.Client.Api;
+using System.Text.RegularExpressions;
 
 namespace Coflnet.Sky.SkyAuctionTracker.Services;
 /// <summary>
@@ -153,14 +154,16 @@ public class ProfitChangeService
                         var upgradeCost = cost?.UpgradeCost;
                         var tierName = (i == (int)Tier.SPECIAL - 1) ? sell.Tier.ToString() : ((Tier)i + 2).ToString();
                         var materialTitle = $"Kat materials for {tierName}";
-                        if (cost == null || cost.MaterialCost >= int.MaxValue)
+
+                        var level = buy.ItemName != null ? int.Parse(Regex.Replace(buy.ItemName?.Split(' ')[1], @"[^\d]", "")) : 1;
+                        if (cost == null || cost.MaterialCost >= int.MaxValue || level > 2)
                         {
                             // approximate cost with raw
                             var rawCost = await katApi.KatRawGetAsync();
                             var raw = rawCost.Where(c => ((int)c.BaseRarity) == i && c.ItemTag == sell.Tag).FirstOrDefault();
                             if (raw == null)
                                 throw new Exception($"could not find kat cost for tier {i}({(Tier)i}) and tag {sell.Tag} {buy.Uuid} -> {sell.Uuid}");
-                            upgradeCost = raw.Cost;
+                            upgradeCost = raw.Cost * (1.0 - 0.003 * level);
                             yield return await CostOf(raw.Material, materialTitle, raw.Amount);
                         }
                         yield return new($"Kat cost for {tierName}", (long)-upgradeCost);
