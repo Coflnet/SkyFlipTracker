@@ -201,11 +201,12 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
 
         [HttpGet]
         [Route("/flips/{PlayerId}")]
+        [ResponseCache(Duration = 60, Location = ResponseCacheLocation.Any, VaryByQueryKeys = new[] { "from", "to" })]
         public async Task<IEnumerable<PastFlip>> GetFlipsOfPlayer(Guid PlayerId, DateTime from, DateTime to)
         {
-            if(from == DateTime.MinValue)
+            if (from == DateTime.MinValue)
                 from = DateTime.Now.AddYears(-1);
-            if(to == DateTime.MinValue)
+            if (to == DateTime.MinValue)
                 to = DateTime.Now;
             return await flipStorageService.GetFlips(PlayerId, from, to);
         }

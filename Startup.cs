@@ -70,6 +70,9 @@ namespace Coflnet.Sky.SkyAuctionTracker
             services.AddJaeger(Configuration);
             services.AddTransient<TrackerService>();
             services.AddSingleton<FlipSumaryEventProducer>();
+            services.AddResponseCaching();
+            services.AddMemoryCache();
+            services.AddResponseCompression();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
@@ -79,6 +82,8 @@ namespace Coflnet.Sky.SkyAuctionTracker
             {
                 app.UseDeveloperExceptionPage();
             }
+            app.UseResponseCompression();
+            app.UseResponseCaching();
             app.UseSwagger();
             app.UseSwaggerUI(c =>
             {
