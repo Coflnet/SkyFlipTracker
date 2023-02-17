@@ -93,6 +93,35 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
                 .GroupBy(flipEvent => flipEvent.PlayerId).CountAsync();
         }
 
+        /// <summary>
+        /// Returns how many user recently received a flip
+        /// </summary>
+        /// <returns></returns>
+        [HttpPost]
+        [Route("/flips/sent")]
+        public async Task<IEnumerable<FlipWorthInfo>> GetSentFlipsWithin([FromBody] List<FlipTimeSelection> selections)
+        {
+            var minTime = selections.Min(s => s.Start);
+            var maxTime = selections.Max(s => s.End);
+            var playerIds = selections.Select(s => s.PlayerId).Distinct();
+            var combinedQuery = db.FlipEvents.Where(flipEvent => flipEvent.Type == FlipEventType.FLIP_RECEIVE && flipEvent.Timestamp > minTime && playerIds.Contains(flipEvent.PlayerId) && flipEvent.Timestamp < maxTime);
+            var allReceives = await combinedQuery.ToListAsync();
+            var result = new List<FlipWorthInfo>();
+            var flipIds = allReceives.Select(r => r.AuctionId).Distinct();
+            var allSentFlips = await db.Flips.Where(f => flipIds.Contains(f.AuctionId)).ToListAsync();
+
+            foreach (var selection in selections)
+            {
+                var relevantReceives = allReceives.Where(r => r.PlayerId == selection.PlayerId && r.Timestamp > selection.Start && r.Timestamp < selection.End);
+                foreach (var item in relevantReceives)
+                {
+                    var worth = allSentFlips.First(f => f.AuctionId == item.AuctionId).TargetPrice;
+                    result.Add(new FlipWorthInfo(selection.PlayerId, worth, item.Timestamp));
+                }
+            }
+            return result;
+        }
+
 
         /// <summary>
         /// Returns how many user recently received a flip
