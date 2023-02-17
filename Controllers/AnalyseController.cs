@@ -103,7 +103,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
         {
             var minTime = selections.Min(s => s.Start);
             var maxTime = selections.Max(s => s.End);
-            var playerIds = selections.Select(s => s.PlayerId).Distinct();
+            var playerIds = selections.Select(s => ParsePlayerId(s.PlayerId)).Distinct();
             var combinedQuery = db.FlipEvents.Where(flipEvent => flipEvent.Type == FlipEventType.FLIP_RECEIVE && flipEvent.Timestamp > minTime && playerIds.Contains(flipEvent.PlayerId) && flipEvent.Timestamp < maxTime);
             var allReceives = await combinedQuery.ToListAsync();
             logger.LogInformation("Found {0} flips sent from {1}", allReceives.Count, string.Join(',', playerIds.Select(p => p.ToString())));
@@ -113,7 +113,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             logger.LogInformation("Found {0} flips sent", allSentFlips.Count);
             foreach (var selection in selections)
             {
-                var relevantReceives = allReceives.Where(r => r.PlayerId == selection.PlayerId && r.Timestamp > selection.Start && r.Timestamp < selection.End);
+                var numeric = ParsePlayerId(selection.PlayerId);
+                var relevantReceives = allReceives.Where(r => r.PlayerId == numeric && r.Timestamp > selection.Start && r.Timestamp < selection.End);
                 foreach (var item in relevantReceives)
                 {
                     var worth = allSentFlips.First(f => f.AuctionId == item.AuctionId).TargetPrice;
@@ -133,8 +134,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
         [Route("/player/{playerId}/alternative")]
         public async Task<AltResult> GetAlt(string playerId, double days = 1, DateTime when = default)
         {
-            if (!long.TryParse(playerId, out long numericId))
-                numericId = service.GetId(playerId);
+            long numericId = ParsePlayerId(playerId);
             if (when == default)
                 when = DateTime.UtcNow;
             var minTime = when - TimeSpan.FromDays(days);
@@ -167,6 +167,13 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
                 TargetBought = relevantBuys,
 
             };
+        }
+
+        private long ParsePlayerId(string playerId)
+        {
+            if (!long.TryParse(playerId, out long numericId))
+                numericId = service.GetId(playerId);
+            return numericId;
         }
 
 

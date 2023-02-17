@@ -4,7 +4,7 @@ public class FlipTimeSelection
     /// <summary>
     /// The player to get the flips for
     /// </summary>
-    public long PlayerId { get; set; }
+    public string PlayerId { get; set; }
     /// <summary>
     /// The start of the time range
     /// </summary>
