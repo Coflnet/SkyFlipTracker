@@ -155,7 +155,7 @@ public class ProfitChangeService
                         var tierName = (i == (int)Tier.SPECIAL - 1) ? sell.Tier.ToString() : ((Tier)i + 2).ToString();
                         var materialTitle = $"Kat materials for {tierName}";
 
-                        var level = buy.ItemName != null ? int.Parse(Regex.Replace(buy.ItemName?.Split(' ')[1], @"[^\d]", "")) : 1;
+                        var level = string.IsNullOrEmpty(buy.ItemName) ? 1 : int.Parse(Regex.Replace(buy.ItemName?.Split(' ')[1], @"[^\d]", ""));
                         if (cost == null || cost.MaterialCost >= int.MaxValue || level > 2)
                         {
                             // approximate cost with raw

@@ -106,7 +106,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             var playerIds = selections.Select(s => s.PlayerId).Distinct();
             var combinedQuery = db.FlipEvents.Where(flipEvent => flipEvent.Type == FlipEventType.FLIP_RECEIVE && flipEvent.Timestamp > minTime && playerIds.Contains(flipEvent.PlayerId) && flipEvent.Timestamp < maxTime);
             var allReceives = await combinedQuery.ToListAsync();
-            logger.LogInformation("Found {0} flips sent", allReceives.Count);
+            logger.LogInformation("Found {0} flips sent from {1}", allReceives.Count, string.Join(',', playerIds.Select(p => p.ToString())));
             var result = new List<FlipWorthInfo>();
             var flipIds = allReceives.Select(r => r.AuctionId).Distinct();
             var allSentFlips = await db.Flips.Where(f => flipIds.Contains(f.AuctionId)).ToListAsync();
@@ -186,7 +186,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
                 maxTime = request.when;
             var minTime = maxTime.Subtract(maxAge * longMacroMultiplier);
 
-            var numeric = request.PlayerIds.Select(playerId =>
+            var numeric = request.PlayerIds.Where(p => p != null).Select(playerId =>
             {
                 if (!long.TryParse(playerId, out long val))
                     val = service.GetId(playerId);
