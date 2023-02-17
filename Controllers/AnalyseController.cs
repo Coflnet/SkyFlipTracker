@@ -104,7 +104,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             var minTime = selections.Min(s => s.Start);
             var maxTime = selections.Max(s => s.End);
             var playerIds = selections.Select(s => ParsePlayerId(s.PlayerId)).Distinct();
-            var combinedQuery = db.FlipEvents.Where(flipEvent => flipEvent.Type == FlipEventType.FLIP_RECEIVE && flipEvent.Timestamp > minTime && playerIds.Contains(flipEvent.PlayerId) && flipEvent.Timestamp < maxTime);
+            var combinedQuery = db.FlipEvents.Where(flipEvent => flipEvent.Type == FlipEventType.AUCTION_SOLD && flipEvent.Timestamp > minTime && playerIds.Contains(flipEvent.PlayerId) && flipEvent.Timestamp < maxTime);
             var allReceives = await combinedQuery.ToListAsync();
             logger.LogInformation("Found {0} flips sent from {1}", allReceives.Count, string.Join(',', playerIds.Select(p => p.ToString())));
             var result = new List<FlipWorthInfo>();
