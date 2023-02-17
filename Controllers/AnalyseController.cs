@@ -118,7 +118,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
                 foreach (var item in relevantReceives)
                 {
                     var worth = allSentFlips.First(f => f.AuctionId == item.AuctionId).TargetPrice;
-                    result.Add(new FlipWorthInfo(selection.PlayerId, worth, item.Timestamp));
+                    result.Add(new FlipWorthInfo(selection.PlayerId, worth, item.Timestamp, item.AuctionId.ToString()));
                 }
             }
             logger.LogInformation("Found {0} flips worth {1} coins", result.Count, result.Sum(r => r.Worth));
