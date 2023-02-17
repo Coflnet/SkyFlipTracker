@@ -106,10 +106,11 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             var playerIds = selections.Select(s => s.PlayerId).Distinct();
             var combinedQuery = db.FlipEvents.Where(flipEvent => flipEvent.Type == FlipEventType.FLIP_RECEIVE && flipEvent.Timestamp > minTime && playerIds.Contains(flipEvent.PlayerId) && flipEvent.Timestamp < maxTime);
             var allReceives = await combinedQuery.ToListAsync();
+            logger.LogInformation("Found {0} flips sent", allReceives.Count);
             var result = new List<FlipWorthInfo>();
             var flipIds = allReceives.Select(r => r.AuctionId).Distinct();
             var allSentFlips = await db.Flips.Where(f => flipIds.Contains(f.AuctionId)).ToListAsync();
-
+            logger.LogInformation("Found {0} flips sent", allSentFlips.Count);
             foreach (var selection in selections)
             {
                 var relevantReceives = allReceives.Where(r => r.PlayerId == selection.PlayerId && r.Timestamp > selection.Start && r.Timestamp < selection.End);
@@ -119,6 +120,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
                     result.Add(new FlipWorthInfo(selection.PlayerId, worth, item.Timestamp));
                 }
             }
+            logger.LogInformation("Found {0} flips worth {1} coins", result.Count, result.Sum(r => r.Worth));
             return result;
         }
 
