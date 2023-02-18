@@ -101,7 +101,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
         [Route("/flips/sent")]
         public async Task<IEnumerable<FlipWorthInfo>> GetSentFlipsWithin([FromBody] List<FlipTimeSelection> selections)
         {
-            if(selections.Count == 0)
+            if (selections.Count == 0)
                 return new List<FlipWorthInfo>();
             var minTime = selections.Min(s => s.Start);
             var maxTime = selections.Max(s => s.End);
@@ -119,8 +119,10 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
                 var relevantReceives = allReceives.Where(r => r.PlayerId == numeric && r.Timestamp > selection.Start && r.Timestamp < selection.End);
                 foreach (var item in relevantReceives)
                 {
-                    var worth = allSentFlips.First(f => f.AuctionId == item.AuctionId).TargetPrice;
-                    result.Add(new FlipWorthInfo(selection.PlayerId, worth, item.Timestamp, item.AuctionId.ToString()));
+                    var flip = allSentFlips.FirstOrDefault(f => f.AuctionId == item.AuctionId);
+                    if (flip == null)
+                        continue;
+                    result.Add(new FlipWorthInfo(selection.PlayerId, flip.TargetPrice, item.Timestamp, item.AuctionId.ToString()));
                 }
             }
             logger.LogInformation("Found {0} flips worth {1} coins", result.Count, result.Sum(r => r.Worth));
