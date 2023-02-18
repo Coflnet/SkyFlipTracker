@@ -154,8 +154,15 @@ public class ProfitChangeService
                         var upgradeCost = cost?.UpgradeCost;
                         var tierName = (i == (int)Tier.SPECIAL - 1) ? sell.Tier.ToString() : ((Tier)i + 2).ToString();
                         var materialTitle = $"Kat materials for {tierName}";
-
-                        var level = string.IsNullOrEmpty(buy.ItemName) ? 1 : int.Parse(Regex.Replace(buy.ItemName?.Split(' ')[1], @"[^\d]", ""));
+                        var level = 1;
+                        try
+                        {
+                            level = string.IsNullOrEmpty(buy.ItemName) ? 1 : int.Parse(Regex.Replace(buy.ItemName?.Split(' ')[1], @"[^\d]", ""));
+                        }
+                        catch (Exception)
+                        {
+                            logger.LogWarning($"could not parse level from {buy.ItemName}");
+                        }
                         if (cost == null || cost.MaterialCost >= int.MaxValue || level > 2)
                         {
                             // approximate cost with raw
