@@ -120,7 +120,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
 
                 using var scope = scopeFactory.CreateScope();
                 var service = scope.ServiceProvider.GetRequiredService<TrackerService>();
-                await service.AddFlips(lps.Select(lp => new Flip()
+                await service.AddFlips(lps.DistinctBy(lp => lp.UId + (int)lp.Finder + lp.TargetPrice).Select(lp => new Flip()
                 {
                     AuctionId = lp.UId,
                     FinderType = lp.Finder,
