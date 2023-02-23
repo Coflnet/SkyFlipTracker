@@ -129,6 +129,17 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             return result;
         }
 
+        /// <summary>
+        /// Requests the loading of a flip
+        /// </summary>
+        /// <param name="uuid"></param>
+        /// <returns></returns>
+        [HttpPost]
+        [Route("/flip/{uuid}/load")]
+        public async Task CalculateFlip(string uuid)
+        {
+            await service.RefreshFlip(uuid);
+        }
 
         /// <summary>
         /// Returns how many user recently received a flip

@@ -10,6 +10,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
+using AutoMapper;
+using Newtonsoft.Json;
 
 namespace Coflnet.Sky.SkyAuctionTracker.Services
 {
@@ -157,12 +159,27 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             Console.WriteLine($"Saved sells {count}");
         }
 
+        public async Task RefreshFlip(string auctionId)
+        {
+            var auction = await auctionsApi.ApiAuctionAuctionUuidGetAsync(auctionId);
+            var mapper = new AutoMapper.Mapper(new MapperConfiguration(cfg =>
+            {
+                cfg.CreateMap<Api.Client.Model.ColorSaveAuction, SaveAuction>().ForMember(dest => dest.FlatenedNBT, opt => opt.MapFrom(src => src.FlatNbt));
+                cfg.CreateMap<Api.Client.Model.ColorEnchant, Enchantment>();
+                cfg.CreateMap<Api.Client.Model.SaveBids, SaveBids>();
+                cfg.AddGlobalIgnore("NbtData");
+            }));
+            var mapped = mapper.Map<SaveAuction>(auction);
+            Console.WriteLine(JsonConvert.SerializeObject(mapped, Formatting.Indented));
+            await IndexCassandra(new SaveAuction[] { mapped });
+        }
+
         private async Task IndexCassandra(IEnumerable<SaveAuction> sells)
         {
             using var activity = activitySource.StartActivity("IndexCassandra", ActivityKind.Server);
             try
             {
-                await TfmSellCallback(sells);
+                await CalculateAndIndex(sells);
                 return;
             }
             catch (System.Exception error)
@@ -171,7 +188,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 {
                     foreach (var item in sells)
                     {
-                        await TfmSellCallback(new SaveAuction[] { item });
+                        await CalculateAndIndex(new SaveAuction[] { item });
                     }
                     logger.LogInformation($"saved sells {sells.Count()} one by one because dupplicate");
                     return;
@@ -189,7 +206,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             }
         }
 
-        private async Task TfmSellCallback(IEnumerable<SaveAuction> sells)
+        private async Task CalculateAndIndex(IEnumerable<SaveAuction> sells)
         {
             var sellLookup = sells.Where(s => s.FlatenedNBT.Where(n => n.Key == "uid").Any())
                                 .GroupBy(s => new { uid = s.FlatenedNBT.Where(n => n.Key == "uid").First(), s.End }).Select(g => g.First())
