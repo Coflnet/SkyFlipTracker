@@ -120,6 +120,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 var service = scope.ServiceProvider.GetRequiredService<TrackerService>();
                 await service.IndexCassandra(toUpdate);
                 flipsUpdated.Inc(toUpdate.Count());
+                Console.WriteLine("updated flips " + toUpdate.Count());
             }, stoppingToken, "fliptracker", 30);
         }
 
