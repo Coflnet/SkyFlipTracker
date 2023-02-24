@@ -23,6 +23,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
 
         private static Prometheus.Counter consumeCounter = Prometheus.Metrics.CreateCounter("sky_fliptracker_consume_lp", "Counts the consumed low priced auctions");
         private static Prometheus.Counter consumeEvent = Prometheus.Metrics.CreateCounter("sky_fliptracker_consume_event", "Counts the consumed flip events");
+        private static Prometheus.Counter flipsUpdated = Prometheus.Metrics.CreateCounter("sky_fliptracker_flips_updated", "How many flips were updated");
 
         public TrackerBackgroundService(
             IServiceScopeFactory scopeFactory, IConfiguration config, ILogger<TrackerBackgroundService> logger)
@@ -52,7 +53,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             await Task.WhenAny(
                 Run(flipCons, "consuming flips"),
                 Run(flipEventCons, "flip events cons"),
-                Run(sellCons, "sells con"));
+                Run(sellCons, "sells con"),
+                Run(LoadFlip(stoppingToken), "load flip"));
             logger.LogError("consuming stopped :O");
             throw new Exception("at least one consuming process stopped");
         }
@@ -109,6 +111,16 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     }
             }, stoppingToken, "fliptracker", 60);
             throw new Exception("consuming sells stopped");
+        }
+        private async Task LoadFlip(CancellationToken stoppingToken)
+        {
+            await Coflnet.Kafka.KafkaConsumer.ConsumeBatch<SaveAuction>(config["KAFKA_HOST"], config["TOPICS:LOAD_FLIPS"], async toUpdate =>
+            {
+                using var scope = scopeFactory.CreateScope();
+                var service = scope.ServiceProvider.GetRequiredService<TrackerService>();
+                await service.IndexCassandra(toUpdate);
+                flipsUpdated.Inc(toUpdate.Count());
+            }, stoppingToken, "fliptracker", 30);
         }
 
         private async Task ConsumeFlips(CancellationToken stoppingToken)

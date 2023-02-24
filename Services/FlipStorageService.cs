@@ -37,7 +37,7 @@ public class FlipStorageService
         await sessionOpenLock.WaitAsync();
         if (_session != null)
             return _session;
-        if(keyspace == null)
+        if (keyspace == null)
             keyspace = config["CASSANDRA:KEYSPACE"];
         try
         {
@@ -81,11 +81,19 @@ public class FlipStorageService
         await Task.WhenAll(flips.Select(f => table.Insert(f).ExecuteAsync()));
     }
 
-    public async Task<IEnumerable<PastFlip>> GetFlips(Guid flipper,  DateTime start, DateTime end)
+    public async Task<IEnumerable<PastFlip>> GetFlips(Guid flipper, DateTime start, DateTime end)
     {
         var session = await GetSession();
         var table = GetFlipsTable(session);
         return await table.Where(f => f.Flipper == flipper && f.SellTime >= start && f.SellTime <= end).ExecuteAsync();
+    }
+    public async Task<IEnumerable<(Guid, short)>> GetFlipVersions(Guid flipper, DateTime start, DateTime end, IEnumerable<Guid> auctionIds)
+    {
+        var session = await GetSession();
+        var table = GetFlipsTable(session);
+        var asObject = await table.Where(f => f.Flipper == flipper && f.SellTime >= start && f.SellTime <= end)
+            .Select(f => new { f.SellAuctionId, f.Version }).ExecuteAsync();
+        return asObject.Select(f => (f.SellAuctionId, f.Version));
     }
 
     public async Task<long> GetProfit(Guid flipper, DateTime end, DateTime start)
@@ -104,6 +112,6 @@ public class FlipStorageService
             .ClusteringKey(c => c.Uid)
             .Column(c => c.FinderType, cm => cm.WithDbType<int>())
             .Column(c => c.ItemTier, cm => cm.WithDbType<int>())
-            .Column(c =>c.ProfitChanges, cm => cm.Ignore())), "flips");
+            .Column(c => c.ProfitChanges, cm => cm.Ignore())), "flips");
     }
 }

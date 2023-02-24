@@ -25,6 +25,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
         private ProfitChangeService profitChangeService;
         private FlipStorageService flipStorageService;
         private ActivitySource activitySource;
+        private const short Version = 1;
 
         public TrackerService(
             TrackerDbContext db,
@@ -159,9 +160,10 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             Console.WriteLine($"Saved sells {count}");
         }
 
-        public async Task RefreshFlip(string auctionId)
+        public async Task RefreshFlips(Guid playerId, IEnumerable<Guid> auctionIds)
         {
-            var auction = await auctionsApi.ApiAuctionAuctionUuidGetAsync(auctionId);
+            var existing = await flipStorageService.GetFlipVersions(playerId, new DateTime(2020, 0, 0), DateTime.Now, auctionIds);
+            var toRefresh = auctionIds.Except(existing.Where(e => e.Item2 < Version).Select(e => e.Item1)).ToList();
             var mapper = new AutoMapper.Mapper(new MapperConfiguration(cfg =>
             {
                 cfg.CreateMap<Api.Client.Model.ColorSaveAuction, SaveAuction>().ForMember(dest => dest.FlatenedNBT, opt => opt.MapFrom(src => src.FlatNbt));
@@ -169,12 +171,13 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 cfg.CreateMap<Api.Client.Model.SaveBids, SaveBids>();
                 cfg.AddGlobalIgnore("NbtData");
             }));
-            var mapped = mapper.Map<SaveAuction>(auction);
-            Console.WriteLine(JsonConvert.SerializeObject(mapped, Formatting.Indented));
-            await IndexCassandra(new SaveAuction[] { mapped });
+
+            var auctions = await Task.WhenAll(toRefresh.Select(async a =>
+                mapper.Map<SaveAuction>(await auctionsApi.ApiAuctionAuctionUuidGetAsync(a.ToString("N")))));
+            await IndexCassandra(auctions);
         }
 
-        private async Task IndexCassandra(IEnumerable<SaveAuction> sells)
+        public async Task IndexCassandra(IEnumerable<SaveAuction> sells)
         {
             using var activity = activitySource.StartActivity("IndexCassandra", ActivityKind.Server);
             try
