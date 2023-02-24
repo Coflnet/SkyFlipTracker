@@ -162,7 +162,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
 
         public async Task RefreshFlips(Guid playerId, IEnumerable<Guid> auctionIds)
         {
-            var existing = await flipStorageService.GetFlipVersions(playerId, new DateTime(2020, 0, 0), DateTime.Now, auctionIds);
+            var existing = await flipStorageService.GetFlipVersions(playerId, new DateTime(2020, 1, 1), DateTime.Now, auctionIds);
             var toRefresh = auctionIds.Except(existing.Where(e => e.Item2 < Version).Select(e => e.Item1)).ToList();
             var mapper = new AutoMapper.Mapper(new MapperConfiguration(cfg =>
             {
