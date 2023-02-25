@@ -150,9 +150,8 @@ public class ProfitChangeService
                             throw new Exception("could not get kat costs from crafts api");
                         var cost = allCosts.Where(c => ((int)c.TargetRarity) > i + 1 && c.CoreData.ItemTag == sell.Tag)
                                     .OrderBy(c => c.TargetRarity).FirstOrDefault();
-                        Console.WriteLine($"kat upgrade cost {(Tier)i}({i}) {cost?.TargetRarity}");
                         var upgradeCost = cost?.UpgradeCost;
-                        var tierName = (i == (int)Tier.SPECIAL - 1) ? sell.Tier.ToString() : ((Tier)i + 2).ToString();
+                        var tierName = (i +1 >= (int)Tier.LEGENDARY) ? sell.Tier.ToString() : ((Tier)i + 2).ToString();
                         var materialTitle = $"Kat materials for {tierName}";
                         var level = 1;
                         try
@@ -167,9 +166,14 @@ public class ProfitChangeService
                         {
                             // approximate cost with raw
                             var rawCost = await katApi.KatRawGetAsync();
-                            var raw = rawCost.Where(c => ((int)c.BaseRarity) == (i +1) && sell.Tag.EndsWith(c.Name.Replace(' ', '_').ToUpper())).FirstOrDefault();
+                            var rarityInt = i + 1;
+                            if (i == (int)Tier.LEGENDARY)
+                                break;
+                            //  rarityInt = (int)Crafts.Client.Model.Tier.LEGENDARY;
+                            Console.WriteLine($"kat upgrade cost {(Tier)rarityInt}({rarityInt}) {cost?.TargetRarity} {sell.Tier}");
+                            var raw = rawCost.Where(c => ((int)c.BaseRarity) == rarityInt && sell.Tag.EndsWith(c.Name.Replace(' ', '_').ToUpper())).FirstOrDefault();
                             if (raw == null)
-                                throw new Exception($"could not find kat cost for tier {i}({(Tier)i+1}) and tag {sell.Tag} {buy.Uuid} -> {sell.Uuid}");
+                                throw new Exception($"could not find kat cost for tier {i}({(Tier)rarityInt}) and tag {sell.Tag} {buy.Uuid} -> {sell.Uuid}");
                             upgradeCost = raw.Cost * (1.0 - 0.003 * level);
                             if (raw.Material != null)
                                 yield return await CostOf(raw.Material, materialTitle, raw.Amount);
@@ -177,7 +181,7 @@ public class ProfitChangeService
                         yield return new($"Kat cost for {tierName}", (long)-upgradeCost);
                         if (cost?.MaterialCost > 0)
                             yield return new(materialTitle, (long)-cost.MaterialCost);
-                        if (i == (int)Tier.SPECIAL - 1)
+                        if (i == (int)Tier.LEGENDARY)
                             break;
                     }
                 }
