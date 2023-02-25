@@ -102,6 +102,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 EnableAutoCommit = false,
                 SessionTimeoutMs = 65000,
                 AutoCommitIntervalMs = 30000,
+                PartitionAssignmentStrategy = PartitionAssignmentStrategy.CooperativeSticky
             };
             await Coflnet.Kafka.KafkaConsumer.ConsumeBatch<SaveAuction>(consumeConfig, config["TOPICS:SOLD_AUCTION"], async flipEvents =>
             {
