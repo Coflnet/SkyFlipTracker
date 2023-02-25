@@ -109,7 +109,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                         logger.LogError(e, "could not save event once");
                         await Task.Delay(1000);
                     }
-            }, stoppingToken, "fliptracker", 60);
+            }, stoppingToken, "fliptracker", 16);
             throw new Exception("consuming sells stopped");
         }
         private async Task LoadFlip(CancellationToken stoppingToken)
@@ -121,7 +121,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 await service.IndexCassandra(toUpdate);
                 flipsUpdated.Inc(toUpdate.Count());
                 Console.WriteLine("updated flips " + toUpdate.Count());
-            }, stoppingToken, "fliptracker", 30);
+            }, stoppingToken, "fliptracker", 8);
         }
 
         private async Task ConsumeFlips(CancellationToken stoppingToken)
