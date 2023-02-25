@@ -36,7 +36,6 @@ public class ProfitChangeTests
         };
         var katMock = new Mock<Crafts.Client.Api.IKatApi>();
 
-
         katMock.Setup(k => k.KatAllGetAsync(0, default)).ReturnsAsync(KatResponse());
         Console.WriteLine(JsonConvert.SerializeObject(KatResponse()));
         service = new ProfitChangeService(null, katMock.Object, null, null, null);
@@ -83,6 +82,51 @@ public class ProfitChangeTests
         Assert.AreEqual(-40, changes[0].Amount);
         Assert.AreEqual(-40000000, changes[1].Amount, changes[1].Label);
         Assert.AreEqual("Kat materials for LEGENDARY", changes[2].Label);
+    }
+
+    [Test]
+    public async Task ScathaUpgrade()
+    {
+        var buy = new ColorSaveAuction()
+        {
+            Uuid = Guid.NewGuid().ToString("N"),
+            Tag = "PET_SCATHA",
+            HighestBidAmount = 1000,
+            FlatNbt = new(),
+            Tier = Api.Client.Model.Tier.RARE
+        };
+        var sell = new Coflnet.Sky.Core.SaveAuction()
+        {
+            Uuid = Guid.NewGuid().ToString("N"),
+            Tag = "PET_SCATHA",
+            HighestBidAmount = 200_000_000,
+            FlatenedNBT = new(),
+            Tier = Core.Tier.EPIC
+        };
+        var katMock = new Mock<Crafts.Client.Api.IKatApi>();
+        katMock.Setup(k => k.KatAllGetAsync(0, default)).ReturnsAsync(KatResponse("PET_ENDER_DRAGON"));
+        katMock.Setup(k => k.KatRawGetAsync(0, default)).ReturnsAsync(new List<Crafts.Client.Model.KatUpgradeCost>()
+        {
+            new Crafts.Client.Model.KatUpgradeCost()
+            {
+                Name = "Scatha",
+                BaseRarity = Crafts.Client.Model.Tier.RARE,
+                Hours = 168,
+                Cost = 125000000,
+                Material = "ENCHANTED_HARD_STONE",
+                Amount = 64
+            }
+        });
+        var pricesApi = new Mock<Api.Client.Api.IPricesApi>();
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), null, 0, default))
+                .ReturnsAsync(() => new() { Median = 1_000_000 });
+        service = new ProfitChangeService(pricesApi.Object, katMock.Object, null, null, null);
+        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        Assert.AreEqual(3, changes.Count);
+        Assert.AreEqual(-4000000, changes[0].Amount);
+        Assert.AreEqual(-64000000, changes[1].Amount, changes[1].Label);
+        Assert.AreEqual("Kat cost for EPIC", changes[2].Label);
+        Assert.AreEqual(-192625000, changes.Sum(c => c.Amount));
     }
 
     [Test]

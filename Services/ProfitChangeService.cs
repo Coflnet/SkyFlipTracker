@@ -167,9 +167,9 @@ public class ProfitChangeService
                         {
                             // approximate cost with raw
                             var rawCost = await katApi.KatRawGetAsync();
-                            var raw = rawCost.Where(c => ((int)c.BaseRarity) == i && c.ItemTag == sell.Tag).FirstOrDefault();
+                            var raw = rawCost.Where(c => ((int)c.BaseRarity) == (i +1) && sell.Tag.EndsWith(c.Name.Replace(' ', '_').ToUpper())).FirstOrDefault();
                             if (raw == null)
-                                throw new Exception($"could not find kat cost for tier {i}({(Tier)i}) and tag {sell.Tag} {buy.Uuid} -> {sell.Uuid}");
+                                throw new Exception($"could not find kat cost for tier {i}({(Tier)i+1}) and tag {sell.Tag} {buy.Uuid} -> {sell.Uuid}");
                             upgradeCost = raw.Cost * (1.0 - 0.003 * level);
                             if (raw.Material != null)
                                 yield return await CostOf(raw.Material, materialTitle, raw.Amount);
