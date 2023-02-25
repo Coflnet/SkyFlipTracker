@@ -226,7 +226,7 @@ public class ProfitChangeService
 
     private static bool IsNotcaluclateable(Core.SaveAuction sell)
     {
-        return sell.Tag.EndsWith("_GIFT_TALISMAN");
+        return sell.Tag?.EndsWith("_GIFT_TALISMAN") ?? true;
     }
 
     private async Task<Items.Client.Model.Item> GetItemMetadata(string tag)
