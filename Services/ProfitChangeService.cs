@@ -172,6 +172,11 @@ public class ProfitChangeService
                             //  rarityInt = (int)Crafts.Client.Model.Tier.LEGENDARY;
                             Console.WriteLine($"kat upgrade cost {(Tier)rarityInt}({rarityInt}) {cost?.TargetRarity} {sell.Tier}");
                             var raw = rawCost.Where(c => ((int)c.BaseRarity) == rarityInt && sell.Tag.EndsWith(c.Name.Replace(' ', '_').ToUpper())).FirstOrDefault();
+                            if(i == 5 && sell.Tag == "PET_JERRY")
+                            {
+                                yield return await CostOf("PET_ITEM_TOY_JERRY", "Jerry 3d glasses");
+                                break;
+                            }
                             if (raw == null)
                                 throw new Exception($"could not find kat cost for tier {i}({(Tier)rarityInt}) and tag {sell.Tag} {buy.Uuid} -> {sell.Uuid}");
                             upgradeCost = raw.Cost * (1.0 - 0.003 * level);
