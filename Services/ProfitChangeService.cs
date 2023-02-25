@@ -248,6 +248,12 @@ public class ProfitChangeService
 
     private async Task<PastFlip.ProfitChange> CostOf(string item, string title, int amount = 1)
     {
+        if(item == "MOVE_JERRY")
+            return new PastFlip.ProfitChange()
+            {
+                Label = title,
+                Amount = -1
+            };
         return new PastFlip.ProfitChange()
         {
             Label = title,
