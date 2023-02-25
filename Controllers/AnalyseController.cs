@@ -212,6 +212,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
 
             var numeric = request.PlayerIds.Where(p => p != null).Select(playerId =>
             {
+                if(string.IsNullOrEmpty(playerId))
+                    throw new CoflnetException("invalid_player_id", "One of the player ids is invalid");
                 if (!long.TryParse(playerId, out long val))
                     val = service.GetId(playerId);
                 return val;
