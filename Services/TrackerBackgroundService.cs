@@ -93,7 +93,17 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
         }
         private async Task SoldAuction(CancellationToken stoppingToken)
         {
-            await Coflnet.Kafka.KafkaConsumer.ConsumeBatch<SaveAuction>(config["KAFKA_HOST"], config["TOPICS:SOLD_AUCTION"], async flipEvents =>
+
+            var consumeConfig = new ConsumerConfig()
+            {
+                BootstrapServers = config["KAFKA_HOST"],
+                GroupId = "fliptracker",
+                AutoOffsetReset = AutoOffsetReset.Earliest,
+                EnableAutoCommit = false,
+                SessionTimeoutMs = 65000,
+                AutoCommitIntervalMs = 30000,
+            };
+            await Coflnet.Kafka.KafkaConsumer.ConsumeBatch<SaveAuction>(consumeConfig, config["TOPICS:SOLD_AUCTION"], async flipEvents =>
             {
                 for (int i = 0; i < 3; i++)
                     try
@@ -109,7 +119,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                         logger.LogError(e, "could not save event once");
                         await Task.Delay(1000);
                     }
-            }, stoppingToken, "fliptracker", 16);
+            }, stoppingToken, 16);
             throw new Exception("consuming sells stopped");
         }
         private async Task LoadFlip(CancellationToken stoppingToken)
