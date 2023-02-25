@@ -255,7 +255,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 try
                 {
                     var sell = item.sell;
-                    var flipFound = finders.Where(f => f.AuctionId == GetId(buy.Uuid)).OrderByDescending(f => f.Timestamp).FirstOrDefault();
+                    var purchaseId = GetId(buy.Uuid);
+                    var flipFound = finders.Where(f => f != null && f.AuctionId == purchaseId).OrderByDescending(f => f.Timestamp).FirstOrDefault();
                     var changes = await profitChangeService.GetChanges(buy, sell).ToListAsync();
                     var profit = (long)(item.sell.HighestBidAmount - buy?.HighestBidAmount ?? 0) + changes.Sum(c => c.Amount);
                     if (sell.End - buy.End > TimeSpan.FromDays(14))
