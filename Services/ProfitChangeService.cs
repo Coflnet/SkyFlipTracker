@@ -191,7 +191,7 @@ public class ProfitChangeService
                     }
                 }
             }
-            else if (sell.FlatenedNBT.Where(l => l.Key == "rarity_upgrades").Any())
+            else if (sell.FlatenedNBT.Where(l => l.Key == "rarity_upgrades").Any() && !buy.FlatNbt.Where(l => l.Key == "rarity_upgrades").Any())
                 yield return await CostOf("RECOMBOBULATOR_3000", "Recombobulator");
             else
                 logger.LogWarning($"could not find rarity change source for {sell.Tag} {buy.Uuid} -> {sell.Uuid}");

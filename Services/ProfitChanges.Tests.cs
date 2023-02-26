@@ -14,6 +14,43 @@ public class ProfitChangeTests
 {
     ProfitChangeService service;
 
+    [Test]
+    public async Task EnderRelicToArtifactRecombed()
+    {
+        var buy = new ColorSaveAuction()
+        {
+            Uuid = Guid.NewGuid().ToString("N"),
+            Tag = "ENDER_ARTIFACT",
+            HighestBidAmount = 1000,
+            FlatNbt = new() { { "rarity_upgrades", "1" } },
+            Tier = Api.Client.Model.Tier.LEGENDARY
+        };
+        var sell = new Coflnet.Sky.Core.SaveAuction()
+        {
+            Uuid = Guid.NewGuid().ToString("N"),
+            Tag = "ENDER_RELIC",
+            HighestBidAmount = 10000,
+            FlatenedNBT = new() { { "rarity_upgrades", "1" } },
+            Tier = Core.Tier.MYTHIC
+        };
+        var craftsApi = new Mock<Crafts.Client.Api.ICraftsApi>();
+        craftsApi.Setup(c => c.CraftsAllGetAsync(0, default)).ReturnsAsync(() => new() {
+            new() { ItemId = "ENDER_RELIC", Ingredients = new() { 
+                new() { ItemId = "ENDER_ARTIFACT", Count = 1 },
+                new() { ItemId = "ENCHANTED_OBSIDIAN", Count = 128 },
+                new() { ItemId = "ENCHANTED_EYE_OF_ENDER", Count = 96 },
+                new() { ItemId = "EXCEEDINGLY_RARE_ENDER_ARTIFACT_UPGRADER", Count = 1 },
+            } } });
+        var pricesApi = new Mock<Api.Client.Api.IPricesApi>();
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), null, 0, default))
+                .ReturnsAsync(() => new() { Median = 200_000_000 });
+        var itemsApi = new Mock<Items.Client.Api.IItemsApi>();
+        itemsApi.Setup(i => i.ItemItemTagGetAsync("ENDER_RELIC", It.IsAny<bool?>(), It.IsAny<int>(), default))
+                .ReturnsAsync(() => new() { Tag = "ENDER_RELIC", Tier = Items.Client.Model.Tier.LEGENDARY });
+        service = new ProfitChangeService(pricesApi.Object, null, craftsApi.Object, NullLogger<ProfitChangeService>.Instance, itemsApi.Object);
+        var result = await service.GetChanges(buy, sell).ToListAsync();
+        Assert.AreEqual(4, result.Count);
+    }
 
     [Test]
     public async Task EndermanMultiLevel()
