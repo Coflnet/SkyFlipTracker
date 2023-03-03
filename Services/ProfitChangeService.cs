@@ -254,11 +254,14 @@ public class ProfitChangeService
                 Label = title,
                 Amount = -1
             };
+        var median = (await pricesApi.ApiItemPriceItemTagGetAsync(item)
+                    ?? throw new Exception($"Failed to find price for {item}")).Median;
+        if (median >= int.MaxValue)
+            median = 0;
         return new PastFlip.ProfitChange()
         {
             Label = title,
-            Amount = -(long)(await pricesApi.ApiItemPriceItemTagGetAsync(item)
-                    ?? throw new Exception($"Failed to find price for {item}")).Median * amount
+            Amount = -(long)median * amount
         };
     }
 
