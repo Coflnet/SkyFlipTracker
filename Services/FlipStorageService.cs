@@ -44,6 +44,7 @@ public class FlipStorageService
             var cluster = Cluster.Builder()
                                 .WithCredentials(config["CASSANDRA:USER"], config["CASSANDRA:PASSWORD"])
                                 .AddContactPoints(config["CASSANDRA:HOSTS"].Split(","))
+                                .WithDefaultKeyspace(keyspace)
                                 .Build();
 
             _session = await cluster.ConnectAsync();
@@ -71,7 +72,18 @@ public class FlipStorageService
     {
         var session = await GetSession();
         var table = GetFlipsTable(session);
-        await table.Insert(flip).ExecuteAsync();
+        try
+        {
+            await table.Insert(flip).ExecuteAsync();
+        }
+        catch (Cassandra.InvalidQueryException e)
+        {
+            if (e.Message.Contains("No keyspace has been specified"))
+            {
+                session.ChangeKeyspace(config["CASSANDRA:KEYSPACE"]);
+            }
+            throw e;
+        }
     }
 
     public async Task SaveFlips(IEnumerable<PastFlip> flips)
