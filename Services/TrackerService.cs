@@ -211,7 +211,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
 
         private async Task CalculateAndIndex(IEnumerable<SaveAuction> sells)
         {
-            var sellLookup = sells.Where(s => s.FlatenedNBT.Where(n => n.Key == "uid").Any())
+            var sellLookup = sells.Where(s => s.FlatenedNBT.Where(n => n.Key == "uid").Any() && s.HighestBidAmount > 0)
                                 .GroupBy(s => new { uid = s.FlatenedNBT.Where(n => n.Key == "uid").First(), s.End }).Select(g => g.First())
                                 .ToDictionary(s => s.FlatenedNBT.Where(n => n.Key == "uid").Select(n => n.Value).FirstOrDefault());
             var exists = await auctionsApi.ApiAuctionsUidsSoldPostAsync(new Api.Client.Model.InventoryBatchLookup() { Uuids = sellLookup.Keys.ToList() });
