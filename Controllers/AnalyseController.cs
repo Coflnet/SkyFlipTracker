@@ -226,7 +226,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
 
             int escrowedUserCount = await GetEscrowedUserCount(maxAge, maxTime, numeric, relevantFlips);
             double avg = 0;
-            var macroedFlips = timeDif.Where(t => t.TotalSeconds > 3.5 && t.TotalSeconds < 4).ToList();
+            var macroedFlips = timeDif.Where(t => t.TotalSeconds > 3.57 && t.TotalSeconds < 4).ToList();
             var macroedTimeDif = await GetMacroedFlipsLongTerm(shadowTiming, maxTime, numeric, macroedFlips);
             double antiMacro = GetShortTermAntiMacroDelay(maxAge, timeDif, macroedFlips.Where(t => t.age < maxAge * shortMacroMultiplier).ToList());
 
