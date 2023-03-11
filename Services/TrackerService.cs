@@ -196,7 +196,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     logger.LogInformation($"saved sells {sells.Count()} one by one because dupplicate");
                     return;
                 }
-                if (sells.Count() < 10)
+                if (sells.Count() < 4)
                     dev.Logger.Instance.Error(error, $"cassandra index failed batch size {sells.Count()}");
                 await Task.Delay(200);
                 if (sells.Count() > 1)
