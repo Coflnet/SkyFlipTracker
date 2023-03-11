@@ -286,9 +286,9 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                         logger.LogInformation($"saving flip {Newtonsoft.Json.JsonConvert.SerializeObject(flip, Newtonsoft.Json.Formatting.Indented)}");
                     }
                 }
-                catch (System.Exception)
+                catch (System.Exception e)
                 {
-                    Console.WriteLine($"Failed to save flip {item.buy.Uuid} -> {item.sell.Uuid} {Newtonsoft.Json.JsonConvert.SerializeObject(item.sell, Newtonsoft.Json.Formatting.Indented)}");
+                    logger.LogError(e, $"Failed to save flip {item.buy.Uuid} -> {item.sell.Uuid} {Newtonsoft.Json.JsonConvert.SerializeObject(item.sell, Newtonsoft.Json.Formatting.Indented)}");
                     throw;
                 }
             });

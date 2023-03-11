@@ -240,7 +240,7 @@ public class ProfitChangeService
 
     private async Task<Items.Client.Model.Item> GetItemMetadata(string tag)
     {
-        var itemMetadata = await itemApi.ItemItemTagGetAsync(tag);
+        var itemMetadata = await itemApi.ItemItemTagGetAsync(tag, true);
         if (itemMetadata == null)
             throw new Exception($"could not find item metadata for {tag}");
         return itemMetadata;
