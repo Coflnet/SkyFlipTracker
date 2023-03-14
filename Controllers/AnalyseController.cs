@@ -29,6 +29,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             "d1acafbfd04644cdaabcffe508829c47", // skipped delay -- aka aestic
             "c051226ddfc643a6b49b5074ecd3a658", // ^ alt
             "fd490a7d6bbe4201b55b5239544a3dbe", // credit card fraud
+            "5e47803d46e346ebb3bb77198496fa20", // paypal chargebacks
             "d472ab290c0f4cbbaccefdce90176d32" // See https://discord.com/channels/267680588666896385/1006897388641853470/1011757951087820911
         };
         private static readonly HashSet<string> CoolMacroers = new() { };
