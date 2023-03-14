@@ -97,14 +97,7 @@ public class ProfitChangeService
             }
             foreach (var item in craft.Ingredients.Where(i => i.ItemId != tagOnPurchase))
             {
-                if (item.Cost == int.MaxValue)
-                    yield return await CostOf(item.ItemId, $"crafting material {item.ItemId}" + (item.Count > 1 ? $" x{item.Count}" : ""));
-                else
-                    yield return new PastFlip.ProfitChange()
-                    {
-                        Amount = -(long)item.Cost,
-                        Label = $"crafting material {item.ItemId}" + (item.Count > 1 ? $" x{item.Count}" : "")
-                    };
+                yield return await CostOf(item.ItemId, $"crafting material {item.ItemId}" + (item.Count > 1 ? $" x{item.Count}" : ""));
             }
             var itemMetadata = await GetItemMetadata(sell.Tag);
             if (((int)buy.Tier.Value - 1) < (int)sell.Tier)
@@ -151,7 +144,7 @@ public class ProfitChangeService
                         var cost = allCosts.Where(c => ((int)c.TargetRarity) > i + 1 && c.CoreData.ItemTag == sell.Tag)
                                     .OrderBy(c => c.TargetRarity).FirstOrDefault();
                         var upgradeCost = cost?.UpgradeCost;
-                        var tierName = (i +1 >= (int)Tier.LEGENDARY) ? sell.Tier.ToString() : ((Tier)i + 2).ToString();
+                        var tierName = (i + 1 >= (int)Tier.LEGENDARY) ? sell.Tier.ToString() : ((Tier)i + 2).ToString();
                         var materialTitle = $"Kat materials for {tierName}";
                         var level = 1;
                         try
@@ -172,7 +165,7 @@ public class ProfitChangeService
                             //  rarityInt = (int)Crafts.Client.Model.Tier.LEGENDARY;
                             Console.WriteLine($"kat upgrade cost {(Tier)rarityInt}({rarityInt}) {cost?.TargetRarity} {sell.Tier}");
                             var raw = rawCost.Where(c => ((int)c.BaseRarity) == rarityInt && sell.Tag.EndsWith(c.Name.Replace(' ', '_').ToUpper())).FirstOrDefault();
-                            if(i == 5 && sell.Tag == "PET_JERRY")
+                            if (i == 5 && sell.Tag == "PET_JERRY")
                             {
                                 yield return await CostOf("PET_ITEM_TOY_JERRY", "Jerry 3d glasses");
                                 break;
@@ -248,7 +241,7 @@ public class ProfitChangeService
 
     private async Task<PastFlip.ProfitChange> CostOf(string item, string title, int amount = 1)
     {
-        if(item == "MOVE_JERRY")
+        if (item == "MOVE_JERRY")
             return new PastFlip.ProfitChange()
             {
                 Label = title,
