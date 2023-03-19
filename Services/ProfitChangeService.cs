@@ -220,9 +220,11 @@ public class ProfitChangeService
         }
     }
 
-    private static Crafts.Client.Model.ProfitableCraft AddCraftPathIngredients(string tagOnPurchase, List<Crafts.Client.Model.ProfitableCraft> allCrafts, List<Crafts.Client.Model.Ingredient> allIngredients)
+    private static Crafts.Client.Model.ProfitableCraft AddCraftPathIngredients(string tagOnPurchase, List<Crafts.Client.Model.ProfitableCraft> allCrafts, List<Crafts.Client.Model.Ingredient> allIngredients, int depth = 0)
     {
         if (allIngredients.Where(i => i.ItemId == tagOnPurchase).Any())
+            return null;
+        if (depth > 10)
             return null;
         // search deeper
         foreach (var item in allIngredients.ToList())
@@ -235,7 +237,7 @@ public class ProfitChangeService
                 allIngredients.AddRange(subCraft.Ingredients);
                 return subCraft;
             }
-            var foundSubCraft = AddCraftPathIngredients(tagOnPurchase, allCrafts, subCraft.Ingredients);
+            var foundSubCraft = AddCraftPathIngredients(tagOnPurchase, allCrafts, subCraft.Ingredients, depth + 1);
             if (foundSubCraft != null)
             {
                 allIngredients.AddRange(subCraft.Ingredients.Where(i => i.ItemId != foundSubCraft.ItemId && i.ItemId != subCraft.ItemId));
