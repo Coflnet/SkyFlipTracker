@@ -95,7 +95,9 @@ public class ProfitChangeService
                 logger.LogWarning($"could not find craft for {sell.Tag} {buy.Uuid} -> {sell.Uuid}");
                 yield break;
             }
-            foreach (var item in craft.Ingredients.Where(i => i.ItemId != tagOnPurchase))
+            var allIngredients = craft.Ingredients.ToList();
+            AddCraftPathIngredients(tagOnPurchase, allCrafts, allIngredients);
+            foreach (var item in allIngredients.Where(i => i.ItemId != tagOnPurchase))
             {
                 yield return await CostOf(item.ItemId, $"crafting material {item.ItemId}" + (item.Count > 1 ? $" x{item.Count}" : ""));
             }
@@ -216,6 +218,32 @@ public class ProfitChangeService
         {
             yield return await ValueOf(item.Value, $"{item.Value} {item.Key} removed");
         }
+    }
+
+    private static Crafts.Client.Model.ProfitableCraft AddCraftPathIngredients(string tagOnPurchase, List<Crafts.Client.Model.ProfitableCraft> allCrafts, List<Crafts.Client.Model.Ingredient> allIngredients)
+    {
+        if (allIngredients.Where(i => i.ItemId == tagOnPurchase).Any())
+            return null;
+        // search deeper
+        foreach (var item in allIngredients.ToList())
+        {
+            var subCraft = allCrafts.Where(c => c.ItemId == item.ItemId).FirstOrDefault();
+            if (subCraft == null)
+                continue;
+            if (subCraft.Ingredients.Where(i => i.ItemId == tagOnPurchase).Any())
+            {
+                allIngredients.AddRange(subCraft.Ingredients);
+                return subCraft;
+            }
+            var foundSubCraft = AddCraftPathIngredients(tagOnPurchase, allCrafts, subCraft.Ingredients);
+            if (foundSubCraft != null)
+            {
+                allIngredients.AddRange(subCraft.Ingredients.Where(i => i.ItemId != foundSubCraft.ItemId && i.ItemId != subCraft.ItemId));
+                allIngredients.Remove(item);
+                return subCraft;
+            }
+        }
+        return null;
     }
 
     private static string GetCorrectKey(KeyValuePair<string, string> gem, Dictionary<string, string> flat)

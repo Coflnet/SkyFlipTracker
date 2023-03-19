@@ -35,7 +35,7 @@ public class ProfitChangeTests
         };
         var craftsApi = new Mock<Crafts.Client.Api.ICraftsApi>();
         craftsApi.Setup(c => c.CraftsAllGetAsync(0, default)).ReturnsAsync(() => new() {
-            new() { ItemId = "ENDER_RELIC", Ingredients = new() { 
+            new() { ItemId = "ENDER_RELIC", Ingredients = new() {
                 new() { ItemId = "ENDER_ARTIFACT", Count = 1 },
                 new() { ItemId = "ENCHANTED_OBSIDIAN", Count = 128 },
                 new() { ItemId = "ENCHANTED_EYE_OF_ENDER", Count = 96 },
@@ -278,6 +278,51 @@ public class ProfitChangeTests
         Assert.AreEqual(-600000020, changes.Sum(c => c.Amount));
     }
 
+    [Test]
+    public async Task MultiLevelCraft()
+    {
+        var buy = new ColorSaveAuction()
+        {
+            Uuid = Guid.NewGuid().ToString("N"),
+            Tag = "NECRON_HANDLE",
+            HighestBidAmount = 1000,
+            FlatNbt = new(),
+            Tier = Api.Client.Model.Tier.EPIC
+        };
+        var sell = new Coflnet.Sky.Core.SaveAuction()
+        {
+            Uuid = Guid.NewGuid().ToString("N"),
+            Tag = "HYPERION",
+            HighestBidAmount = 1000,
+            FlatenedNBT = new(),
+            Tier = Core.Tier.LEGENDARY
+        };
+        var craftsApi = new Mock<Crafts.Client.Api.ICraftsApi>();
+        craftsApi.Setup(c => c.CraftsAllGetAsync(0, default)).ReturnsAsync(() => new() {
+            new() { ItemId = "HYPERION", Ingredients = new() { 
+                new() { ItemId = "MadeUpForDepth", Count = 1 },
+                new() { ItemId = "GIANT_FRAGMENT_LASER", Count = 8}}},
+            new() { ItemId = "MadeUpForDepth", Ingredients = new() { 
+                new() { ItemId = "NECRON_BLADE", Count = 1 },
+                new() { ItemId = "INCLUDE", Count = 10 }}},
+            new() { ItemId = "GIANT_FRAGMENT_LASER", Ingredients = new() { 
+                new() { ItemId = "SHOULDNOTINCLUDE", Count = 10 }}},
+            new() { ItemId = "NECRON_BLADE", Ingredients = new() { 
+                new() { ItemId = "NECRON_HANDLE", Count = 1 }, 
+                new() { ItemId = "WITHER_CATALYST", Count = 24}} }
+             });
+        var pricesApi = new Mock<Api.Client.Api.IPricesApi>();
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), null, 0, default)).ReturnsAsync(() => new() { Median = 1_000_000 });
+        var itemsApi = new Mock<Items.Client.Api.IItemsApi>();
+        itemsApi.Setup(i => i.ItemItemTagGetAsync("HYPERION", It.IsAny<bool?>(), It.IsAny<int>(), default)).ReturnsAsync(() => new() { Tag = "HYPERION", Tier = Items.Client.Model.Tier.LEGENDARY });
+        service = new ProfitChangeService(pricesApi.Object, null, craftsApi.Object, NullLogger<ProfitChangeService>.Instance, itemsApi.Object);
+        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        Assert.AreEqual(4, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
+        Assert.AreEqual("crafting material GIANT_FRAGMENT_LASER x8", changes[1].Label);
+        Assert.AreEqual("crafting material INCLUDE x10", changes[2].Label);
+        Assert.AreEqual("crafting material WITHER_CATALYST x24", changes[3].Label);
+        Assert.AreEqual(-3000020, changes.Sum(c => c.Amount));
+    }
     private List<KatUpgradeResult> KatResponse(string petTag = "PET_ENDERMAN")
     {
         var all = new List<KatUpgradeResult>()
