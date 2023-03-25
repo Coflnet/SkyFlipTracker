@@ -157,6 +157,7 @@ public class ProfitChangeService
                         {
                             logger.LogWarning($"could not parse level from {buy.ItemName}");
                         }
+                        var costAdded = false;
                         if (cost == null || cost.MaterialCost >= int.MaxValue || level > 2)
                         {
                             // approximate cost with raw
@@ -176,10 +177,13 @@ public class ProfitChangeService
                                 throw new Exception($"could not find kat cost for tier {i}({(Tier)rarityInt}) and tag {sell.Tag} {buy.Uuid} -> {sell.Uuid}");
                             upgradeCost = raw.Cost * (1.0 - 0.003 * level);
                             if (raw.Material != null)
+                            {
+                                costAdded = true;
                                 yield return await CostOf(raw.Material, materialTitle, raw.Amount);
+                            }
                         }
                         yield return new($"Kat cost for {tierName}", (long)-upgradeCost);
-                        if (cost?.MaterialCost > 0)
+                        if (cost?.MaterialCost > 0 && !costAdded)
                             yield return new(materialTitle, (long)-cost.MaterialCost);
                         if (i == (int)Tier.LEGENDARY)
                             break;
