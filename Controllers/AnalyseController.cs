@@ -136,12 +136,13 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
         /// </summary>
         /// <param name="playerId"></param>
         /// <param name="uuids"></param>
+        /// <param name="version"></param>
         /// <returns></returns>
         [HttpPost]
         [Route("/flips/{playerId}/load")]
-        public async Task CalculateFlips(Guid playerId, [FromBody] List<Guid> uuids)
+        public async Task CalculateFlips(Guid playerId, [FromBody] List<Guid> uuids, int version = 0)
         {
-            await service.RefreshFlips(playerId, uuids);
+            await service.RefreshFlips(playerId, uuids, version);
         }
 
         /// <summary>
