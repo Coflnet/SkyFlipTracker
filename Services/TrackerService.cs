@@ -160,10 +160,14 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             Console.WriteLine($"Saved sells {count}");
         }
 
-        public async Task RefreshFlips(Guid playerId, IEnumerable<Guid> auctionIds)
+        public async Task RefreshFlips(Guid playerId, IEnumerable<Guid> auctionIds, int version)
         {
             var existing = await flipStorageService.GetFlipVersions(playerId, new DateTime(2020, 1, 1), DateTime.Now, auctionIds);
-            var toRefresh = auctionIds.Except(existing.Where(e => e.Item2 < Version).Select(e => e.Item1)).ToList();
+            if(version == 0)
+            {
+                version = Version;
+            }
+            var toRefresh = auctionIds.Except(existing.Where(e => e.Item2 < version).Select(e => e.Item1)).ToList();
             var mapper = new AutoMapper.Mapper(new MapperConfiguration(cfg =>
             {
                 cfg.CreateMap<Api.Client.Model.ColorSaveAuction, SaveAuction>().ForMember(dest => dest.FlatenedNBT, opt => opt.MapFrom(src => src.FlatNbt));
