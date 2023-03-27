@@ -160,10 +160,17 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             Console.WriteLine($"Saved sells {count}");
         }
 
+        /// <summary>
+        /// Refreshes flips for given auctions
+        /// </summary>
+        /// <param name="playerId"></param>
+        /// <param name="auctionIds"></param>
+        /// <param name="version"></param>
+        /// <returns></returns>
         public async Task RefreshFlips(Guid playerId, IEnumerable<Guid> auctionIds, int version)
         {
             var existing = await flipStorageService.GetFlipVersions(playerId, new DateTime(2020, 1, 1), DateTime.Now, auctionIds);
-            if(version == 0)
+            if (version == 0)
             {
                 version = Version;
             }
@@ -177,7 +184,15 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             }));
 
             var auctions = await Task.WhenAll(toRefresh.Select(async a =>
-                mapper.Map<SaveAuction>(await auctionsApi.ApiAuctionAuctionUuidGetAsync(a.ToString("N")))));
+            {
+                var original = await auctionsApi.ApiAuctionAuctionUuidGetAsync(a.ToString("N"));
+                if(original == null)
+                    throw new Exception($"auction {a} could not be loaded");
+                var mapped = mapper.Map<SaveAuction>(original);
+                if(mapped == null)
+                    throw new Exception($"auction {JsonConvert.SerializeObject(original)} could not be mapped");
+                return mapped;
+            }));
             await IndexCassandra(auctions);
         }
 
