@@ -185,9 +185,11 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
 
             var auctions = await Task.WhenAll(toRefresh.Select(async a =>
             {
-                var original = await auctionsApi.ApiAuctionAuctionUuidGetAsync(a.ToString("N"));
+                var originalResp = await auctionsApi.ApiAuctionAuctionUuidGetWithHttpInfoAsync(a.ToString("N"));
+                var original = JsonConvert.DeserializeObject<Api.Client.Model.ColorSaveAuction>(originalResp.RawContent);
                 if(original == null)
-                    throw new Exception($"auction {a} could not be loaded");
+                    throw new Exception($"auction {a.ToString("N")} could not be loaded");
+                
                 var mapped = mapper.Map<SaveAuction>(original);
                 if(mapped == null)
                     throw new Exception($"auction {JsonConvert.SerializeObject(original)} could not be mapped");
