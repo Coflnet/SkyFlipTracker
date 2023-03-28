@@ -106,6 +106,11 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             };
             await Coflnet.Kafka.KafkaConsumer.ConsumeBatch<SaveAuction>(consumeConfig, config["TOPICS:SOLD_AUCTION"], async flipEvents =>
             {
+                if (flipEvents.All(e => e.End < DateTime.UtcNow - TimeSpan.FromDays(2)))
+                {
+                    logger.LogInformation("skipping old sell");
+                    return;
+                }
                 for (int i = 0; i < 3; i++)
                     try
                     {
