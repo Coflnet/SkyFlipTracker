@@ -99,7 +99,7 @@ public class ProfitChangeService
             AddCraftPathIngredients(tagOnPurchase, allCrafts, allIngredients);
             foreach (var item in allIngredients.Where(i => i.ItemId != tagOnPurchase))
             {
-                yield return await CostOf(item.ItemId, $"crafting material {item.ItemId}" + (item.Count > 1 ? $" x{item.Count}" : ""));
+                yield return await CostOf(item.ItemId, $"crafting material {item.ItemId}" + (item.Count > 1 ? $" x{item.Count}" : ""), item.Count);
             }
             var itemMetadata = await GetItemMetadata(sell.Tag);
             if (((int)buy.Tier.Value - 1) < (int)sell.Tier)
