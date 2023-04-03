@@ -319,9 +319,12 @@ public class ProfitChangeTests
         var changes = await service.GetChanges(buy, sell).ToListAsync();
         Assert.AreEqual(4, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
         Assert.AreEqual("crafting material GIANT_FRAGMENT_LASER x8", changes[1].Label);
+        Assert.AreEqual(-8_000_000, changes[1].Amount);
         Assert.AreEqual("crafting material INCLUDE x10", changes[2].Label);
+        Assert.AreEqual(-10_000_000, changes[2].Amount);
         Assert.AreEqual("crafting material WITHER_CATALYST x24", changes[3].Label);
-        Assert.AreEqual(-3000020, changes.Sum(c => c.Amount));
+        Assert.AreEqual(-24_000_000, changes[3].Amount);
+        Assert.AreEqual(-42000020, changes.Sum(c => c.Amount));
     }
     private List<KatUpgradeResult> KatResponse(string petTag = "PET_ENDERMAN")
     {
