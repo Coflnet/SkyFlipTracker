@@ -287,6 +287,7 @@ public class ProfitChangeTests
             Tag = "HYPERION",
             HighestBidAmount = 1000,
             FlatNbt = new(),
+            Enchantments = new List<ColorEnchant>() { new() { Type = EnchantmentType.UltimateWisdom, Level = 5 } },
             Tier = Api.Client.Model.Tier.EPIC
         };
         var sell = new Coflnet.Sky.Core.SaveAuction()
@@ -295,7 +296,8 @@ public class ProfitChangeTests
             Tag = "HYPERION",
             HighestBidAmount = 10_000_000,
             FlatenedNBT = new(),
-            Enchantments = new() { new() { Type = Core.Enchantment.EnchantmentType.sharpness, Level = 6 } },
+            Enchantments = new() { new() { Type = Core.Enchantment.EnchantmentType.sharpness, Level = 6 },
+                new(){Type = Core.Enchantment.EnchantmentType.ultimate_wisdom, Level = 5} },
             Tier = Core.Tier.LEGENDARY
         };
         var pricesApi = new Mock<Api.Client.Api.IPricesApi>();
@@ -328,16 +330,16 @@ public class ProfitChangeTests
         };
         var craftsApi = new Mock<Crafts.Client.Api.ICraftsApi>();
         craftsApi.Setup(c => c.CraftsAllGetAsync(0, default)).ReturnsAsync(() => new() {
-            new() { ItemId = "HYPERION", Ingredients = new() { 
+            new() { ItemId = "HYPERION", Ingredients = new() {
                 new() { ItemId = "MadeUpForDepth", Count = 1 },
                 new() { ItemId = "GIANT_FRAGMENT_LASER", Count = 8}}},
-            new() { ItemId = "MadeUpForDepth", Ingredients = new() { 
+            new() { ItemId = "MadeUpForDepth", Ingredients = new() {
                 new() { ItemId = "NECRON_BLADE", Count = 1 },
                 new() { ItemId = "INCLUDE", Count = 10 }}},
-            new() { ItemId = "GIANT_FRAGMENT_LASER", Ingredients = new() { 
+            new() { ItemId = "GIANT_FRAGMENT_LASER", Ingredients = new() {
                 new() { ItemId = "SHOULDNOTINCLUDE", Count = 10 }}},
-            new() { ItemId = "NECRON_BLADE", Ingredients = new() { 
-                new() { ItemId = "NECRON_HANDLE", Count = 1 }, 
+            new() { ItemId = "NECRON_BLADE", Ingredients = new() {
+                new() { ItemId = "NECRON_HANDLE", Count = 1 },
                 new() { ItemId = "WITHER_CATALYST", Count = 24}} }
              });
         var pricesApi = new Mock<Api.Client.Api.IPricesApi>();
