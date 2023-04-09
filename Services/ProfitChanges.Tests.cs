@@ -279,6 +279,35 @@ public class ProfitChangeTests
     }
 
     [Test]
+    public async Task Enchantments()
+    {
+        var buy = new ColorSaveAuction()
+        {
+            Uuid = Guid.NewGuid().ToString("N"),
+            Tag = "HYPERION",
+            HighestBidAmount = 1000,
+            FlatNbt = new(),
+            Tier = Api.Client.Model.Tier.EPIC
+        };
+        var sell = new Coflnet.Sky.Core.SaveAuction()
+        {
+            Uuid = Guid.NewGuid().ToString("N"),
+            Tag = "HYPERION",
+            HighestBidAmount = 10_000_000,
+            FlatenedNBT = new(),
+            Enchantments = new() { new() { Type = Core.Enchantment.EnchantmentType.sharpness, Level = 6 } },
+            Tier = Core.Tier.LEGENDARY
+        };
+        var pricesApi = new Mock<Api.Client.Api.IPricesApi>();
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), null, 0, default)).ReturnsAsync(() => new() { Median = 2_000_000 });
+        service = new ProfitChangeService(pricesApi.Object, null, null, NullLogger<ProfitChangeService>.Instance, null);
+        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        Assert.AreEqual(2, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
+        Assert.AreEqual(-2_200_000, changes.Sum(c => c.Amount));
+        pricesApi.Verify(p => p.ApiItemPriceItemTagGetAsync("ENCHANTMENT_SHARPNESS_6", null, 0, default), Times.Once);
+    }
+
+    [Test]
     public async Task MultiLevelCraft()
     {
         var buy = new ColorSaveAuction()

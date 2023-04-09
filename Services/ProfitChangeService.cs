@@ -6,6 +6,7 @@ using Coflnet.Sky.Api.Client.Api;
 using Coflnet.Sky.Crafts.Client.Api;
 using Coflnet.Sky.Items.Client.Api;
 using System.Text.RegularExpressions;
+using Newtonsoft.Json;
 
 namespace Coflnet.Sky.SkyAuctionTracker.Services;
 /// <summary>
@@ -222,6 +223,29 @@ public class ProfitChangeService
         {
             yield return await ValueOf(item.Value, $"{item.Value} {item.Key} removed");
         }
+        var newEnchantmens = sell.Enchantments?.Where(f => !buy.Enchantments?.Where(e => e.Type.ToString().ToLower() == f.Type.ToString().ToLower()).Any() ?? true).ToList();
+        if (newEnchantmens != null)
+            foreach (var item in newEnchantmens)
+            {
+                PastFlip.ProfitChange found = await GetCostForEnchant(item);
+                if (found != null)
+                    yield return found;
+            }
+    }
+
+    private async Task<PastFlip.ProfitChange> GetCostForEnchant(Core.Enchantment item)
+    {
+        PastFlip.ProfitChange found = null;
+        try
+        {
+            found = await CostOf($"ENCHANTMENT_{item.Type}_{item.Level}".ToUpper(), $"Enchant {item.Type} lvl {item.Level} added");
+        }
+        catch (System.Exception e)
+        {
+            logger.LogError(e, $"could not find enchant cost for {item.Type} lvl {item.Level}");
+        }
+
+        return found;
     }
 
     private static Crafts.Client.Model.ProfitableCraft AddCraftPathIngredients(string tagOnPurchase, List<Crafts.Client.Model.ProfitableCraft> allCrafts, List<Crafts.Client.Model.Ingredient> allIngredients, int depth = 0)
