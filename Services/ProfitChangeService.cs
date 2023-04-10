@@ -223,10 +223,15 @@ public class ProfitChangeService
         {
             yield return await ValueOf(item.Value, $"{item.Value} {item.Key} removed");
         }
-        var newEnchantmens = sell.Enchantments?.Where(f => !buy.Enchantments?.Where(e => e.Type.ToString().ToLower() == f.Type.ToString().Replace("_","").ToLower()).Any() ?? true).ToList();
+        var newEnchantmens = sell.Enchantments?.Where(f => !buy.Enchantments?.Where(e => e.Type.ToString().ToLower() == f.Type.ToString().Replace("_", "").ToLower()).Any() ?? true).ToList();
         if (newEnchantmens != null)
             foreach (var item in newEnchantmens)
             {
+                if (Enum.TryParse<EnchantmentType>(item.Type.ToString().Replace("_", ""), true, out _))
+                {
+                    logger.LogWarning($"unkown enchantment {item.Type}");
+                    continue; // skip unkown enchants
+                }
                 PastFlip.ProfitChange found = await GetCostForEnchant(item);
                 if (found != null)
                     yield return found;
