@@ -267,7 +267,9 @@ public class ProfitChangeService
                 continue;
             if (subCraft.Ingredients.Where(i => i.ItemId == tagOnPurchase).Any())
             {
-                allIngredients.AddRange(subCraft.Ingredients);
+                var toAdd = subCraft.Ingredients.Where(i => i.ItemId != tagOnPurchase && i.ItemId != subCraft.ItemId);
+                allIngredients.AddRange(toAdd);
+                allIngredients.Remove(item);
                 return subCraft;
             }
             var foundSubCraft = AddCraftPathIngredients(tagOnPurchase, allCrafts, subCraft.Ingredients, depth + 1);

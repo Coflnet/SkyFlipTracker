@@ -359,12 +359,12 @@ public class ProfitChangeTests
     }
 
     [Test]
-    public async Task SingleLevelCraft()
+    public async Task MultiLevelCraftOriginal()
     {
         var buy = new ColorSaveAuction()
         {
             Uuid = Guid.NewGuid().ToString("N"),
-            Tag = "NECRON_BLADE",
+            Tag = "NECRON_HANDLE",
             HighestBidAmount = 1000,
             FlatNbt = new(),
             Tier = Api.Client.Model.Tier.EPIC
@@ -381,7 +381,10 @@ public class ProfitChangeTests
         craftsApi.Setup(c => c.CraftsAllGetAsync(0, default)).ReturnsAsync(() => new() {
             new() { ItemId = "HYPERION", Ingredients = new() {
                 new() { ItemId = "NECRON_BLADE", Count = 1 },
-                new() { ItemId = "WITHER_CATALYST", Count = 10 }}}
+                new() { ItemId = "WITHER_CATALYST", Count = 10 }}},
+            new() { ItemId = "NECRON_BLADE", Ingredients = new() {
+                new() { ItemId = "NECRON_HANDLE", Count = 1 },
+                new() { ItemId = "WITHER_CATALYST", Count = 24}} }
              });
         var pricesApi = new Mock<Api.Client.Api.IPricesApi>();
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), null, 0, default)).ReturnsAsync(() => new() { Median = 1_000_000 });
@@ -389,7 +392,7 @@ public class ProfitChangeTests
         itemsApi.Setup(i => i.ItemItemTagGetAsync("HYPERION", It.IsAny<bool?>(), It.IsAny<int>(), default)).ReturnsAsync(() => new() { Tag = "HYPERION", Tier = Items.Client.Model.Tier.LEGENDARY });
         service = new ProfitChangeService(pricesApi.Object, null, craftsApi.Object, NullLogger<ProfitChangeService>.Instance, itemsApi.Object);
         var changes = await service.GetChanges(buy, sell).ToListAsync();
-        Assert.AreEqual(2, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
+        Assert.AreEqual(3, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
         Assert.AreEqual("crafting material WITHER_CATALYST x10", changes[1].Label);
     
     }
