@@ -265,7 +265,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 CancellationToken = new CancellationTokenSource(20000).Token
             }, async (item, token) =>
             {
-                var buy = await auctionsApi.ApiAuctionAuctionUuidGetAsync(item.buy.Uuid, 0, token);
+                var buy = await auctionsApi.ApiAuctionAuctionUuidGetAsync(item.buy.Uuid, 0, token) ?? throw new Exception("could not load buy from sky api");
                 flipSumaryEventProducer.Produce(new FlipSumaryEvent()
                 {
                     Flipper = item.sell.AuctioneerId,
@@ -312,14 +312,10 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                         ProfitChanges = changes
                     };
                     await flipStorageService.SaveFlip(flip);
-                    if (flip.ProfitChanges.Count() > 2 && flip.Profit != 0 && !flip.ProfitChanges.Any(c => c.Label.StartsWith("crafting material")) || flip.ProfitChanges.Any(c => c.Label.Contains("drill_part")))
-                    {
-                        logger.LogInformation($"saving flip {Newtonsoft.Json.JsonConvert.SerializeObject(flip, Newtonsoft.Json.Formatting.Indented)}");
-                    }
                 }
                 catch (System.Exception e)
                 {
-                    logger.LogError(e, $"Failed to save flip {item.buy.Uuid} -> {item.sell.Uuid} {Newtonsoft.Json.JsonConvert.SerializeObject(item.sell)}\n{Newtonsoft.Json.JsonConvert.SerializeObject(item.buy)}");
+                    logger.LogError(e, $"Failed to save flip {item.buy.Uuid} -> {item.sell.Uuid} {Newtonsoft.Json.JsonConvert.SerializeObject(item.sell)}\n{Newtonsoft.Json.JsonConvert.SerializeObject(buy)}");
                     throw;
                 }
             });
