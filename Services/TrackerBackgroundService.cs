@@ -56,7 +56,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 Run(sellCons, "sells con"),
                 Run(LoadFlip(stoppingToken), "load flip"));
             logger.LogError("consuming stopped :O");
-            throw new Exception("at least one consuming process stopped");
+            if (!stoppingToken.IsCancellationRequested)
+                throw new Exception("at least one consuming process stopped");
         }
 
         private async Task Run(Task task, string message)
