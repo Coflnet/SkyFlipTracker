@@ -227,7 +227,7 @@ public class ProfitChangeService
         if (newEnchantmens != null)
             foreach (var item in newEnchantmens)
             {
-                if (Enum.TryParse<EnchantmentType>(item.Type.ToString().Replace("_", ""), true, out _))
+                if (!Enum.TryParse<EnchantmentType>(item.Type.ToString().Replace("_", ""), true, out _))
                 {
                     logger.LogWarning($"unkown enchantment {item.Type}");
                     continue; // skip unkown enchants

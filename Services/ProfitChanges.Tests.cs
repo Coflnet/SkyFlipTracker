@@ -357,6 +357,42 @@ public class ProfitChangeTests
         Assert.AreEqual(-24_000_000, changes[3].Amount);
         Assert.AreEqual(-42000020, changes.Sum(c => c.Amount));
     }
+
+    [Test]
+    public async Task SingleLevelCraft()
+    {
+        var buy = new ColorSaveAuction()
+        {
+            Uuid = Guid.NewGuid().ToString("N"),
+            Tag = "NECRON_BLADE",
+            HighestBidAmount = 1000,
+            FlatNbt = new(),
+            Tier = Api.Client.Model.Tier.EPIC
+        };
+        var sell = new Coflnet.Sky.Core.SaveAuction()
+        {
+            Uuid = Guid.NewGuid().ToString("N"),
+            Tag = "HYPERION",
+            HighestBidAmount = 1000,
+            FlatenedNBT = new(),
+            Tier = Core.Tier.LEGENDARY
+        };
+        var craftsApi = new Mock<Crafts.Client.Api.ICraftsApi>();
+        craftsApi.Setup(c => c.CraftsAllGetAsync(0, default)).ReturnsAsync(() => new() {
+            new() { ItemId = "HYPERION", Ingredients = new() {
+                new() { ItemId = "NECRON_BLADE", Count = 1 },
+                new() { ItemId = "WITHER_CATALYST", Count = 10 }}}
+             });
+        var pricesApi = new Mock<Api.Client.Api.IPricesApi>();
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), null, 0, default)).ReturnsAsync(() => new() { Median = 1_000_000 });
+        var itemsApi = new Mock<Items.Client.Api.IItemsApi>();
+        itemsApi.Setup(i => i.ItemItemTagGetAsync("HYPERION", It.IsAny<bool?>(), It.IsAny<int>(), default)).ReturnsAsync(() => new() { Tag = "HYPERION", Tier = Items.Client.Model.Tier.LEGENDARY });
+        service = new ProfitChangeService(pricesApi.Object, null, craftsApi.Object, NullLogger<ProfitChangeService>.Instance, itemsApi.Object);
+        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        Assert.AreEqual(2, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
+        Assert.AreEqual("crafting material WITHER_CATALYST x10", changes[1].Label);
+    
+    }
     private List<KatUpgradeResult> KatResponse(string petTag = "PET_ENDERMAN")
     {
         var all = new List<KatUpgradeResult>()
