@@ -269,7 +269,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             {
                 var buyResp = await auctionsApi.ApiAuctionAuctionUuidGetWithHttpInfoAsync(item.buy.Uuid, 0, token);
                 if(buyResp.StatusCode != System.Net.HttpStatusCode.OK || buyResp.Data == null)
-                    throw new Exception($"could not load buy {item.buy.Uuid} {buyResp.StatusCode} {buyResp.Content}");
+                    throw new Exception($"could not load buy {item.buy.Uuid} {buyResp.StatusCode} Content: {buyResp.RawContent}");
                 var buy = buyResp.Data;
                 flipSumaryEventProducer.Produce(new FlipSumaryEvent()
                 {
