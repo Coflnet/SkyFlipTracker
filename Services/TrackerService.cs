@@ -265,7 +265,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 CancellationToken = new CancellationTokenSource(20000).Token
             }, async (item, token) =>
             {
-                var buy = await auctionsApi.ApiAuctionAuctionUuidGetAsync(item.buy.Uuid, 0, token) ?? throw new Exception("could not load buy from sky api");
+                var buy = (await auctionsApi.ApiAuctionAuctionUuidGetAsync(item.buy.Uuid, 0, token)) 
+                            ?? throw new Exception("could not load buy from sky api " + item.buy.Uuid);
                 flipSumaryEventProducer.Produce(new FlipSumaryEvent()
                 {
                     Flipper = item.sell.AuctioneerId,
