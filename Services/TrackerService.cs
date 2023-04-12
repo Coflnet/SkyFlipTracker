@@ -12,6 +12,7 @@ using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 using AutoMapper;
 using Newtonsoft.Json;
+using Prometheus;
 
 namespace Coflnet.Sky.SkyAuctionTracker.Services
 {
@@ -26,6 +27,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
         private FlipStorageService flipStorageService;
         private ActivitySource activitySource;
         private const short Version = 1;
+        Counter flipSavedCounter = Metrics.CreateCounter("flip_saved", "How many flips were saved");
 
         public TrackerService(
             TrackerDbContext db,
@@ -87,7 +89,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     db.Flips.AddRange(newFlips);
                     var count = await db.SaveChangesAsync();
                     await db.Database.CommitTransactionAsync();
-                    logger.LogInformation($"saved {count} flips");
+                    flipSavedCounter.Inc(count);
                     break;
                 }
                 catch (Exception e)
