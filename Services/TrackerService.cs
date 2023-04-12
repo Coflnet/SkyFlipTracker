@@ -264,11 +264,11 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             // Console.WriteLine(Newtonsoft.Json.JsonConvert.SerializeObject(soldAuctions, Newtonsoft.Json.Formatting.Indented));
             await Parallel.ForEachAsync(soldAuctions, new ParallelOptions()
             {
-                MaxDegreeOfParallelism = 2,
+                MaxDegreeOfParallelism = 3,
                 CancellationToken = new CancellationTokenSource(20000).Token
             }, async (item, token) =>
             {
-                var buyResp = await auctionsApi.ApiAuctionAuctionUuidGetWithHttpInfoAsync(item.buy.Uuid, 0, token);
+                var buyResp = await auctionsApi.ApiAuctionAuctionUuidGetWithHttpInfoAsync(item.buy.Uuid, 0, token).ConfigureAwait(false);
                 var buy = buyResp.Data;
                 if (buyResp.StatusCode != System.Net.HttpStatusCode.OK || buyResp.Data == null)
                 {
@@ -293,7 +293,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     List<PastFlip.ProfitChange> changes = new();
                     try
                     {
-                        changes = await profitChangeService.GetChanges(buy, sell).ToListAsync();
+                        changes = await profitChangeService.GetChanges(buy, sell).ToListAsync().ConfigureAwait(false);
                     }
                     catch (System.Exception e)
                     {
