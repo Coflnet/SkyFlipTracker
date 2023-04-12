@@ -264,7 +264,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             // Console.WriteLine(Newtonsoft.Json.JsonConvert.SerializeObject(soldAuctions, Newtonsoft.Json.Formatting.Indented));
             await Parallel.ForEachAsync(soldAuctions, new ParallelOptions()
             {
-                MaxDegreeOfParallelism = 3,
+                MaxDegreeOfParallelism = 2,
                 CancellationToken = new CancellationTokenSource(20000).Token
             }, async (item, token) =>
             {
