@@ -139,6 +139,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
         internal async Task AddSells(IEnumerable<SaveAuction> sells)
         {
             var lookup = sells.Select(s => s.UId).ToHashSet();
+            var cassandraTask = IndexCassandra(sells.ToList());
             var existing = await db.FlipEvents.Where(e => lookup.Contains(e.AuctionId) && e.Type == FlipEventType.AUCTION_SOLD).Select(e => e.AuctionId).ToListAsync();
             var found = await db.Flips.Where(e => lookup.Contains(e.AuctionId)).Select(e => e.AuctionId).ToListAsync();
             foreach (var item in sells)
@@ -158,9 +159,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             }
             logger.LogInformation($"saving sells {sells.Count()}");
             var count = await db.SaveChangesAsync();
-            var toTrack = sells.ToList();
-
-            await IndexCassandra(toTrack);
+            await cassandraTask;
             Console.WriteLine($"Saved sells {count}");
         }
 

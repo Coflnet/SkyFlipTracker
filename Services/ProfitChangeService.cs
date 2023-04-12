@@ -240,6 +240,8 @@ public class ProfitChangeService
 
     private async Task<PastFlip.ProfitChange> GetCostForEnchant(Core.Enchantment item)
     {
+        if(item.Type == Core.Enchantment.EnchantmentType.telekinesis)
+            return null; // not a book anymore
         PastFlip.ProfitChange found = null;
         try
         {
