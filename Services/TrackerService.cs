@@ -235,9 +235,10 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             var sellLookup = sells.Where(s => s.FlatenedNBT.Where(n => n.Key == "uid").Any() && s.HighestBidAmount > 0)
                                 .GroupBy(s => new { uid = s.FlatenedNBT.Where(n => n.Key == "uid").First(), s.End }).Select(g => g.First())
                                 .ToDictionary(s => s.FlatenedNBT.Where(n => n.Key == "uid").Select(n => n.Value).FirstOrDefault());
-            var exists = await auctionsApi.ApiAuctionsUidsSoldPostAsync(new Api.Client.Model.InventoryBatchLookup() { Uuids = sellLookup.Keys.ToList() });
-            if (exists == null)
-                throw new Exception("Could not reach api to load purchases");
+            var buyLookup = await auctionsApi.ApiAuctionsUidsSoldPostWithHttpInfoAsync(new Api.Client.Model.InventoryBatchLookup() { Uuids = sellLookup.Keys.ToList() });
+            if (buyLookup.StatusCode != System.Net.HttpStatusCode.OK)
+                throw new Exception("Could not reach api to load purchases " + buyLookup.StatusCode);
+            var exists = buyLookup.Data;
             if (exists.Count == 0)
                 return;
             var soldAuctions = exists.Select(item => new

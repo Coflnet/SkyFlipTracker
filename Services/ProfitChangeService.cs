@@ -244,6 +244,8 @@ public class ProfitChangeService
         try
         {
             found = await CostOf($"ENCHANTMENT_{item.Type}_{item.Level}".ToUpper(), $"Enchant {item.Type} lvl {item.Level} added");
+            if(found.Amount == 0)
+                return null; // ignore 0 cost enchants
         }
         catch (System.Exception e)
         {
