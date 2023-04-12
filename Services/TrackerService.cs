@@ -27,7 +27,9 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
         private FlipStorageService flipStorageService;
         private ActivitySource activitySource;
         private const short Version = 1;
-        Counter flipSavedCounter = Metrics.CreateCounter("flip_saved", "How many flips were saved");
+        Counter flipFoundCounter = Metrics.CreateCounter("sky_fliptracker_saved_finding", "How many found flips were saved");
+        Counter userFlipCounter = Metrics.CreateCounter("sky_fliptracker_user_flip", "How many flips were done by a user");
+
 
         public TrackerService(
             TrackerDbContext db,
@@ -89,7 +91,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     db.Flips.AddRange(newFlips);
                     var count = await db.SaveChangesAsync();
                     await db.Database.CommitTransactionAsync();
-                    flipSavedCounter.Inc(count);
+                    flipFoundCounter.Inc(count);
                     break;
                 }
                 catch (Exception e)
@@ -268,9 +270,14 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             }, async (item, token) =>
             {
                 var buyResp = await auctionsApi.ApiAuctionAuctionUuidGetWithHttpInfoAsync(item.buy.Uuid, 0, token);
-                if(buyResp.StatusCode != System.Net.HttpStatusCode.OK || buyResp.Data == null)
-                    throw new Exception($"could not load buy {item.buy.Uuid} {buyResp.StatusCode} Content: {buyResp.RawContent}");
                 var buy = buyResp.Data;
+                if (buyResp.StatusCode != System.Net.HttpStatusCode.OK || buyResp.Data == null)
+                {
+                    // try to parse it
+                    buy = JsonConvert.DeserializeObject<Api.Client.Model.ColorSaveAuction>(buyResp.RawContent);
+                    if (buy == null)
+                        throw new Exception($"could not load buy {item.buy.Uuid} {buyResp.StatusCode} Content: {buyResp.RawContent}");
+                }
                 flipSumaryEventProducer.Produce(new FlipSumaryEvent()
                 {
                     Flipper = item.sell.AuctioneerId,
@@ -317,6 +324,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                         ProfitChanges = changes
                     };
                     await flipStorageService.SaveFlip(flip);
+                    userFlipCounter.Inc();
                 }
                 catch (System.Exception e)
                 {

@@ -125,7 +125,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                         logger.LogError(e, "could not save event once");
                         await Task.Delay(1000);
                     }
-            }, stoppingToken, 16);
+            }, stoppingToken, 20);
             throw new Exception("consuming sells stopped");
         }
         private async Task LoadFlip(CancellationToken stoppingToken)
