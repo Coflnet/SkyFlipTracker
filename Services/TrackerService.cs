@@ -187,11 +187,11 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             {
                 var originalResp = await auctionsApi.ApiAuctionAuctionUuidGetWithHttpInfoAsync(a.ToString("N"));
                 var original = JsonConvert.DeserializeObject<Api.Client.Model.ColorSaveAuction>(originalResp.RawContent);
-                if(original == null)
+                if (original == null)
                     throw new Exception($"auction {a.ToString("N")} could not be loaded");
-                
+
                 var mapped = mapper.Map<SaveAuction>(original);
-                if(mapped == null)
+                if (mapped == null)
                     throw new Exception($"auction {JsonConvert.SerializeObject(original)} could not be mapped");
                 return mapped;
             }));
@@ -278,7 +278,16 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     var sell = item.sell;
                     var purchaseId = GetId(buy.Uuid);
                     var flipFound = finders.Where(f => f != null && f.AuctionId == purchaseId).OrderByDescending(f => f.Timestamp).FirstOrDefault();
-                    var changes = await profitChangeService.GetChanges(buy, sell).ToListAsync();
+                    List<PastFlip.ProfitChange> changes = new();
+                    try
+                    {
+                        changes = await profitChangeService.GetChanges(buy, sell).ToListAsync();
+                    }
+                    catch (System.Exception e)
+                    {
+                        logger.LogError(e, "Could not load profit changes");
+                        throw;
+                    }
                     var profit = (long)(item.sell.HighestBidAmount - buy?.HighestBidAmount ?? 0) + changes.Sum(c => c.Amount);
                     if (sell.End - buy.End > TimeSpan.FromDays(14))
                         profit = 0; // no flip if it took more than 2 weeks
