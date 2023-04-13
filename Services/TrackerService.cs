@@ -247,7 +247,9 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             var soldAuctions = exists.Select(item => new
             {
                 sell = sellLookup.GetValueOrDefault(item.Key),
-                buy = item.Value.Where(v => v.Uuid != sellLookup.GetValueOrDefault(item.Key)?.Uuid && v.Timestamp < sellLookup.GetValueOrDefault(item.Key)?.End)
+                buy = item.Value.Where(v => v.Uuid != sellLookup.GetValueOrDefault(item.Key)?.Uuid
+                                        && (v.Timestamp < sellLookup.GetValueOrDefault(item.Key)?.End
+                                        || v.Timestamp > DateTime.UtcNow))
                                     .OrderByDescending(u => u.Timestamp).FirstOrDefault()
             }).Where(item => item.buy != null).ToList();
             var purchaseUid = soldAuctions.Select(u => GetId(u.buy.Uuid)).ToHashSet();
