@@ -232,6 +232,8 @@ public class ProfitChangeService
                     logger.LogWarning($"unkown enchantment {item.Type}");
                     continue; // skip unkown enchants
                 }
+                if (buy.Enchantments.Any(e => e.Type == EnchantmentType.Unknown && e.Level == item.Level))
+                    continue; // skip unkown enchants that would match
                 PastFlip.ProfitChange found = await GetCostForEnchant(item);
                 if (found != null)
                     yield return found;
@@ -240,13 +242,13 @@ public class ProfitChangeService
 
     private async Task<PastFlip.ProfitChange> GetCostForEnchant(Core.Enchantment item)
     {
-        if(item.Type == Core.Enchantment.EnchantmentType.telekinesis)
+        if (item.Type == Core.Enchantment.EnchantmentType.telekinesis)
             return null; // not a book anymore
         PastFlip.ProfitChange found = null;
         try
         {
             found = await CostOf($"ENCHANTMENT_{item.Type}_{item.Level}".ToUpper(), $"Enchant {item.Type} lvl {item.Level} added");
-            if(found.Amount == 0)
+            if (found.Amount == 0)
                 return null; // ignore 0 cost enchants
         }
         catch (System.Exception e)
