@@ -211,6 +211,14 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             return (await flipStorageService.GetFlips(PlayerId, from, to)).GroupBy(f=>f.SellAuctionId).Select(f=>f.First());
         }
 
+        [HttpGet]
+        [Route("/flips/{PlayerId}/{uid}")]
+        [ResponseCache(Duration = 60, Location = ResponseCacheLocation.Any, VaryByQueryKeys = new[] { "from", "to" })]
+        public async Task<PastFlip> GetFlipsOfPlayer(Guid PlayerId, long uid)
+        {
+            return await flipStorageService.GetFlip(PlayerId, uid);
+        }
+
         private long GetId(string uuid)
         {
             return service.GetId(uuid);

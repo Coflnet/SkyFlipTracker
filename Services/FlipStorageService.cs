@@ -99,6 +99,17 @@ public class FlipStorageService
         var table = GetFlipsTable(session);
         return await table.Where(f => f.Flipper == flipper && f.SellTime >= start && f.SellTime <= end).ExecuteAsync();
     }
+    public async Task<PastFlip> GetFlip(Guid flipper, long uid)
+    {
+        var session = await GetSession();
+        var table = GetFlipsTable(session);
+        var end = DateTime.UtcNow;
+        var start = end.AddDays(-10000);
+        return await table.Where(f => f.Flipper == flipper && f.Uid == uid && f.SellTime > start && f.SellTime < end)
+                .AllowFiltering() // bad
+                .ExecuteAsync().ContinueWith(t => t.Result.FirstOrDefault());
+    }
+
     public async Task<IEnumerable<(Guid, short)>> GetFlipVersions(Guid flipper, DateTime start, DateTime end, IEnumerable<Guid> auctionIds)
     {
         var session = await GetSession();
