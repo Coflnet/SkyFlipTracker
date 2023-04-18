@@ -19,6 +19,7 @@ public class ProfitChangeService
     private ICraftsApi craftsApi;
     private IItemsApi itemApi;
     private readonly ILogger<ProfitChangeService> logger;
+    private Core.PropertyMapper mapper = new();
     /// <summary>
     /// Keys containing itemTags that can be removed
     /// </summary>
@@ -238,6 +239,16 @@ public class ProfitChangeService
                 if (found != null)
                     yield return found;
             }
+        if (buy.Reforge?.ToString().ToLower() != sell.Reforge.ToString().ToLower().Replace("_", ""))
+        {
+            var reforgeItem = mapper.GetReforgeCost(sell.Reforge, sell.Tier);
+            if(reforgeItem.Item1 != string.Empty)
+            {
+                var itemCost = await CostOf(reforgeItem.Item1, $"Reforge {sell.Reforge} added");
+                itemCost.Amount -= reforgeItem.Item2;
+                yield return itemCost;
+            }
+        }
     }
 
     private async Task<PastFlip.ProfitChange> GetCostForEnchant(Core.Enchantment item)
