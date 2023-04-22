@@ -69,6 +69,7 @@ namespace Coflnet.Sky.SkyAuctionTracker
             services.AddSingleton<FlipStorageService>();
             services.AddJaeger(Configuration);
             services.AddTransient<TrackerService>();
+            services.AddSingleton<Kafka.KafkaCreator>();
             services.AddSingleton<FlipSumaryEventProducer>();
             services.AddResponseCaching();
             services.AddMemoryCache();

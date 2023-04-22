@@ -18,17 +18,10 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
         /// Create new instance of <see cref="FlipSumaryEventProducer"/>
         /// </summary>
         /// <param name="config"></param>
-        public FlipSumaryEventProducer(IConfiguration config)
+        /// <param name="kafkaCreate"></param>
+        public FlipSumaryEventProducer(IConfiguration config, Kafka.KafkaCreator kafkaCreate)
         {
-            producer = new ProducerBuilder<string, string>(new ProducerConfig
-            {
-                BootstrapServers = config["KAFKA_HOST"],
-                ClientId = "sky-fliptracker",
-                BatchSize = 16384*16,
-                LingerMs = 10,
-                MessageSendMaxRetries = 3,
-                CompressionType = CompressionType.Gzip
-            }).Build();
+            producer = kafkaCreate.BuildProducer<string, string>();
             topic = config["TOPICS:FLIP_SUMMARY"];
         }
 

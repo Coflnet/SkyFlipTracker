@@ -11,6 +11,7 @@ using Microsoft.Extensions.Logging;
 using Coflnet.Sky.SkyAuctionTracker.Controllers;
 using System.Linq;
 using Coflnet.Sky.Core;
+using Coflnet.Kafka;
 
 namespace Coflnet.Sky.SkyAuctionTracker.Services
 {
@@ -75,7 +76,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
 
         private async Task ConsumeEvents(CancellationToken stoppingToken)
         {
-            await Coflnet.Kafka.KafkaConsumer.ConsumeBatch<FlipEvent>(config["KAFKA_HOST"], config["TOPICS:FLIP_EVENT"], async flipEvents =>
+            await Coflnet.Kafka.KafkaConsumer.ConsumeBatch<FlipEvent>(config, config["TOPICS:FLIP_EVENT"], async flipEvents =>
             {
                 for (int i = 0; i < 3; i++)
                     try
@@ -105,7 +106,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 AutoCommitIntervalMs = 0,
                 PartitionAssignmentStrategy = PartitionAssignmentStrategy.CooperativeSticky
             };
-            await Coflnet.Kafka.KafkaConsumer.ConsumeBatch<SaveAuction>(consumeConfig, config["TOPICS:SOLD_AUCTION"], async flipEvents =>
+            await KafkaConsumer.ConsumeBatch<SaveAuction>(consumeConfig, config["TOPICS:SOLD_AUCTION"], async flipEvents =>
             {
                 if (flipEvents.All(e => e.End < DateTime.UtcNow - TimeSpan.FromDays(2)))
                 {
@@ -131,7 +132,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
         }
         private async Task LoadFlip(CancellationToken stoppingToken)
         {
-            await Coflnet.Kafka.KafkaConsumer.ConsumeBatch<SaveAuction>(config["KAFKA_HOST"], config["TOPICS:LOAD_FLIPS"], async toUpdate =>
+            await KafkaConsumer.ConsumeBatch<SaveAuction>(config, config["TOPICS:LOAD_FLIPS"], async toUpdate =>
             {
                 using var scope = scopeFactory.CreateScope();
                 var service = scope.ServiceProvider.GetRequiredService<TrackerService>();
@@ -143,7 +144,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
 
         private async Task ConsumeFlips(CancellationToken stoppingToken)
         {
-            await Coflnet.Kafka.KafkaConsumer.ConsumeBatch<LowPricedAuction>(config["KAFKA_HOST"], config["TOPICS:LOW_PRICED"], async lps =>
+            await KafkaConsumer.ConsumeBatch<LowPricedAuction>(config, config["TOPICS:LOW_PRICED"], async lps =>
             {
                 if (lps.Count() == 0)
                     return;
