@@ -23,6 +23,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
         {
             producer = kafkaCreate.BuildProducer<string, string>();
             topic = config["TOPICS:FLIP_SUMMARY"];
+            _ = kafkaCreate.CreateTopicIfNotExist(topic);
         }
 
         /// <summary>
