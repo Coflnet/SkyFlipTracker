@@ -91,15 +91,14 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     {
                         logger.LogError(e, "could not save event once");
                     }
-            }, stoppingToken, "fliptracker", 15);
+            }, stoppingToken, "sky-fliptracker", 15);
         }
         private async Task SoldAuction(CancellationToken stoppingToken)
         {
 
-            var consumeConfig = new ConsumerConfig()
+            var consumeConfig = new ConsumerConfig(KafkaCreator.GetClientConfig(config))
             {
-                BootstrapServers = config["KAFKA_HOST"],
-                GroupId = "fliptracker",
+                GroupId = "sky-fliptracker",
                 AutoOffsetReset = AutoOffsetReset.Earliest,
                 EnableAutoCommit = false,
                 SessionTimeoutMs = 65000,
@@ -139,7 +138,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 await service.IndexCassandra(toUpdate);
                 flipsUpdated.Inc(toUpdate.Count());
                 Console.WriteLine("updated flips " + toUpdate.Count());
-            }, stoppingToken, "fliptracker", 8);
+            }, stoppingToken, "sky-fliptracker", 8);
         }
 
         private async Task ConsumeFlips(CancellationToken stoppingToken)
@@ -158,7 +157,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     TargetPrice = (int)(int.MaxValue > lp.TargetPrice ? lp.TargetPrice : int.MaxValue)
                 }));
                 consumeCounter.Inc(lps.Count());
-            }, stoppingToken, "fliptracker", 50);
+            }, stoppingToken, "sky-fliptracker", 50);
         }
 
     }
