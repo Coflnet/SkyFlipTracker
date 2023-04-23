@@ -25,13 +25,14 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
         private static Prometheus.Counter consumeCounter = Prometheus.Metrics.CreateCounter("sky_fliptracker_consume_lp", "Counts the consumed low priced auctions");
         private static Prometheus.Counter consumeEvent = Prometheus.Metrics.CreateCounter("sky_fliptracker_consume_event", "Counts the consumed flip events");
         private static Prometheus.Counter flipsUpdated = Prometheus.Metrics.CreateCounter("sky_fliptracker_flips_updated", "How many flips were updated");
-
+        private KafkaCreator kafkaCreator;
         public TrackerBackgroundService(
-            IServiceScopeFactory scopeFactory, IConfiguration config, ILogger<TrackerBackgroundService> logger)
+            IServiceScopeFactory scopeFactory, IConfiguration config, ILogger<TrackerBackgroundService> logger, KafkaCreator kafkaCreator)
         {
             this.scopeFactory = scopeFactory;
             this.config = config;
             this.logger = logger;
+            this.kafkaCreator = kafkaCreator;
         }
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
@@ -105,6 +106,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 AutoCommitIntervalMs = 0,
                 PartitionAssignmentStrategy = PartitionAssignmentStrategy.CooperativeSticky
             };
+            await kafkaCreator.CreateTopicIfNotExist(config["TOPICS:SOLD_AUCTION"], 9);
             await KafkaConsumer.ConsumeBatch<SaveAuction>(consumeConfig, config["TOPICS:SOLD_AUCTION"], async flipEvents =>
             {
                 if (flipEvents.All(e => e.End < DateTime.UtcNow - TimeSpan.FromDays(2)))
