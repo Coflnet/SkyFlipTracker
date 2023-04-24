@@ -338,6 +338,37 @@ public class ProfitChangeTests
     }
 
     [Test]
+    public async Task EnchantmentUpgrade()
+    {
+        var buy = new ColorSaveAuction()
+        {
+            Uuid = Guid.NewGuid().ToString("N"),
+            Tag = "HYPERION",
+            HighestBidAmount = 1000,
+            FlatNbt = new(),
+            Enchantments = new List<ColorEnchant>() { new() { Type = EnchantmentType.UltimateChimera, Level = 3 } },
+            Tier = Api.Client.Model.Tier.EPIC
+        };
+        var sell = new Coflnet.Sky.Core.SaveAuction()
+        {
+            Uuid = Guid.NewGuid().ToString("N"),
+            Tag = "HYPERION",
+            HighestBidAmount = 10_000_000,
+            FlatenedNBT = new(),
+            Enchantments = new() { 
+                new(){Type = Core.Enchantment.EnchantmentType.ultimate_chimera, Level = 4} },
+            Tier = Core.Tier.LEGENDARY
+        };
+        var pricesApi = new Mock<Api.Client.Api.IPricesApi>();
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), null, 0, default)).ReturnsAsync(() => new() { Median = 20_000_000 });
+        service = new ProfitChangeService(pricesApi.Object, null, null, NullLogger<ProfitChangeService>.Instance, null);
+        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        Assert.AreEqual(2, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
+        Assert.AreEqual(-20_200_000, changes.Sum(c => c.Amount));
+        pricesApi.Verify(p => p.ApiItemPriceItemTagGetAsync("ENCHANTMENT_ULTIMATE_CHIMERA_3", null, 0, default), Times.Once);
+    }
+
+    [Test]
     public async Task MultiLevelCraft()
     {
         var buy = new ColorSaveAuction()

@@ -224,7 +224,7 @@ public class ProfitChangeService
         {
             yield return await ValueOf(item.Value, $"{item.Value} {item.Key} removed");
         }
-        var newEnchantmens = sell.Enchantments?.Where(f => !buy.Enchantments?.Where(e => e.Type.ToString().ToLower() == f.Type.ToString().Replace("_", "").ToLower()).Any() ?? true).ToList();
+        var newEnchantmens = sell.Enchantments?.Where(f => !buy.Enchantments?.Where(e => e.Type.ToString().ToLower() == f.Type.ToString().Replace("_", "").ToLower() && f.Level == e.Level).Any() ?? true).ToList();
         if (newEnchantmens != null)
             foreach (var item in newEnchantmens)
             {
@@ -235,7 +235,7 @@ public class ProfitChangeService
                 }
                 if (buy.Enchantments.Any(e => e.Type == EnchantmentType.Unknown && e.Level == item.Level))
                     continue; // skip unkown enchants that would match
-                PastFlip.ProfitChange found = await GetCostForEnchant(item);
+                PastFlip.ProfitChange found = await GetCostForEnchant(item, buy.Enchantments);
                 if (found != null)
                     yield return found;
             }
@@ -251,20 +251,27 @@ public class ProfitChangeService
         }
     }
 
-    private async Task<PastFlip.ProfitChange> GetCostForEnchant(Core.Enchantment item)
+    private async Task<PastFlip.ProfitChange> GetCostForEnchant(Core.Enchantment item, List<ColorEnchant> enchantments)
     {
         if (item.Type == Core.Enchantment.EnchantmentType.telekinesis)
             return null; // not a book anymore
         PastFlip.ProfitChange found = null;
+        int requiredLevel = item.Level;
+        var matchingEnchant = enchantments.Where(e => e.Type.ToString().ToLower() == item.Type.ToString().Replace("_", "").ToLower()).FirstOrDefault();
+        if(matchingEnchant != null && matchingEnchant.Level == item.Level -1)
+        {
+            // only required one level lower book
+            requiredLevel = item.Level - 1;
+        }
         try
         {
-            found = await CostOf($"ENCHANTMENT_{item.Type}_{item.Level}".ToUpper(), $"Enchant {item.Type} lvl {item.Level} added");
+            found = await CostOf($"ENCHANTMENT_{item.Type}_{requiredLevel}".ToUpper(), $"Enchant {item.Type} lvl {requiredLevel} added");
             if (found.Amount == 0)
                 return null; // ignore 0 cost enchants
         }
         catch (System.Exception e)
         {
-            logger.LogError(e, $"could not find enchant cost for {item.Type} lvl {item.Level}");
+            logger.LogError(e, $"could not find enchant cost for {item.Type} lvl {requiredLevel}");
         }
 
         return found;

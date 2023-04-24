@@ -43,11 +43,6 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 await context.Database.MigrateAsync();
             }
 
-            var consConfig = new ConsumerConfig()
-            {
-                BootstrapServers = config["KAFKA_HOST"],
-                GroupId = "flip-tracker"
-            };
             Task flipCons = ConsumeFlips(stoppingToken);
             Task flipEventCons = ConsumeEvents(stoppingToken);
             var sellCons = SoldAuction(stoppingToken);
