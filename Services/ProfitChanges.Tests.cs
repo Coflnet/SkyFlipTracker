@@ -267,6 +267,34 @@ public class ProfitChangeTests
         Assert.AreEqual(2, changes.Count);
         Assert.AreEqual(-(5_000_000 + 600_000 + 200_000), changes.Sum(c => c.Amount));
     }
+    [Test]
+    public async Task AoteReforgeNaming()
+    {
+        var buy = new ColorSaveAuction()
+        {
+            Uuid = Guid.NewGuid().ToString("N"),
+            Tag = "AOTE",
+            HighestBidAmount = 1000,
+            Reforge = Reforge.AoteStone,
+            FlatNbt = new(),
+            Tier = Api.Client.Model.Tier.RARE
+        };
+        var sell = new Coflnet.Sky.Core.SaveAuction()
+        {
+            Uuid = Guid.NewGuid().ToString("N"),
+            Tag = "AOTE",
+            HighestBidAmount = 10_000_000,
+            Reforge = Core.ItemReferences.Reforge.warped_on_aote,
+            Tier = Core.Tier.MYTHIC
+        };
+        var pricesApi = new Mock<Api.Client.Api.IPricesApi>();
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), null, 0, default))
+                .ReturnsAsync(() => new() { Median = 5_000_000 });
+        service = new ProfitChangeService(pricesApi.Object, null, null, NullLogger<ProfitChangeService>.Instance, null);
+        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        Assert.AreEqual(1, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
+        Assert.AreEqual(-200_000, changes.Sum(c => c.Amount));
+    }
 
     [Test]
     public async Task AbilityScrolls()

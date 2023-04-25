@@ -239,10 +239,16 @@ public class ProfitChangeService
                 if (found != null)
                     yield return found;
             }
-        if (buy.Reforge?.ToString().ToLower() != sell.Reforge.ToString().ToLower().Replace("_", ""))
+        var reforgeName = sell.Reforge.ToString().ToLower().Replace("_", "");
+        if (sell.Reforge == Core.ItemReferences.Reforge.warped_on_aote)
+        {
+            // special case for alias
+            reforgeName = "aotestone";
+        }
+        if (buy.Reforge?.ToString().ToLower() != reforgeName)
         {
             var reforgeItem = mapper.GetReforgeCost(sell.Reforge, sell.Tier);
-            if(reforgeItem.Item1 != string.Empty)
+            if (reforgeItem.Item1 != string.Empty)
             {
                 var itemCost = await CostOf(reforgeItem.Item1, $"Reforge {sell.Reforge} added");
                 itemCost.Amount -= reforgeItem.Item2;
@@ -258,7 +264,7 @@ public class ProfitChangeService
         PastFlip.ProfitChange found = null;
         int requiredLevel = item.Level;
         var matchingEnchant = enchantments.Where(e => e.Type.ToString().ToLower() == item.Type.ToString().Replace("_", "").ToLower()).FirstOrDefault();
-        if(matchingEnchant != null && matchingEnchant.Level == item.Level -1)
+        if (matchingEnchant != null && matchingEnchant.Level == item.Level - 1)
         {
             // only required one level lower book
             requiredLevel = item.Level - 1;
