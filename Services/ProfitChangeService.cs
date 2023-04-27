@@ -255,6 +255,17 @@ public class ProfitChangeService
                 yield return itemCost;
             }
         }
+        foreach (var item in sell.FlatenedNBT.Where(s => !buy.FlatNbt.Any(b => b.Key == s.Key && b.Value == s.Value)))
+        {
+            // missing nbt
+            if (!mapper.TryGetIngredients(item.Key, item.Value, buy.FlatNbt.Where(f => f.Key == item.Key).FirstOrDefault().Value, out var items))
+                continue;
+
+            foreach (var ingredient in items)
+            {
+                yield return await CostOf(ingredient, $"Used {ingredient} to upgraded {item.Key} to {item.Value}");
+            }
+        }
     }
 
     private async Task<PastFlip.ProfitChange> GetCostForEnchant(Core.Enchantment item, List<ColorEnchant> enchantments)

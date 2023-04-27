@@ -397,6 +397,46 @@ public class ProfitChangeTests
     }
 
     [Test]
+    public async Task AddedMasterStars()
+    {
+        var buy = new ColorSaveAuction()
+        {
+            Uuid = Guid.NewGuid().ToString("N"),
+            Tag = "HYPERION",
+            HighestBidAmount = 879_000_000,
+            FlatNbt = new(),
+            Enchantments = new List<ColorEnchant>(),
+            Tier = Api.Client.Model.Tier.EPIC
+        };
+        var sell = new Coflnet.Sky.Core.SaveAuction()
+        {
+            Uuid = Guid.NewGuid().ToString("N"),
+            Tag = "HYPERION",
+            HighestBidAmount = 979_000_000,
+            FlatenedNBT = new() {
+                {"upgrade_level", "9"},
+                {"art_of_war_count", "1"}
+            },
+            Enchantments = new(),
+            Tier = Core.Tier.LEGENDARY
+        };
+        var pricesApi = new Mock<Api.Client.Api.IPricesApi>();
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), null, 0, default)).ReturnsAsync(() => new() { Median = 10_000_000 });
+        service = new ProfitChangeService(pricesApi.Object, null, null, NullLogger<ProfitChangeService>.Instance, null);
+        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        Assert.AreEqual(6, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
+        Assert.AreEqual(-69580000, changes.Sum(c => c.Amount));
+        pricesApi.Verify(p => p.ApiItemPriceItemTagGetAsync("FOURTH_MASTER_STAR", null, 0, default), Times.Once);
+        pricesApi.Verify(p => p.ApiItemPriceItemTagGetAsync("THIRD_MASTER_STAR", null, 0, default), Times.Once);
+        pricesApi.Verify(p => p.ApiItemPriceItemTagGetAsync("SECOND_MASTER_STAR", null, 0, default), Times.Once);
+        pricesApi.Verify(p => p.ApiItemPriceItemTagGetAsync("FIRST_MASTER_STAR", null, 0, default), Times.Once);
+        pricesApi.Verify(p => p.ApiItemPriceItemTagGetAsync("THE_ART_OF_WAR", null, 0, default), Times.Once);
+
+        Assert.AreEqual("Used SECOND_MASTER_STAR to upgraded upgrade_level to 9", changes[3].Label);
+
+    }
+
+    [Test]
     public async Task MultiLevelCraft()
     {
         var buy = new ColorSaveAuction()
