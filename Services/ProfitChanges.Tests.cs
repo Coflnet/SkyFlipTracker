@@ -335,6 +335,35 @@ public class ProfitChangeTests
     }
 
     [Test]
+    public async Task RarityUpgrade()
+    {
+        var buy = new ColorSaveAuction()
+        {
+            Uuid = Guid.NewGuid().ToString("N"),
+            Tag = "HYPERION",
+            HighestBidAmount = 1000,
+            FlatNbt = new(),
+            Tier = Api.Client.Model.Tier.EPIC
+        };
+        var sell = new Coflnet.Sky.Core.SaveAuction()
+        {
+            Uuid = Guid.NewGuid().ToString("N"),
+            Tag = "HYPERION",
+            HighestBidAmount = 10_000_000,
+            FlatenedNBT = new()
+            {
+                { "rarity_upgrades", "1" }
+            },
+            Tier = Core.Tier.LEGENDARY
+        };
+         var pricesApi = new Mock<Api.Client.Api.IPricesApi>();
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), null, 0, default)).ReturnsAsync(() => new() { Median = 200_000_000 });
+        service = new ProfitChangeService(pricesApi.Object, null, null, NullLogger<ProfitChangeService>.Instance, null);
+        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        Assert.AreEqual(2, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
+    }
+
+    [Test]
     public async Task Enchantments()
     {
         var buy = new ColorSaveAuction()

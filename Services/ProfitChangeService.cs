@@ -257,6 +257,8 @@ public class ProfitChangeService
         }
         foreach (var item in sell.FlatenedNBT.Where(s => !buy.FlatNbt.Any(b => b.Key == s.Key && b.Value == s.Value)))
         {
+            if(item.Key == "rarity_upgrades")
+                continue;
             // missing nbt
             if (!mapper.TryGetIngredients(item.Key, item.Value, buy.FlatNbt.Where(f => f.Key == item.Key).FirstOrDefault().Value, out var items))
                 continue;
