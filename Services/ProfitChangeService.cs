@@ -132,6 +132,7 @@ public class ProfitChangeService
                 buy.Tier = tier;
             logger.LogInformation($"upgraded rarity to {buy.Tier} of {buy.Uuid} due to pet tier");
         }
+        var targetTier = sell.Tier;
         if (buy.Tier.HasValue && ((int)buy.Tier.Value - 1) < (int)sell.Tier)
             if (sell.Tag.StartsWith("PET_"))
             {
@@ -192,10 +193,29 @@ public class ProfitChangeService
                     }
                 }
             }
-            else if (sell.FlatenedNBT.Where(l => l.Key == "rarity_upgrades").Any() && !buy.FlatNbt.Where(l => l.Key == "rarity_upgrades").Any())
-                yield return await CostOf("RECOMBOBULATOR_3000", "Recombobulator");
             else
-                logger.LogWarning($"could not find rarity change source for {sell.Tag} {buy.Uuid} -> {sell.Uuid}");
+            {
+                if (sell.FlatenedNBT.Where(l => l.Key == "rarity_upgrades").Any() && !buy.FlatNbt.Where(l => l.Key == "rarity_upgrades").Any())
+                {
+                    yield return await CostOf("RECOMBOBULATOR_3000", "Recombobulator");
+                    targetTier--;
+                }
+                if (sell.Tag == "PULSE_RING")
+                {
+                    var toibCount = 0;
+                    if (targetTier >= Core.Tier.LEGENDARY)
+                        toibCount += 80;
+                    if (buy.Tier <= Tier.UNCOMMON)
+                        toibCount += 3;
+                    if (buy.Tier < Tier.EPIC && targetTier >= Core.Tier.EPIC)
+                        toibCount += 17;
+
+                    yield return await CostOf("THUNDER_IN_A_BOTTLE", $"{toibCount}x Thunder in a bottle", toibCount);
+                    targetTier--;
+                }
+                if ((int)buy.Tier.Value - 1 != (int)targetTier)
+                    logger.LogWarning($"could not find rarity change source for {sell.Tag} {buy.Uuid} -> {sell.Uuid}");
+            }
         // determine gem differences 
         var gemsOnPurchase = buy.FlatNbt.Where(f => f.Value == "PERFECT" || f.Value == "FLAWLESS").ToList();
         var gemsOnSell = sell.FlatenedNBT.Where(f => f.Value == "PERFECT" || f.Value == "FLAWLESS").ToList();
@@ -257,7 +277,7 @@ public class ProfitChangeService
         }
         foreach (var item in sell.FlatenedNBT.Where(s => !buy.FlatNbt.Any(b => b.Key == s.Key && b.Value == s.Value)))
         {
-            if(item.Key == "rarity_upgrades")
+            if (item.Key == "rarity_upgrades")
                 continue;
             // missing nbt
             if (!mapper.TryGetIngredients(item.Key, item.Value, buy.FlatNbt.Where(f => f.Key == item.Key).FirstOrDefault().Value, out var items))

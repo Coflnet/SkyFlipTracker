@@ -364,6 +364,61 @@ public class ProfitChangeTests
     }
 
     [Test]
+    public async Task PulseRingUpgrade()
+    {
+        var buy = new ColorSaveAuction()
+        {
+            Uuid = Guid.NewGuid().ToString("N"),
+            Tag = "PULSE_RING",
+            HighestBidAmount = 1000,
+            FlatNbt = new(),
+            Tier = Api.Client.Model.Tier.EPIC
+        };
+        var sell = new Coflnet.Sky.Core.SaveAuction()
+        {
+            Uuid = Guid.NewGuid().ToString("N"),
+            Tag = "PULSE_RING",
+            HighestBidAmount = 10_000_000,
+            FlatenedNBT = new(),
+            Tier = Core.Tier.LEGENDARY
+        };
+         var pricesApi = new Mock<Api.Client.Api.IPricesApi>();
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), null, 0, default)).ReturnsAsync(() => new() { Median = 1_000_000 });
+        service = new ProfitChangeService(pricesApi.Object, null, null, NullLogger<ProfitChangeService>.Instance, null);
+        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        Assert.AreEqual(2, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
+        Assert.AreEqual(-80200000, changes.Sum(c => c.Amount));
+        Assert.AreEqual("80x Thunder in a bottle", changes[1].Label);
+    }
+    [Test]
+    public async Task PulseRingUpgradeFull()
+    {
+        var buy = new ColorSaveAuction()
+        {
+            Uuid = Guid.NewGuid().ToString("N"),
+            Tag = "PULSE_RING",
+            HighestBidAmount = 1000,
+            FlatNbt = new(),
+            Tier = Api.Client.Model.Tier.UNCOMMON
+        };
+        var sell = new Coflnet.Sky.Core.SaveAuction()
+        {
+            Uuid = Guid.NewGuid().ToString("N"),
+            Tag = "PULSE_RING",
+            HighestBidAmount = 10_000_000,
+            FlatenedNBT = new(),
+            Tier = Core.Tier.MYTHIC
+        };
+         var pricesApi = new Mock<Api.Client.Api.IPricesApi>();
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), null, 0, default)).ReturnsAsync(() => new() { Median = 1_000_000 });
+        service = new ProfitChangeService(pricesApi.Object, null, null, NullLogger<ProfitChangeService>.Instance, null);
+        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        Assert.AreEqual(2, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
+        Assert.AreEqual(-100200000, changes.Sum(c => c.Amount));
+        Assert.AreEqual("100x Thunder in a bottle", changes[1].Label);
+    }
+
+    [Test]
     public async Task Enchantments()
     {
         var buy = new ColorSaveAuction()
