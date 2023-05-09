@@ -356,7 +356,7 @@ public class ProfitChangeTests
             },
             Tier = Core.Tier.LEGENDARY
         };
-         var pricesApi = new Mock<Api.Client.Api.IPricesApi>();
+        var pricesApi = new Mock<Api.Client.Api.IPricesApi>();
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), null, 0, default)).ReturnsAsync(() => new() { Median = 200_000_000 });
         service = new ProfitChangeService(pricesApi.Object, null, null, NullLogger<ProfitChangeService>.Instance, null);
         var changes = await service.GetChanges(buy, sell).ToListAsync();
@@ -382,7 +382,7 @@ public class ProfitChangeTests
             FlatenedNBT = new(),
             Tier = Core.Tier.LEGENDARY
         };
-         var pricesApi = new Mock<Api.Client.Api.IPricesApi>();
+        var pricesApi = new Mock<Api.Client.Api.IPricesApi>();
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), null, 0, default)).ReturnsAsync(() => new() { Median = 1_000_000 });
         service = new ProfitChangeService(pricesApi.Object, null, null, NullLogger<ProfitChangeService>.Instance, null);
         var changes = await service.GetChanges(buy, sell).ToListAsync();
@@ -409,7 +409,7 @@ public class ProfitChangeTests
             FlatenedNBT = new(),
             Tier = Core.Tier.MYTHIC
         };
-         var pricesApi = new Mock<Api.Client.Api.IPricesApi>();
+        var pricesApi = new Mock<Api.Client.Api.IPricesApi>();
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), null, 0, default)).ReturnsAsync(() => new() { Median = 1_000_000 });
         service = new ProfitChangeService(pricesApi.Object, null, null, NullLogger<ProfitChangeService>.Instance, null);
         var changes = await service.GetChanges(buy, sell).ToListAsync();
@@ -427,7 +427,7 @@ public class ProfitChangeTests
             Tag = "HYPERION",
             HighestBidAmount = 1000,
             FlatenedNBT = new(),
-            Enchantments = new () { new() { Type = Core.Enchantment.EnchantmentType.ultimate_wisdom, Level = 5 } },
+            Enchantments = new() { new() { Type = Core.Enchantment.EnchantmentType.ultimate_wisdom, Level = 5 } },
             Tier = Core.Tier.EPIC
         };
         var sell = new Coflnet.Sky.Core.SaveAuction()
@@ -458,7 +458,7 @@ public class ProfitChangeTests
             Tag = "HYPERION",
             HighestBidAmount = 1000,
             FlatenedNBT = new(),
-            Enchantments = new () { new() { Type = Core.Enchantment.EnchantmentType.ultimate_chimera, Level = 3 } },
+            Enchantments = new() { new() { Type = Core.Enchantment.EnchantmentType.ultimate_chimera, Level = 3 } },
             Tier = Core.Tier.EPIC
         };
         var sell = new Coflnet.Sky.Core.SaveAuction()
@@ -467,7 +467,7 @@ public class ProfitChangeTests
             Tag = "HYPERION",
             HighestBidAmount = 10_000_000,
             FlatenedNBT = new(),
-            Enchantments = new() { 
+            Enchantments = new() {
                 new(){Type = Core.Enchantment.EnchantmentType.ultimate_chimera, Level = 4} },
             Tier = Core.Tier.LEGENDARY
         };
@@ -481,6 +481,45 @@ public class ProfitChangeTests
     }
 
     [Test]
+    public async Task FieryKuudraCore()
+    {
+        var buy = new Core.SaveAuction()
+        {
+            Uuid = Guid.NewGuid().ToString("N"),
+            Tag = "BURNING_KUUDRA_CORE",
+            HighestBidAmount = 1000,
+            FlatenedNBT = new(),
+            Enchantments = new(),
+            Tier = Core.Tier.RARE
+        };
+        var sell = new Coflnet.Sky.Core.SaveAuction()
+        {
+            Uuid = Guid.NewGuid().ToString("N"),
+            Tag = "FIERY_KUUDRA_CORE",
+            HighestBidAmount = 10_000_000,
+            FlatenedNBT = new(),
+            Enchantments = new(),
+            Tier = Core.Tier.EPIC
+        };
+        var pricesApi = new Mock<Api.Client.Api.IPricesApi>();
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), null, 0, default)).ReturnsAsync(() => new() { Median = 20_000_000 });
+        var craftsApi = new Mock<Crafts.Client.Api.ICraftsApi>();
+        craftsApi.Setup(c => c.CraftsAllGetAsync(0, default)).ReturnsAsync(() => new() {
+            new() { ItemId = "FIERY_KUUDRA_CORE", Ingredients = new() {
+                new() { ItemId = "BURNING_KUUDRA_CORE", Count = 4 }
+                }}});
+        var itemsApi = new Mock<Items.Client.Api.IItemsApi>();
+        itemsApi.Setup(i => i.ItemItemTagGetAsync("FIERY_KUUDRA_CORE", It.IsAny<bool?>(), It.IsAny<int>(), default))
+            .ReturnsAsync(() => new() { Tag = "FIERY_KUUDRA_CORE", Tier = Items.Client.Model.Tier.EPIC });
+
+        service = new ProfitChangeService(pricesApi.Object, null, craftsApi.Object, NullLogger<ProfitChangeService>.Instance, itemsApi.Object);
+        var changes = await service.GetChanges(buy, sell).ToListAsync();
+
+        Assert.AreEqual(2, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
+        Assert.AreEqual(-60_200_000, changes.Sum(c => c.Amount));
+    }
+
+    [Test]
     public async Task AddedMasterStars()
     {
         var buy = new Core.SaveAuction()
@@ -489,7 +528,7 @@ public class ProfitChangeTests
             Tag = "HYPERION",
             HighestBidAmount = 879_000_000,
             FlatenedNBT = new(),
-            Enchantments = new (),
+            Enchantments = new(),
             Tier = Core.Tier.EPIC
         };
         var sell = new Coflnet.Sky.Core.SaveAuction()
@@ -605,7 +644,7 @@ public class ProfitChangeTests
         var changes = await service.GetChanges(buy, sell).ToListAsync();
         Assert.AreEqual(3, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
         Assert.AreEqual("crafting material WITHER_CATALYST x10", changes[1].Label);
-    
+
     }
     private List<KatUpgradeResult> KatResponse(string petTag = "PET_ENDERMAN")
     {

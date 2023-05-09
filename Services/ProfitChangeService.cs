@@ -98,9 +98,13 @@ public class ProfitChangeService
             }
             var allIngredients = craft.Ingredients.ToList();
             AddCraftPathIngredients(tagOnPurchase, allCrafts, allIngredients);
-            foreach (var item in allIngredients.Where(i => i.ItemId != tagOnPurchase))
+            foreach (var item in allIngredients)
             {
-                yield return await CostOf(item.ItemId, $"crafting material {item.ItemId}" + (item.Count > 1 ? $" x{item.Count}" : ""), item.Count);
+                var count = item.Count;
+                if(item.ItemId == tagOnPurchase)
+                    count--;
+                if(count > 0)
+                    yield return await CostOf(item.ItemId, $"crafting material {item.ItemId}" + (count > 1 ? $" x{count}" : ""), count);
             }
             var itemMetadata = await GetItemMetadata(sell.Tag);
             if ((int)buy.Tier < (int)sell.Tier)
@@ -312,6 +316,7 @@ public class ProfitChangeService
 
     private static Crafts.Client.Model.ProfitableCraft AddCraftPathIngredients(string tagOnPurchase, List<Crafts.Client.Model.ProfitableCraft> allCrafts, List<Crafts.Client.Model.Ingredient> allIngredients, int depth = 0)
     {
+        Console.WriteLine($"searching for {tagOnPurchase}");
         if (allIngredients.Where(i => i.ItemId == tagOnPurchase).Any())
             return null;
         if (depth > 10)
@@ -319,6 +324,7 @@ public class ProfitChangeService
         // search deeper
         foreach (var item in allIngredients.ToList())
         {
+            Console.WriteLine($"searching for {item.ItemId} in {tagOnPurchase}");
             var subCraft = allCrafts.Where(c => c.ItemId == item.ItemId).FirstOrDefault();
             if (subCraft == null)
                 continue;
@@ -326,18 +332,28 @@ public class ProfitChangeService
             {
                 var toAdd = subCraft.Ingredients.Where(i => i.ItemId != tagOnPurchase && i.ItemId != subCraft.ItemId);
                 allIngredients.AddRange(toAdd);
-                allIngredients.Remove(item);
+                RemoveItem(allIngredients, item);
                 return subCraft;
             }
             var foundSubCraft = AddCraftPathIngredients(tagOnPurchase, allCrafts, subCraft.Ingredients, depth + 1);
             if (foundSubCraft != null)
             {
                 allIngredients.AddRange(subCraft.Ingredients.Where(i => i.ItemId != foundSubCraft.ItemId && i.ItemId != subCraft.ItemId));
-                allIngredients.Remove(item);
+                RemoveItem(allIngredients, item);
                 return subCraft;
             }
         }
         return null;
+
+        static void RemoveItem(List<Crafts.Client.Model.Ingredient> allIngredients, Crafts.Client.Model.Ingredient item)
+        {
+            var matchingIngredient = allIngredients.Where(i => i.ItemId == item.ItemId).FirstOrDefault();
+            if (matchingIngredient != null)
+                if (matchingIngredient.Count > 1)
+                    matchingIngredient.Count--;
+                else
+                    allIngredients.Remove(matchingIngredient);
+        }
     }
 
     private static string GetCorrectKey(KeyValuePair<string, string> gem, Dictionary<string, string> flat)
