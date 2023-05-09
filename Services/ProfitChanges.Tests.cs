@@ -17,13 +17,13 @@ public class ProfitChangeTests
     [Test]
     public async Task EnderRelicToArtifactRecombed()
     {
-        var buy = new ColorSaveAuction()
+        var buy = new Core.SaveAuction()
         {
             Uuid = Guid.NewGuid().ToString("N"),
             Tag = "ENDER_ARTIFACT",
             HighestBidAmount = 1000,
-            FlatNbt = new() { { "rarity_upgrades", "1" } },
-            Tier = Api.Client.Model.Tier.LEGENDARY
+            FlatenedNBT = new() { { "rarity_upgrades", "1" } },
+            Tier = Core.Tier.LEGENDARY
         };
         var sell = new Coflnet.Sky.Core.SaveAuction()
         {
@@ -55,15 +55,15 @@ public class ProfitChangeTests
     [Test]
     public async Task EndermanMultiLevel()
     {
-        var buy = new ColorSaveAuction()
+        var buy = new Core.SaveAuction()
         {
             Uuid = Guid.NewGuid().ToString("N"),
             Tag = "PET_ENDERMAN",
             HighestBidAmount = 1000,
-            FlatNbt = new(),
-            Tier = Api.Client.Model.Tier.RARE
+            FlatenedNBT = new(),
+            Tier = Core.Tier.RARE
         };
-        var sell = new Coflnet.Sky.Core.SaveAuction()
+        var sell = new Core.SaveAuction()
         {
             Uuid = Guid.NewGuid().ToString("N"),
             Tag = "PET_ENDERMAN",
@@ -77,7 +77,7 @@ public class ProfitChangeTests
         Console.WriteLine(JsonConvert.SerializeObject(KatResponse()));
         service = new ProfitChangeService(null, katMock.Object, null, null, null);
         var changes = await service.GetChanges(buy, sell).ToListAsync();
-        Assert.AreEqual(4 * 2 + 1, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
+        Assert.AreEqual(3 * 2 + 1, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
         Assert.AreEqual(-20, changes[0].Amount);
         Assert.AreEqual(-100_000, changes[1].Amount, changes[1].Label);
         Assert.AreEqual("Kat materials for EPIC", changes[2].Label);
@@ -89,19 +89,19 @@ public class ProfitChangeTests
         }
         Assert.AreEqual("Kat materials for " + Core.Tier.MYTHIC, changes.Last().Label);
         Console.WriteLine(JsonConvert.SerializeObject(changes, Formatting.Indented));
-        Assert.AreEqual(-42100220, changes.Sum(c => c.Amount));
+        Assert.AreEqual(-41100170, changes.Sum(c => c.Amount));
     }
 
     [Test]
     public async Task EnderDragonSingleLevel()
     {
-        var buy = new ColorSaveAuction()
+        var buy = new Core.SaveAuction()
         {
             Uuid = Guid.NewGuid().ToString("N"),
             Tag = "PET_ENDER_DRAGON",
             HighestBidAmount = 1000,
-            FlatNbt = new(),
-            Tier = Api.Client.Model.Tier.EPIC
+            FlatenedNBT = new(),
+            Tier = Core.Tier.EPIC
         };
         var sell = new Coflnet.Sky.Core.SaveAuction()
         {
@@ -124,13 +124,13 @@ public class ProfitChangeTests
     [Test]
     public async Task ScathaUpgrade()
     {
-        var buy = new ColorSaveAuction()
+        var buy = new Core.SaveAuction()
         {
             Uuid = Guid.NewGuid().ToString("N"),
             Tag = "PET_SCATHA",
             HighestBidAmount = 1000,
-            FlatNbt = new(),
-            Tier = Api.Client.Model.Tier.RARE
+            FlatenedNBT = new(),
+            Tier = Core.Tier.RARE
         };
         var sell = new Coflnet.Sky.Core.SaveAuction()
         {
@@ -169,13 +169,13 @@ public class ProfitChangeTests
     [Test]
     public async Task BatUpgrade()
     {
-        var buy = new ColorSaveAuction()
+        var buy = new Core.SaveAuction()
         {
             Uuid = Guid.NewGuid().ToString("N"),
             Tag = "PET_BAT",
             HighestBidAmount = 1000,
-            FlatNbt = new(),
-            Tier = Api.Client.Model.Tier.LEGENDARY
+            FlatenedNBT = new(),
+            Tier = Core.Tier.LEGENDARY
         };
         var sell = new Coflnet.Sky.Core.SaveAuction()
         {
@@ -215,13 +215,13 @@ public class ProfitChangeTests
     [Test]
     public async Task TierBoostAddition()
     {
-        var buy = new ColorSaveAuction()
+        var buy = new Core.SaveAuction()
         {
             Uuid = Guid.NewGuid().ToString("N"),
             Tag = "PET_ENDERMAN",
             HighestBidAmount = 1000,
-            FlatNbt = new(),
-            Tier = Api.Client.Model.Tier.RARE
+            FlatenedNBT = new(),
+            Tier = Core.Tier.RARE
         };
         var sell = new Coflnet.Sky.Core.SaveAuction()
         {
@@ -243,13 +243,13 @@ public class ProfitChangeTests
     [Test]
     public async Task ReforgeChange()
     {
-        var buy = new ColorSaveAuction()
+        var buy = new Core.SaveAuction()
         {
             Uuid = Guid.NewGuid().ToString("N"),
             Tag = "FERMENTO_BOOTS",
             HighestBidAmount = 1000,
-            FlatNbt = new(),
-            Tier = Api.Client.Model.Tier.RARE
+            FlatenedNBT = new(),
+            Tier = Core.Tier.RARE
         };
         var sell = new Coflnet.Sky.Core.SaveAuction()
         {
@@ -270,14 +270,14 @@ public class ProfitChangeTests
     [Test]
     public async Task AoteReforgeNaming()
     {
-        var buy = new ColorSaveAuction()
+        var buy = new Core.SaveAuction()
         {
             Uuid = Guid.NewGuid().ToString("N"),
             Tag = "AOTE",
             HighestBidAmount = 1000,
-            Reforge = Reforge.AoteStone,
-            FlatNbt = new(),
-            Tier = Api.Client.Model.Tier.RARE
+            Reforge = Core.ItemReferences.Reforge.aote_stone,
+            FlatenedNBT = new(),
+            Tier = Core.Tier.RARE
         };
         var sell = new Coflnet.Sky.Core.SaveAuction()
         {
@@ -300,13 +300,13 @@ public class ProfitChangeTests
     public async Task AbilityScrolls()
     {
         // {"enchantments":[],"uuid":"8748045335304745869fa27afd7cf781","count":1,"startingBid":649999979,"tag":"NECRON_HANDLE","itemName":"Necron's Handle","start":"2023-01-20T06:14:58","end":"2023-01-20T06:29:09","auctioneerId":"0ca2593d6806476780068c4e45bd1006","profileId":"aee34ca707784cc0b1506466177ccb19","coopMembers":null,"highestBidAmount":649999979,"bids":[{"bidder":"7c5ff00eb1e04f50acd28554c911dbb4","profileId":"unknown","amount":649999979,"timestamp":"2023-01-20T06:28:37"}],"anvilUses":0,"nbtData":{"data":{"uid":"e5337b00fecb"}},"itemCreatedAt":"2023-01-20T00:43:00","reforge":"None","category":"MISC","tier":"EPIC","bin":true,"flatNbt":{"uid":"e5337b00fecb"}}
-        var buy = new ColorSaveAuction()
+        var buy = new Core.SaveAuction()
         {
             Uuid = Guid.NewGuid().ToString("N"),
             Tag = "NECRON_HANDLE",
             HighestBidAmount = 1000,
-            FlatNbt = new(),
-            Tier = Api.Client.Model.Tier.EPIC
+            FlatenedNBT = new(),
+            Tier = Core.Tier.EPIC
         };
         // {"enchantments":[],"uuid":"247f6a20f72448369fcd4acd8876d3c7","count":1,"startingBid":1619999000,"tag":"HYPERION","itemName":"Heroic Hyperion ✪✪✪✪✪","start":"2023-01-20T06:30:51","end":"2023-01-20T21:07:09","auctioneerId":"7c5ff00eb1e04f50acd28554c911dbb4","profileId":"81d6550f356d4304815cbd795cd27b3f","coopMembers":null,"highestBidAmount":1619999000,"bids":[{"bidder":"4bbd3840b07d49a78b1c313fd8e63d1c","profileId":"unknown","amount":1619999000,"timestamp":"2023-01-20T21:05:31"}],"anvilUses":0,"nbtData":{"data":{"rarity_upgrades":1,"hpc":15,"upgrade_level":5,"uid":"e5337b00fecb","ability_scroll":["IMPLOSION_SCROLL","SHADOW_WARP_SCROLL","WITHER_SHIELD_SCROLL"]}},"itemCreatedAt":"2023-01-20T00:43:00","reforge":"Heroic","category":"WEAPON","tier":"MYTHIC","bin":true,"flatNbt":{"rarity_upgrades":"1","hpc":"15","upgrade_level":"5","uid":"e5337b00fecb","ability_scroll":"IMPLOSION_SCROLL SHADOW_WARP_SCROLL WITHER_SHIELD_SCROLL"}}
         var sell = new Coflnet.Sky.Core.SaveAuction()
@@ -337,13 +337,13 @@ public class ProfitChangeTests
     [Test]
     public async Task RarityUpgrade()
     {
-        var buy = new ColorSaveAuction()
+        var buy = new Core.SaveAuction()
         {
             Uuid = Guid.NewGuid().ToString("N"),
             Tag = "HYPERION",
             HighestBidAmount = 1000,
-            FlatNbt = new(),
-            Tier = Api.Client.Model.Tier.EPIC
+            FlatenedNBT = new(),
+            Tier = Core.Tier.EPIC
         };
         var sell = new Coflnet.Sky.Core.SaveAuction()
         {
@@ -366,13 +366,13 @@ public class ProfitChangeTests
     [Test]
     public async Task PulseRingUpgrade()
     {
-        var buy = new ColorSaveAuction()
+        var buy = new Core.SaveAuction()
         {
             Uuid = Guid.NewGuid().ToString("N"),
             Tag = "PULSE_RING",
             HighestBidAmount = 1000,
-            FlatNbt = new(),
-            Tier = Api.Client.Model.Tier.EPIC
+            FlatenedNBT = new(),
+            Tier = Core.Tier.EPIC
         };
         var sell = new Coflnet.Sky.Core.SaveAuction()
         {
@@ -393,13 +393,13 @@ public class ProfitChangeTests
     [Test]
     public async Task PulseRingUpgradeFull()
     {
-        var buy = new ColorSaveAuction()
+        var buy = new Core.SaveAuction()
         {
             Uuid = Guid.NewGuid().ToString("N"),
             Tag = "PULSE_RING",
             HighestBidAmount = 1000,
-            FlatNbt = new(),
-            Tier = Api.Client.Model.Tier.UNCOMMON
+            FlatenedNBT = new(),
+            Tier = Core.Tier.UNCOMMON
         };
         var sell = new Coflnet.Sky.Core.SaveAuction()
         {
@@ -421,14 +421,14 @@ public class ProfitChangeTests
     [Test]
     public async Task Enchantments()
     {
-        var buy = new ColorSaveAuction()
+        var buy = new Core.SaveAuction()
         {
             Uuid = Guid.NewGuid().ToString("N"),
             Tag = "HYPERION",
             HighestBidAmount = 1000,
-            FlatNbt = new(),
-            Enchantments = new List<ColorEnchant>() { new() { Type = EnchantmentType.UltimateWisdom, Level = 5 } },
-            Tier = Api.Client.Model.Tier.EPIC
+            FlatenedNBT = new(),
+            Enchantments = new () { new() { Type = Core.Enchantment.EnchantmentType.ultimate_wisdom, Level = 5 } },
+            Tier = Core.Tier.EPIC
         };
         var sell = new Coflnet.Sky.Core.SaveAuction()
         {
@@ -452,14 +452,14 @@ public class ProfitChangeTests
     [Test]
     public async Task EnchantmentUpgrade()
     {
-        var buy = new ColorSaveAuction()
+        var buy = new Core.SaveAuction()
         {
             Uuid = Guid.NewGuid().ToString("N"),
             Tag = "HYPERION",
             HighestBidAmount = 1000,
-            FlatNbt = new(),
-            Enchantments = new List<ColorEnchant>() { new() { Type = EnchantmentType.UltimateChimera, Level = 3 } },
-            Tier = Api.Client.Model.Tier.EPIC
+            FlatenedNBT = new(),
+            Enchantments = new () { new() { Type = Core.Enchantment.EnchantmentType.ultimate_chimera, Level = 3 } },
+            Tier = Core.Tier.EPIC
         };
         var sell = new Coflnet.Sky.Core.SaveAuction()
         {
@@ -483,14 +483,14 @@ public class ProfitChangeTests
     [Test]
     public async Task AddedMasterStars()
     {
-        var buy = new ColorSaveAuction()
+        var buy = new Core.SaveAuction()
         {
             Uuid = Guid.NewGuid().ToString("N"),
             Tag = "HYPERION",
             HighestBidAmount = 879_000_000,
-            FlatNbt = new(),
-            Enchantments = new List<ColorEnchant>(),
-            Tier = Api.Client.Model.Tier.EPIC
+            FlatenedNBT = new(),
+            Enchantments = new (),
+            Tier = Core.Tier.EPIC
         };
         var sell = new Coflnet.Sky.Core.SaveAuction()
         {
@@ -523,13 +523,13 @@ public class ProfitChangeTests
     [Test]
     public async Task MultiLevelCraft()
     {
-        var buy = new ColorSaveAuction()
+        var buy = new Core.SaveAuction()
         {
             Uuid = Guid.NewGuid().ToString("N"),
             Tag = "NECRON_HANDLE",
             HighestBidAmount = 1000,
-            FlatNbt = new(),
-            Tier = Api.Client.Model.Tier.EPIC
+            FlatenedNBT = new(),
+            Tier = Core.Tier.EPIC
         };
         var sell = new Coflnet.Sky.Core.SaveAuction()
         {
@@ -572,13 +572,13 @@ public class ProfitChangeTests
     [Test]
     public async Task MultiLevelCraftOriginal()
     {
-        var buy = new ColorSaveAuction()
+        var buy = new Core.SaveAuction()
         {
             Uuid = Guid.NewGuid().ToString("N"),
             Tag = "NECRON_HANDLE",
             HighestBidAmount = 1000,
-            FlatNbt = new(),
-            Tier = Api.Client.Model.Tier.EPIC
+            FlatenedNBT = new(),
+            Tier = Core.Tier.EPIC
         };
         var sell = new Coflnet.Sky.Core.SaveAuction()
         {

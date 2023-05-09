@@ -2,11 +2,10 @@ using Coflnet.Sky.SkyAuctionTracker.Models;
 using Coflnet.Sky.Api.Client.Model;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Coflnet.Sky.Api.Client.Api;
 using Coflnet.Sky.Crafts.Client.Api;
 using Coflnet.Sky.Items.Client.Api;
 using System.Text.RegularExpressions;
-using Newtonsoft.Json;
+using Coflnet.Sky.Core;
 
 namespace Coflnet.Sky.SkyAuctionTracker.Services;
 /// <summary>
@@ -14,7 +13,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services;
 /// </summary>
 public class ProfitChangeService
 {
-    private IPricesApi pricesApi;
+    private Coflnet.Sky.Api.Client.Api.IPricesApi pricesApi;
     private Crafts.Client.Api.IKatApi katApi;
     private ICraftsApi craftsApi;
     private IItemsApi itemApi;
@@ -39,7 +38,7 @@ public class ProfitChangeService
     /// <param name="logger"></param>
     /// <param name="itemApi"></param>
     public ProfitChangeService(
-        IPricesApi pricesApi,
+        Coflnet.Sky.Api.Client.Api.IPricesApi pricesApi,
         Crafts.Client.Api.IKatApi katApi,
         ICraftsApi craftsApi,
         ILogger<ProfitChangeService> logger,
@@ -58,7 +57,7 @@ public class ProfitChangeService
     /// <param name="buy"></param>
     /// <param name="sell"></param>
     /// <returns></returns>
-    public async IAsyncEnumerable<PastFlip.ProfitChange> GetChanges(ColorSaveAuction buy, Coflnet.Sky.Core.SaveAuction sell)
+    public async IAsyncEnumerable<PastFlip.ProfitChange> GetChanges(Coflnet.Sky.Core.SaveAuction buy, Coflnet.Sky.Core.SaveAuction sell)
     {
         var changes = new List<PastFlip.ProfitChange>();
         yield return new PastFlip.ProfitChange()
@@ -68,10 +67,10 @@ public class ProfitChangeService
         };
         if (IsNotcaluclateable(sell))
             yield break;
-        if (buy.Tier == Tier.UNKNOWN)
+        if (buy.Tier == Core.Tier.UNKNOWN)
         {
             var itemMetadata = await GetItemMetadata(buy.Tag);
-            buy.Tier = (Tier)itemMetadata.Tier;
+            buy.Tier = (Core.Tier)itemMetadata.Tier;
         }
         if (sell.Tier == Core.Tier.UNKNOWN)
         {
@@ -104,7 +103,7 @@ public class ProfitChangeService
                 yield return await CostOf(item.ItemId, $"crafting material {item.ItemId}" + (item.Count > 1 ? $" x{item.Count}" : ""), item.Count);
             }
             var itemMetadata = await GetItemMetadata(sell.Tag);
-            if (((int)buy.Tier.Value - 1) < (int)sell.Tier)
+            if ((int)buy.Tier < (int)sell.Tier)
             {
                 if ((int)sell.Tier + 1 == (int)itemMetadata.Tier.Value)
                 {
@@ -117,7 +116,7 @@ public class ProfitChangeService
 
         if (sell.FlatenedNBT.ContainsKey("ability_scroll"))
         {
-            var scrollsOnPurchase = buy.FlatNbt.Where(l => l.Key == "ability_scroll").SelectMany(l => l.Value.Split(' ')).ToList();
+            var scrollsOnPurchase = buy.FlatenedNBT.Where(l => l.Key == "ability_scroll").SelectMany(l => l.Value.Split(' ')).ToList();
             var scrollsOnSell = sell.FlatenedNBT.Where(l => l.Key == "ability_scroll").SelectMany(l => l.Value.Split(' ')).ToList();
             var scrollsAdded = scrollsOnSell.Except(scrollsOnPurchase).ToList();
             foreach (var item in scrollsAdded)
@@ -126,22 +125,22 @@ public class ProfitChangeService
             }
         }
 
-        if (buy.Tier.HasValue && buy.Tier.Value == Tier.UNKNOWN && buy.Tag.StartsWith("PET_"))
+        if (buy.Tier == Core.Tier.UNKNOWN && buy.Tag.StartsWith("PET_"))
         {
-            if (Enum.TryParse(buy.FlatNbt.Where(l => l.Key == "tier").FirstOrDefault().Value, out Tier tier))
+            if (Enum.TryParse(buy.FlatenedNBT.Where(l => l.Key == "tier").FirstOrDefault().Value, out Core.Tier tier))
                 buy.Tier = tier;
             logger.LogInformation($"upgraded rarity to {buy.Tier} of {buy.Uuid} due to pet tier");
         }
         var targetTier = sell.Tier;
-        if (buy.Tier.HasValue && ((int)buy.Tier.Value - 1) < (int)sell.Tier)
+        if ((int)buy.Tier < (int)sell.Tier)
             if (sell.Tag.StartsWith("PET_"))
             {
                 if (sell.FlatenedNBT.Where(l => l.Key == "heldItem" && l.Value == "PET_ITEM_TIER_BOOST").Any())
                     yield return await CostOf("PET_ITEM_TIER_BOOST", "tier Boost cost");
                 else
                 {
-                    Console.WriteLine($"buy tier {(int)buy.Tier.Value - 1} {buy.Tier} sell tier {(int)sell.Tier} {sell.Tier}");
-                    for (int i = ((int)buy.Tier.Value - 1); i < (int)sell.Tier; i++)
+                    Console.WriteLine($"buy tier {(int)buy.Tier} {buy.Tier} sell tier {(int)sell.Tier} {sell.Tier}");
+                    for (int i = ((int)buy.Tier); i < (int)sell.Tier; i++)
                     {
                         var allCosts = await katApi.KatAllGetAsync(0, default);
                         if (allCosts == null)
@@ -149,7 +148,7 @@ public class ProfitChangeService
                         var cost = allCosts.Where(c => ((int)c.TargetRarity) > i + 1 && c.CoreData.ItemTag == sell.Tag)
                                     .OrderBy(c => c.TargetRarity).FirstOrDefault();
                         var upgradeCost = cost?.UpgradeCost;
-                        var tierName = (i + 1 >= (int)Tier.LEGENDARY) ? sell.Tier.ToString() : ((Tier)i + 2).ToString();
+                        var tierName = (i >= (int)Core.Tier.LEGENDARY) ? sell.Tier.ToString() : ((Core.Tier)i + 1).ToString();
                         var materialTitle = $"Kat materials for {tierName}";
                         var level = 1;
                         try
@@ -166,10 +165,10 @@ public class ProfitChangeService
                             // approximate cost with raw
                             var rawCost = await katApi.KatRawGetAsync();
                             var rarityInt = i + 1;
-                            if (i == (int)Tier.LEGENDARY)
+                            if (i > (int)Core.Tier.LEGENDARY)
                                 break;
                             //  rarityInt = (int)Crafts.Client.Model.Tier.LEGENDARY;
-                            Console.WriteLine($"kat upgrade cost {(Tier)rarityInt}({rarityInt}) {cost?.TargetRarity} {sell.Tier}");
+                            Console.WriteLine($"kat upgrade cost {(Core.Tier)rarityInt}({rarityInt}) {cost?.TargetRarity} {sell.Tier}");
                             var raw = rawCost.Where(c => ((int)c.BaseRarity) == rarityInt && sell.Tag.EndsWith(c.Name.Replace(' ', '_').ToUpper())).FirstOrDefault();
                             if (i == 5 && sell.Tag == "PET_JERRY")
                             {
@@ -177,7 +176,7 @@ public class ProfitChangeService
                                 break;
                             }
                             if (raw == null)
-                                throw new Exception($"could not find kat cost for tier {i}({(Tier)rarityInt}) and tag {sell.Tag} {buy.Uuid} -> {sell.Uuid}");
+                                throw new Exception($"could not find kat cost for tier {i}({(Core.Tier)rarityInt}) and tag {sell.Tag} {buy.Uuid} -> {sell.Uuid}");
                             upgradeCost = raw.Cost * (1.0 - 0.003 * level);
                             if (raw.Material != null)
                             {
@@ -188,14 +187,14 @@ public class ProfitChangeService
                         yield return new($"Kat cost for {tierName}", (long)-upgradeCost);
                         if (cost?.MaterialCost > 0 && !costAdded)
                             yield return new(materialTitle, (long)-cost.MaterialCost);
-                        if (i == (int)Tier.LEGENDARY)
+                        if (i == (int)Core.Tier.LEGENDARY)
                             break;
                     }
                 }
             }
             else
             {
-                if (sell.FlatenedNBT.Where(l => l.Key == "rarity_upgrades").Any() && !buy.FlatNbt.Where(l => l.Key == "rarity_upgrades").Any())
+                if (sell.FlatenedNBT.Where(l => l.Key == "rarity_upgrades").Any() && !buy.FlatenedNBT.Where(l => l.Key == "rarity_upgrades").Any())
                 {
                     yield return await CostOf("RECOMBOBULATOR_3000", "Recombobulator");
                     targetTier--;
@@ -205,19 +204,19 @@ public class ProfitChangeService
                     var toibCount = 0;
                     if (targetTier >= Core.Tier.LEGENDARY)
                         toibCount += 80;
-                    if (buy.Tier <= Tier.UNCOMMON)
+                    if (buy.Tier <= Core.Tier.UNCOMMON)
                         toibCount += 3;
-                    if (buy.Tier < Tier.EPIC && targetTier >= Core.Tier.EPIC)
+                    if (buy.Tier < Core.Tier.EPIC && targetTier >= Core.Tier.EPIC)
                         toibCount += 17;
 
                     yield return await CostOf("THUNDER_IN_A_BOTTLE", $"{toibCount}x Thunder in a bottle", toibCount);
                     targetTier--;
                 }
-                if ((int)buy.Tier.Value - 1 != (int)targetTier)
+                if ((int)buy.Tier != (int)targetTier)
                     logger.LogWarning($"could not find rarity change source for {sell.Tag} {buy.Uuid} -> {sell.Uuid}");
             }
         // determine gem differences 
-        var gemsOnPurchase = buy.FlatNbt.Where(f => f.Value == "PERFECT" || f.Value == "FLAWLESS").ToList();
+        var gemsOnPurchase = buy.FlatenedNBT.Where(f => f.Value == "PERFECT" || f.Value == "FLAWLESS").ToList();
         var gemsOnSell = sell.FlatenedNBT.Where(f => f.Value == "PERFECT" || f.Value == "FLAWLESS").ToList();
         var gemsAdded = gemsOnSell.Except(gemsOnPurchase).ToList();
         var gemsRemoved = gemsOnPurchase.Except(gemsOnSell).ToList();
@@ -228,11 +227,11 @@ public class ProfitChangeService
         }
         foreach (var gem in gemsRemoved)
         {
-            string type = GetCorrectKey(gem, buy.FlatNbt);
+            string type = GetCorrectKey(gem, buy.FlatenedNBT);
             yield return await ValueOf($"{gem.Value}_{type}_GEM", $"{gem.Value} {type} gem removed");
         }
 
-        var itemsOnPurchase = buy.FlatNbt.Where(f => ItemKeys.Contains(f.Key)).ToList();
+        var itemsOnPurchase = buy.FlatenedNBT.Where(f => ItemKeys.Contains(f.Key)).ToList();
         var itemsOnSell = sell.FlatenedNBT.Where(f => ItemKeys.Contains(f.Key)).ToList();
         var itemsAdded = itemsOnSell.Except(itemsOnPurchase).ToList();
         var itemsRemoved = itemsOnPurchase.Except(itemsOnSell).ToList();
@@ -244,16 +243,11 @@ public class ProfitChangeService
         {
             yield return await ValueOf(item.Value, $"{item.Value} {item.Key} removed");
         }
-        var newEnchantmens = sell.Enchantments?.Where(f => !buy.Enchantments?.Where(e => e.Type.ToString().ToLower() == f.Type.ToString().Replace("_", "").ToLower() && f.Level == e.Level).Any() ?? true).ToList();
+        var newEnchantmens = sell.Enchantments?.Where(f => !buy.Enchantments?.Where(e => e.Type == f.Type && f.Level == e.Level).Any() ?? true).ToList();
         if (newEnchantmens != null)
             foreach (var item in newEnchantmens)
             {
-                if (!Enum.TryParse<EnchantmentType>(item.Type.ToString().Replace("_", ""), true, out _))
-                {
-                    logger.LogWarning($"unkown enchantment {item.Type}");
-                    continue; // skip unkown enchants
-                }
-                if (buy.Enchantments.Any(e => e.Type == EnchantmentType.Unknown && e.Level == item.Level))
+                if (buy.Enchantments.Any(e => e.Type == Core.Enchantment.EnchantmentType.unknown && e.Level == item.Level))
                     continue; // skip unkown enchants that would match
                 PastFlip.ProfitChange found = await GetCostForEnchant(item, buy.Enchantments);
                 if (found != null)
@@ -265,7 +259,7 @@ public class ProfitChangeService
             // special case for alias
             reforgeName = "aotestone";
         }
-        if (buy.Reforge?.ToString().ToLower() != reforgeName)
+        if (buy.Reforge != sell.Reforge)
         {
             var reforgeItem = mapper.GetReforgeCost(sell.Reforge, sell.Tier);
             if (reforgeItem.Item1 != string.Empty)
@@ -275,12 +269,12 @@ public class ProfitChangeService
                 yield return itemCost;
             }
         }
-        foreach (var item in sell.FlatenedNBT.Where(s => !buy.FlatNbt.Any(b => b.Key == s.Key && b.Value == s.Value)))
+        foreach (var item in sell.FlatenedNBT.Where(s => !buy.FlatenedNBT.Any(b => b.Key == s.Key && b.Value == s.Value)))
         {
             if (item.Key == "rarity_upgrades")
                 continue;
             // missing nbt
-            if (!mapper.TryGetIngredients(item.Key, item.Value, buy.FlatNbt.Where(f => f.Key == item.Key).FirstOrDefault().Value, out var items))
+            if (!mapper.TryGetIngredients(item.Key, item.Value, buy.FlatenedNBT.Where(f => f.Key == item.Key).FirstOrDefault().Value, out var items))
                 continue;
 
             foreach (var ingredient in items)
@@ -290,13 +284,13 @@ public class ProfitChangeService
         }
     }
 
-    private async Task<PastFlip.ProfitChange> GetCostForEnchant(Core.Enchantment item, List<ColorEnchant> enchantments)
+    private async Task<PastFlip.ProfitChange> GetCostForEnchant(Core.Enchantment item, List<Core.Enchantment> enchantments)
     {
         if (item.Type == Core.Enchantment.EnchantmentType.telekinesis)
             return null; // not a book anymore
         PastFlip.ProfitChange found = null;
         int requiredLevel = item.Level;
-        var matchingEnchant = enchantments.Where(e => e.Type.ToString().ToLower() == item.Type.ToString().Replace("_", "").ToLower()).FirstOrDefault();
+        var matchingEnchant = enchantments.Where(e => e.Type == item.Type).FirstOrDefault();
         if (matchingEnchant != null && matchingEnchant.Level == item.Level - 1)
         {
             // only required one level lower book

@@ -10,7 +10,7 @@ public class TypeParsingTest
     public void Test()
     {
         var original = new Core.SaveAuction() { Reforge = Core.ItemReferences.Reforge.aote_stone };
-        var parsed = JsonConvert.DeserializeObject<ColorSaveAuction>(JsonConvert.SerializeObject(original));
-        Assert.AreEqual(Reforge.AoteStone, parsed.Reforge);
+        var parsed = JsonConvert.DeserializeObject<Core.SaveAuction>(JsonConvert.SerializeObject(original));
+        Assert.AreEqual(Core.ItemReferences.Reforge.aote_stone, parsed.Reforge);
     }
 }

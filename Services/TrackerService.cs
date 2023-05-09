@@ -271,14 +271,10 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             }, async (item, token) =>
             {
                 var buyResp = await auctionsApi.ApiAuctionAuctionUuidGetWithHttpInfoAsync(item.buy.Uuid, 0, token).ConfigureAwait(false);
-                var buy = buyResp.Data;
-                if (buyResp.StatusCode != System.Net.HttpStatusCode.OK || buyResp.Data == null)
-                {
-                    // try to parse it
-                    buy = JsonConvert.DeserializeObject<Api.Client.Model.ColorSaveAuction>(buyResp.RawContent);
-                    if (buy == null)
-                        throw new Exception($"could not load buy {item.buy.Uuid} {buyResp.StatusCode} Content: {buyResp.RawContent}");
-                }
+                var buy = JsonConvert.DeserializeObject<SaveAuction>(buyResp.RawContent);
+                if (buy == null)
+                    throw new Exception($"could not load buy {item.buy.Uuid} {buyResp.StatusCode} Content: {buyResp.RawContent}");
+
                 flipSumaryEventProducer.Produce(new FlipSumaryEvent()
                 {
                     Flipper = item.sell.AuctioneerId,
@@ -355,7 +351,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
         public string Flipper { get; set; }
         public int Profit { get; set; }
         public SaveAuction Sell { get; internal set; }
-        public Api.Client.Model.ColorSaveAuction Buy { get; internal set; }
+        public SaveAuction Buy { get; internal set; }
         public Flip Finder { get; internal set; }
     }
 }
