@@ -189,14 +189,14 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             var auctions = await Task.WhenAll(toRefresh.Select(async a =>
             {
                 var originalResp = await auctionsApi.ApiAuctionAuctionUuidGetWithHttpInfoAsync(a.ToString("N"));
-                var original = JsonConvert.DeserializeObject<Api.Client.Model.ColorSaveAuction>(originalResp.RawContent);
-                if (original == null)
+                return JsonConvert.DeserializeObject<ApiSaveAuction>(originalResp.RawContent);
+                /*if (original == null)
                     throw new Exception($"auction {a.ToString("N")} could not be loaded");
 
                 var mapped = mapper.Map<SaveAuction>(original);
                 if (mapped == null)
                     throw new Exception($"auction {JsonConvert.SerializeObject(original)} could not be mapped");
-                return mapped;
+                return mapped;*/
             }));
             await IndexCassandra(auctions);
         }
@@ -271,7 +271,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             }, async (item, token) =>
             {
                 var buyResp = await auctionsApi.ApiAuctionAuctionUuidGetWithHttpInfoAsync(item.buy.Uuid, 0, token).ConfigureAwait(false);
-                var buy = JsonConvert.DeserializeObject<SaveAuction>(buyResp.RawContent);
+                var buy = JsonConvert.DeserializeObject<ApiSaveAuction>(buyResp.RawContent);
                 if (buy == null)
                     throw new Exception($"could not load buy {item.buy.Uuid} {buyResp.StatusCode} Content: {buyResp.RawContent}");
 

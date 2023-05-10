@@ -364,6 +364,36 @@ public class ProfitChangeTests
     }
 
     [Test]
+    public async Task NotAddedEthermerge()
+    {
+        var buy = new Core.SaveAuction()
+        {
+            Uuid = Guid.NewGuid().ToString("N"),
+            Tag = "ASPECT_OF_THE_VOID",
+            HighestBidAmount = 1000,
+            FlatenedNBT = new(){{"ethermerge", "1"}},
+            Tier = Core.Tier.EPIC
+        };
+        var sell = new Core.SaveAuction()
+        {
+            Uuid = Guid.NewGuid().ToString("N"),
+            Tag = "ASPECT_OF_THE_VOID",
+            HighestBidAmount = 10_000_000,
+            FlatenedNBT = new(){{"ethermerge", "1"}},
+            Tier = Core.Tier.EPIC
+        };
+        var json = JsonConvert.SerializeObject(buy);
+        buy = JsonConvert.DeserializeObject<ApiSaveAuction>(json);
+        var pricesApi = new Mock<Api.Client.Api.IPricesApi>();
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), null, 0, default)).ReturnsAsync(() => new() { Median = 200_000_000 });
+        service = new ProfitChangeService(pricesApi.Object, null, null, NullLogger<ProfitChangeService>.Instance, null);
+        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        Console.WriteLine(json);
+        Console.WriteLine(JsonConvert.SerializeObject(buy, Formatting.Indented));
+        Assert.AreEqual(1, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
+    }
+
+    [Test]
     public async Task PulseRingUpgrade()
     {
         var buy = new Core.SaveAuction()

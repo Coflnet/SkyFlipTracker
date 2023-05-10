@@ -6,6 +6,7 @@ using Coflnet.Sky.Crafts.Client.Api;
 using Coflnet.Sky.Items.Client.Api;
 using System.Text.RegularExpressions;
 using Coflnet.Sky.Core;
+using System.Runtime.Serialization;
 
 namespace Coflnet.Sky.SkyAuctionTracker.Services;
 /// <summary>
@@ -101,9 +102,9 @@ public class ProfitChangeService
             foreach (var item in allIngredients)
             {
                 var count = item.Count;
-                if(item.ItemId == tagOnPurchase)
+                if (item.ItemId == tagOnPurchase)
                     count--;
-                if(count > 0)
+                if (count > 0)
                     yield return await CostOf(item.ItemId, $"crafting material {item.ItemId}" + (count > 1 ? $" x{count}" : ""), count);
             }
             var itemMetadata = await GetItemMetadata(sell.Tag);
@@ -405,4 +406,13 @@ public class ProfitChangeService
                 ?? throw new Exception($"could not find price for {item}")).Median * amount * 98 / 100
         };
     }
+}
+
+public class ApiSaveAuction : Core.SaveAuction
+{
+    /// <summary>
+    /// 
+    /// </summary>
+    [DataMember(Name = "flatNbt", EmitDefaultValue = true)]
+    public override Dictionary<string, string> FlatenedNBT { get; set; }
 }
