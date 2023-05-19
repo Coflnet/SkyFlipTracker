@@ -25,8 +25,9 @@ public class HypixelItemService
         if (_items != null)
             return _items;
 
-        return JsonSerializer.Deserialize<Root>(await File.ReadAllTextAsync("items.json"))
-            .Items.Where(x => x.Id != null).ToDictionary(x => x.Id);
+        if (File.Exists("items.json"))
+            return JsonSerializer.Deserialize<Root>(await File.ReadAllTextAsync("items.json"))
+                .Items.Where(x => x.Id != null).ToDictionary(x => x.Id);
         var response = await _httpClient.GetAsync("https://api.hypixel.net/resources/skyblock/items");
         if (response.IsSuccessStatusCode)
         {
