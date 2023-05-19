@@ -71,6 +71,8 @@ namespace Coflnet.Sky.SkyAuctionTracker
             services.AddTransient<TrackerService>();
             services.AddSingleton<Kafka.KafkaCreator>();
             services.AddSingleton<FlipSumaryEventProducer>();
+            services.AddSingleton<HypixelItemService>();
+            services.AddHttpClient();
             services.AddResponseCaching();
             services.AddMemoryCache();
             services.AddResponseCompression();

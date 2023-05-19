@@ -47,7 +47,7 @@ public class ProfitChangeTests
         var itemsApi = new Mock<Items.Client.Api.IItemsApi>();
         itemsApi.Setup(i => i.ItemItemTagGetAsync("ENDER_RELIC", It.IsAny<bool?>(), It.IsAny<int>(), default))
                 .ReturnsAsync(() => new() { Tag = "ENDER_RELIC", Tier = Items.Client.Model.Tier.LEGENDARY });
-        service = new ProfitChangeService(pricesApi.Object, null, craftsApi.Object, NullLogger<ProfitChangeService>.Instance, itemsApi.Object);
+        service = new ProfitChangeService(pricesApi.Object, null, craftsApi.Object, NullLogger<ProfitChangeService>.Instance, itemsApi.Object, null);
         var result = await service.GetChanges(buy, sell).ToListAsync();
         Assert.AreEqual(4, result.Count);
     }
@@ -75,7 +75,7 @@ public class ProfitChangeTests
 
         katMock.Setup(k => k.KatAllGetAsync(0, default)).ReturnsAsync(KatResponse());
         Console.WriteLine(JsonConvert.SerializeObject(KatResponse()));
-        service = new ProfitChangeService(null, katMock.Object, null, null, null);
+        service = new ProfitChangeService(null, katMock.Object, null, null, null, null);
         var changes = await service.GetChanges(buy, sell).ToListAsync();
         Assert.AreEqual(3 * 2 + 1, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
         Assert.AreEqual(-20, changes[0].Amount);
@@ -113,7 +113,7 @@ public class ProfitChangeTests
         };
         var katMock = new Mock<Crafts.Client.Api.IKatApi>();
         katMock.Setup(k => k.KatAllGetAsync(0, default)).ReturnsAsync(KatResponse("PET_ENDER_DRAGON"));
-        service = new ProfitChangeService(null, katMock.Object, null, null, null);
+        service = new ProfitChangeService(null, katMock.Object, null, null, null, null);
         var changes = await service.GetChanges(buy, sell).ToListAsync();
         Assert.AreEqual(3, changes.Count);
         Assert.AreEqual(-40, changes[0].Amount);
@@ -157,7 +157,7 @@ public class ProfitChangeTests
         var pricesApi = new Mock<Api.Client.Api.IPricesApi>();
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), null, 0, default))
                 .ReturnsAsync(() => new() { Median = 1_000_000 });
-        service = new ProfitChangeService(pricesApi.Object, katMock.Object, null, null, null);
+        service = new ProfitChangeService(pricesApi.Object, katMock.Object, null, null, null, null);
         var changes = await service.GetChanges(buy, sell).ToListAsync();
         Assert.AreEqual(3, changes.Count);
         Assert.AreEqual(-4000000, changes[0].Amount);
@@ -202,7 +202,7 @@ public class ProfitChangeTests
         var pricesApi = new Mock<Api.Client.Api.IPricesApi>();
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), null, 0, default))
                 .ReturnsAsync(() => new() { Median = 1_000_000 });
-        service = new ProfitChangeService(pricesApi.Object, katMock.Object, null, null, null);
+        service = new ProfitChangeService(pricesApi.Object, katMock.Object, null, null, null, null);
         var changes = await service.GetChanges(buy, sell).ToListAsync();
         Console.WriteLine(JsonConvert.SerializeObject(changes, Formatting.Indented));
         Assert.AreEqual(3, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
@@ -234,7 +234,7 @@ public class ProfitChangeTests
         var pricesApi = new Mock<Api.Client.Api.IPricesApi>();
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), null, 0, default))
                 .ReturnsAsync(() => new() { Median = 100_000_000 });
-        service = new ProfitChangeService(pricesApi.Object, null, null, null, null);
+        service = new ProfitChangeService(pricesApi.Object, null, null, null, null, null);
         var changes = await service.GetChanges(buy, sell).ToListAsync();
         Assert.AreEqual(2, changes.Count);
         Assert.AreEqual(-100000020, changes.Sum(c => c.Amount));
@@ -262,7 +262,7 @@ public class ProfitChangeTests
         var pricesApi = new Mock<Api.Client.Api.IPricesApi>();
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), null, 0, default))
                 .ReturnsAsync(() => new() { Median = 5_000_000 });
-        service = new ProfitChangeService(pricesApi.Object, null, null, NullLogger<ProfitChangeService>.Instance, null);
+        service = new ProfitChangeService(pricesApi.Object, null, null, NullLogger<ProfitChangeService>.Instance, null, null);
         var changes = await service.GetChanges(buy, sell).ToListAsync();
         Assert.AreEqual(2, changes.Count);
         Assert.AreEqual(-(5_000_000 + 600_000 + 200_000), changes.Sum(c => c.Amount));
@@ -290,7 +290,7 @@ public class ProfitChangeTests
         var pricesApi = new Mock<Api.Client.Api.IPricesApi>();
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), null, 0, default))
                 .ReturnsAsync(() => new() { Median = 5_000_000 });
-        service = new ProfitChangeService(pricesApi.Object, null, null, NullLogger<ProfitChangeService>.Instance, null);
+        service = new ProfitChangeService(pricesApi.Object, null, null, NullLogger<ProfitChangeService>.Instance, null, null);
         var changes = await service.GetChanges(buy, sell).ToListAsync();
         Assert.AreEqual(1, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
         Assert.AreEqual(-200_000, changes.Sum(c => c.Amount));
@@ -328,7 +328,7 @@ public class ProfitChangeTests
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), null, 0, default)).ReturnsAsync(() => new() { Median = 200_000_000 });
         var itemsApi = new Mock<Items.Client.Api.IItemsApi>();
         itemsApi.Setup(i => i.ItemItemTagGetAsync("HYPERION", It.IsAny<bool?>(), It.IsAny<int>(), default)).ReturnsAsync(() => new() { Tag = "HYPERION", Tier = Items.Client.Model.Tier.LEGENDARY });
-        service = new ProfitChangeService(pricesApi.Object, null, craftsApi.Object, NullLogger<ProfitChangeService>.Instance, itemsApi.Object);
+        service = new ProfitChangeService(pricesApi.Object, null, craftsApi.Object, NullLogger<ProfitChangeService>.Instance, itemsApi.Object, null);
         var changes = await service.GetChanges(buy, sell).ToListAsync();
         Assert.AreEqual(4, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
         Assert.AreEqual(-600000020, changes.Sum(c => c.Amount));
@@ -358,7 +358,7 @@ public class ProfitChangeTests
         };
         var pricesApi = new Mock<Api.Client.Api.IPricesApi>();
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), null, 0, default)).ReturnsAsync(() => new() { Median = 200_000_000 });
-        service = new ProfitChangeService(pricesApi.Object, null, null, NullLogger<ProfitChangeService>.Instance, null);
+        service = new ProfitChangeService(pricesApi.Object, null, null, NullLogger<ProfitChangeService>.Instance, null, null);
         var changes = await service.GetChanges(buy, sell).ToListAsync();
         Assert.AreEqual(2, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
     }
@@ -386,7 +386,7 @@ public class ProfitChangeTests
         buy = JsonConvert.DeserializeObject<ApiSaveAuction>(json);
         var pricesApi = new Mock<Api.Client.Api.IPricesApi>();
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), null, 0, default)).ReturnsAsync(() => new() { Median = 200_000_000 });
-        service = new ProfitChangeService(pricesApi.Object, null, null, NullLogger<ProfitChangeService>.Instance, null);
+        service = new ProfitChangeService(pricesApi.Object, null, null, NullLogger<ProfitChangeService>.Instance, null, null);
         var changes = await service.GetChanges(buy, sell).ToListAsync();
         Console.WriteLine(json);
         Console.WriteLine(JsonConvert.SerializeObject(buy, Formatting.Indented));
@@ -414,7 +414,7 @@ public class ProfitChangeTests
         };
         var pricesApi = new Mock<Api.Client.Api.IPricesApi>();
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), null, 0, default)).ReturnsAsync(() => new() { Median = 1_000_000 });
-        service = new ProfitChangeService(pricesApi.Object, null, null, NullLogger<ProfitChangeService>.Instance, null);
+        service = new ProfitChangeService(pricesApi.Object, null, null, NullLogger<ProfitChangeService>.Instance, null, null);
         var changes = await service.GetChanges(buy, sell).ToListAsync();
         Assert.AreEqual(2, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
         Assert.AreEqual(-80200000, changes.Sum(c => c.Amount));
@@ -441,7 +441,7 @@ public class ProfitChangeTests
         };
         var pricesApi = new Mock<Api.Client.Api.IPricesApi>();
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), null, 0, default)).ReturnsAsync(() => new() { Median = 1_000_000 });
-        service = new ProfitChangeService(pricesApi.Object, null, null, NullLogger<ProfitChangeService>.Instance, null);
+        service = new ProfitChangeService(pricesApi.Object, null, null, NullLogger<ProfitChangeService>.Instance, null, null);
         var changes = await service.GetChanges(buy, sell).ToListAsync();
         Assert.AreEqual(2, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
         Assert.AreEqual(-100200000, changes.Sum(c => c.Amount));
@@ -472,7 +472,7 @@ public class ProfitChangeTests
         };
         var pricesApi = new Mock<Api.Client.Api.IPricesApi>();
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), null, 0, default)).ReturnsAsync(() => new() { Median = 2_000_000 });
-        service = new ProfitChangeService(pricesApi.Object, null, null, NullLogger<ProfitChangeService>.Instance, null);
+        service = new ProfitChangeService(pricesApi.Object, null, null, NullLogger<ProfitChangeService>.Instance, null, null);
         var changes = await service.GetChanges(buy, sell).ToListAsync();
         Assert.AreEqual(2, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
         Assert.AreEqual(-2_200_000, changes.Sum(c => c.Amount));
@@ -503,7 +503,7 @@ public class ProfitChangeTests
         };
         var pricesApi = new Mock<Api.Client.Api.IPricesApi>();
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), null, 0, default)).ReturnsAsync(() => new() { Median = 20_000_000 });
-        service = new ProfitChangeService(pricesApi.Object, null, null, NullLogger<ProfitChangeService>.Instance, null);
+        service = new ProfitChangeService(pricesApi.Object, null, null, NullLogger<ProfitChangeService>.Instance, null, null);
         var changes = await service.GetChanges(buy, sell).ToListAsync();
         Assert.AreEqual(2, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
         Assert.AreEqual(-20_200_000, changes.Sum(c => c.Amount));
@@ -542,7 +542,7 @@ public class ProfitChangeTests
         itemsApi.Setup(i => i.ItemItemTagGetAsync("FIERY_KUUDRA_CORE", It.IsAny<bool?>(), It.IsAny<int>(), default))
             .ReturnsAsync(() => new() { Tag = "FIERY_KUUDRA_CORE", Tier = Items.Client.Model.Tier.EPIC });
 
-        service = new ProfitChangeService(pricesApi.Object, null, craftsApi.Object, NullLogger<ProfitChangeService>.Instance, itemsApi.Object);
+        service = new ProfitChangeService(pricesApi.Object, null, craftsApi.Object, NullLogger<ProfitChangeService>.Instance, itemsApi.Object, null);
         var changes = await service.GetChanges(buy, sell).ToListAsync();
 
         Assert.AreEqual(2, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
@@ -575,7 +575,7 @@ public class ProfitChangeTests
         };
         var pricesApi = new Mock<Api.Client.Api.IPricesApi>();
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), null, 0, default)).ReturnsAsync(() => new() { Median = 10_000_000 });
-        service = new ProfitChangeService(pricesApi.Object, null, null, NullLogger<ProfitChangeService>.Instance, null);
+        service = new ProfitChangeService(pricesApi.Object, null, null, NullLogger<ProfitChangeService>.Instance, null, null);
         var changes = await service.GetChanges(buy, sell).ToListAsync();
         Assert.AreEqual(6, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
         Assert.AreEqual(-69580000, changes.Sum(c => c.Amount));
@@ -626,7 +626,7 @@ public class ProfitChangeTests
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), null, 0, default)).ReturnsAsync(() => new() { Median = 1_000_000 });
         var itemsApi = new Mock<Items.Client.Api.IItemsApi>();
         itemsApi.Setup(i => i.ItemItemTagGetAsync("HYPERION", It.IsAny<bool?>(), It.IsAny<int>(), default)).ReturnsAsync(() => new() { Tag = "HYPERION", Tier = Items.Client.Model.Tier.LEGENDARY });
-        service = new ProfitChangeService(pricesApi.Object, null, craftsApi.Object, NullLogger<ProfitChangeService>.Instance, itemsApi.Object);
+        service = new ProfitChangeService(pricesApi.Object, null, craftsApi.Object, NullLogger<ProfitChangeService>.Instance, itemsApi.Object, null);
         var changes = await service.GetChanges(buy, sell).ToListAsync();
         Assert.AreEqual(4, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
         Assert.AreEqual("crafting material GIANT_FRAGMENT_LASER x8", changes[1].Label);
@@ -670,7 +670,7 @@ public class ProfitChangeTests
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), null, 0, default)).ReturnsAsync(() => new() { Median = 1_000_000 });
         var itemsApi = new Mock<Items.Client.Api.IItemsApi>();
         itemsApi.Setup(i => i.ItemItemTagGetAsync("HYPERION", It.IsAny<bool?>(), It.IsAny<int>(), default)).ReturnsAsync(() => new() { Tag = "HYPERION", Tier = Items.Client.Model.Tier.LEGENDARY });
-        service = new ProfitChangeService(pricesApi.Object, null, craftsApi.Object, NullLogger<ProfitChangeService>.Instance, itemsApi.Object);
+        service = new ProfitChangeService(pricesApi.Object, null, craftsApi.Object, NullLogger<ProfitChangeService>.Instance, itemsApi.Object, null);
         var changes = await service.GetChanges(buy, sell).ToListAsync();
         Assert.AreEqual(3, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
         Assert.AreEqual("crafting material WITHER_CATALYST x10", changes[1].Label);

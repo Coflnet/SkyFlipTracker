@@ -44,7 +44,6 @@ public class FlipStorageService
             var cluster = Cluster.Builder()
                                 .WithCredentials(config["CASSANDRA:USER"], config["CASSANDRA:PASSWORD"])
                                 .AddContactPoints(config["CASSANDRA:HOSTS"].Split(","))
-                                .WithDefaultKeyspace(keyspace)
                                 .Build();
 
             _session = await cluster.ConnectAsync();

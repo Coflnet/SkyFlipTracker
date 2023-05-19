@@ -20,6 +20,7 @@ public class ProfitChangeService
     private IItemsApi itemApi;
     private readonly ILogger<ProfitChangeService> logger;
     private Core.PropertyMapper mapper = new();
+    private HypixelItemService hypixelItemService;
     /// <summary>
     /// Keys containing itemTags that can be removed
     /// </summary>
@@ -38,18 +39,21 @@ public class ProfitChangeService
     /// <param name="craftsApi"></param>
     /// <param name="logger"></param>
     /// <param name="itemApi"></param>
+    /// <param name="hypixelItemService"></param>
     public ProfitChangeService(
         Coflnet.Sky.Api.Client.Api.IPricesApi pricesApi,
         Crafts.Client.Api.IKatApi katApi,
         ICraftsApi craftsApi,
         ILogger<ProfitChangeService> logger,
-        IItemsApi itemApi)
+        IItemsApi itemApi,
+        HypixelItemService hypixelItemService)
     {
         this.pricesApi = pricesApi;
         this.katApi = katApi;
         this.craftsApi = craftsApi;
         this.logger = logger;
         this.itemApi = itemApi;
+        this.hypixelItemService = hypixelItemService;
     }
 
     /// <summary>
@@ -278,6 +282,24 @@ public class ProfitChangeService
         {
             if (item.Key == "rarity_upgrades")
                 continue;
+            if (item.Key == "unlocked_slots")
+            {
+                var slotCost = await hypixelItemService.GetSlotCost(
+                    sell.Tag,
+                    buy.FlatenedNBT.Where(f => f.Key == "unlocked_slots").SelectMany(f => f.Value.Split(',')).ToList(),
+                    item.Value.Split(',').ToList());
+                foreach (var cost in slotCost)
+                {
+                    if (cost.Coins != 0)
+                        yield return new PastFlip.ProfitChange()
+                        {
+                            Label = "Slot unlock cost",
+                            Amount = -cost.Coins
+                        };
+                    else if (cost.Type == "ITEM")
+                        yield return await CostOf(cost.ItemId, $"Slot unlock item {cost.ItemId}x{cost.Amount}", cost.Amount ?? 1);
+                }
+            }
             // missing nbt
             if (!mapper.TryGetIngredients(item.Key, item.Value, buy.FlatenedNBT.Where(f => f.Key == item.Key).FirstOrDefault().Value, out var items))
                 continue;
