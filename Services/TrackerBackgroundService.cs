@@ -105,13 +105,15 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             var sellConsumeConfig = new ConsumerConfig(consumeConfig.ToDictionary(c=>c.Key,c=>c.Value))
             {
                 GroupId = "sky-fliptracker-sell",
+                SessionTimeoutMs = 10000,
             };
             await kafkaCreator.CreateTopicIfNotExist(config["TOPICS:SOLD_AUCTION"], 9);
 
             var sellConsume = KafkaConsumer.ConsumeBatch<SaveAuction>(sellConsumeConfig, config["TOPICS:SOLD_AUCTION"], async flipEvents =>
             {
-                if (flipEvents.All(e => e.End < DateTime.UtcNow - TimeSpan.FromDays(2)))
+                if (flipEvents.All(e => e.End < DateTime.UtcNow - TimeSpan.FromHours(8)))
                 {
+                    if(Random.Shared.NextDouble() < 0.1)
                     logger.LogInformation("skipping old sell");
                     return;
                 }
