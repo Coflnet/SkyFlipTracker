@@ -24,6 +24,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
 
         private static Prometheus.Counter consumeCounter = Prometheus.Metrics.CreateCounter("sky_fliptracker_consume_lp", "Counts the consumed low priced auctions");
         private static Prometheus.Counter consumeEvent = Prometheus.Metrics.CreateCounter("sky_fliptracker_consume_event", "Counts the consumed flip events");
+        private static Prometheus.Counter consumedSells = Prometheus.Metrics.CreateCounter("sky_fliptracker_consume_sells", "Counts the consumed sells");
         private static Prometheus.Counter flipsUpdated = Prometheus.Metrics.CreateCounter("sky_fliptracker_flips_updated", "How many flips were updated");
         private KafkaCreator kafkaCreator;
         public TrackerBackgroundService(
@@ -101,8 +102,13 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 AutoCommitIntervalMs = 0,
                 PartitionAssignmentStrategy = PartitionAssignmentStrategy.CooperativeSticky
             };
+            var sellConsumeConfig = new ConsumerConfig(consumeConfig.ToDictionary(c=>c.Key,c=>c.Value))
+            {
+                GroupId = "sky-fliptracker-sell",
+            };
             await kafkaCreator.CreateTopicIfNotExist(config["TOPICS:SOLD_AUCTION"], 9);
-            await KafkaConsumer.ConsumeBatch<SaveAuction>(consumeConfig, config["TOPICS:SOLD_AUCTION"], async flipEvents =>
+
+            var sellConsume = KafkaConsumer.ConsumeBatch<SaveAuction>(sellConsumeConfig, config["TOPICS:SOLD_AUCTION"], async flipEvents =>
             {
                 if (flipEvents.All(e => e.End < DateTime.UtcNow - TimeSpan.FromDays(2)))
                 {
@@ -115,6 +121,28 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                         using var scope = scopeFactory.CreateScope();
                         var service = scope.ServiceProvider.GetRequiredService<TrackerService>();
                         await service.AddSells(flipEvents);
+                        consumedSells.Inc(flipEvents.Count());
+                        return;
+                    }
+                    catch (Exception e)
+                    {
+                        logger.LogError(e, "could not save sells once");
+                        await Task.Delay(1000);
+                    }
+            }, stoppingToken, 50);
+            await KafkaConsumer.ConsumeBatch<SaveAuction>(consumeConfig, config["TOPICS:SOLD_AUCTION"], async flipEvents =>
+            {
+                if (flipEvents.All(e => e.End < DateTime.UtcNow - TimeSpan.FromDays(2)))
+                {
+                    logger.LogInformation("skipping old sell");
+                    return;
+                }
+                for (int i = 0; i < 3; i++)
+                    try
+                    {
+                        using var scope = scopeFactory.CreateScope();
+                        var service = scope.ServiceProvider.GetRequiredService<TrackerService>();
+                        await service.IndexCassandra(flipEvents);
                         consumeEvent.Inc(flipEvents.Count());
                         return;
                     }
