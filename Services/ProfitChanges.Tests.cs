@@ -587,6 +587,7 @@ public class ProfitChangeTests
         pricesApi.Verify(p => p.ApiItemPriceItemTagGetAsync("SECOND_MASTER_STAR", null, 0, default), Times.Once);
         pricesApi.Verify(p => p.ApiItemPriceItemTagGetAsync("FIRST_MASTER_STAR", null, 0, default), Times.Once);
         pricesApi.Verify(p => p.ApiItemPriceItemTagGetAsync("THE_ART_OF_WAR", null, 0, default), Times.Once);
+        pricesApi.Verify(p => p.ApiItemPriceItemTagGetAsync("ESSENCE_WITHER", null, 0, default), Times.Exactly(4));
 
         Assert.AreEqual("WITHER essence x500 to add star", changes[2].Label);
         Assert.AreEqual("Used SECOND_MASTER_STAR to upgraded upgrade_level to 9", changes[7].Label);

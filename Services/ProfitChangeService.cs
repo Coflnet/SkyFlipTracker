@@ -307,7 +307,7 @@ public class ProfitChangeService
                 foreach (var cost in upgradeCost)
                 {
                     if (cost.Type == "ESSENCE")
-                        yield return await CostOf($"ESSENCE_{cost.ItemId}", $"{cost.EssenceType} essence x{cost.Amount} to add star", cost.Amount);
+                        yield return await CostOf($"ESSENCE_{cost.EssenceType}", $"{cost.EssenceType} essence x{cost.Amount} to add star", cost.Amount);
                     else if (cost.Type == "ITEM")
                         yield return await CostOf(cost.ItemId, $"{cost.ItemId}x{cost.Amount} for star", cost.Amount);
                 }
