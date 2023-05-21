@@ -74,6 +74,23 @@ public class HypixelItemService
         return costs;
     }
 
+    
+    public async Task<IEnumerable<DungeonUpgradeCost>> GetStarCost(string itemId, int baseTier, int tier)
+    {
+        if(baseTier >= 5) // master stars
+            return new List<DungeonUpgradeCost>();
+        var items = await GetItemsAsync();
+        var item = items[itemId];
+        var cost = item.UpgradeCosts;
+        if (cost == null)
+        {
+            _logger.LogWarning($"Failed to get salvage costs for {itemId} {tier}");
+            return new List<DungeonUpgradeCost>();
+        }
+
+        return cost.Skip(baseTier).Take(tier - baseTier).SelectMany(x => x);
+    }
+
 
 }
 #pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
@@ -112,7 +129,7 @@ public record Item(
     [property: JsonPropertyName("tier")] string Tier,
     [property: JsonPropertyName("npc_sell_price")] double NpcSellPrice,
     [property: JsonPropertyName("tiered_stats")] TieredStats TieredStats,
-    [property: JsonPropertyName("upgrade_costs")] IReadOnlyList<List<Salvage>> UpgradeCosts,
+    [property: JsonPropertyName("upgrade_costs")] IReadOnlyList<List<DungeonUpgradeCost>> UpgradeCosts,
     [property: JsonPropertyName("gear_score")] int GearScore,
     [property: JsonPropertyName("requirements")] IReadOnlyList<Requirement> Requirements,
     [property: JsonPropertyName("dungeon_item")] bool DungeonItem,
@@ -155,6 +172,13 @@ public record Salvage(
     [property: JsonPropertyName("type")] string Type,
     [property: JsonPropertyName("essence_type")] string EssenceType,
     [property: JsonPropertyName("amount")] int Amount
+);
+
+public record DungeonUpgradeCost(
+    [property: JsonPropertyName("essence_type")] string EssenceType,
+    [property: JsonPropertyName("amount")] int Amount,
+    [property: JsonPropertyName("item_id")] string ItemId,
+    [property: JsonPropertyName("type")] string Type
 );
 
 public record Stats(

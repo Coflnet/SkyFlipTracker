@@ -282,6 +282,7 @@ public class ProfitChangeService
         {
             if (item.Key == "rarity_upgrades")
                 continue;
+            var valueOnBuy = buy.FlatenedNBT.Where(f => f.Key == item.Key).FirstOrDefault();
             if (item.Key == "unlocked_slots")
             {
                 var slotCost = await hypixelItemService.GetSlotCost(
@@ -300,8 +301,19 @@ public class ProfitChangeService
                         yield return await CostOf(cost.ItemId, $"Slot unlock item {cost.ItemId}x{cost.Amount}", cost.Amount ?? 1);
                 }
             }
+            if(item.Key == "upgrade_level")
+            {
+                var upgradeCost = await hypixelItemService.GetStarCost(sell.Tag, int.Parse(valueOnBuy.Value ?? "0"), int.Parse(item.Value));
+                foreach (var cost in upgradeCost)
+                {
+                    if (cost.Type == "ESSENCE")
+                        yield return await CostOf($"ESSENCE_{cost.ItemId}", $"{cost.EssenceType} essence x{cost.Amount} to add star", cost.Amount);
+                    else if (cost.Type == "ITEM")
+                        yield return await CostOf(cost.ItemId, $"{cost.ItemId}x{cost.Amount} for star", cost.Amount);
+                }
+            }
             // missing nbt
-            if (!mapper.TryGetIngredients(item.Key, item.Value, buy.FlatenedNBT.Where(f => f.Key == item.Key).FirstOrDefault().Value, out var items))
+            if (!mapper.TryGetIngredients(item.Key, item.Value, valueOnBuy.Value, out var items))
                 continue;
 
             foreach (var ingredient in items)

@@ -371,7 +371,7 @@ public class ProfitChangeTests
             Uuid = Guid.NewGuid().ToString("N"),
             Tag = "ASPECT_OF_THE_VOID",
             HighestBidAmount = 1000,
-            FlatenedNBT = new(){{"ethermerge", "1"}},
+            FlatenedNBT = new() { { "ethermerge", "1" } },
             Tier = Core.Tier.EPIC
         };
         var sell = new Core.SaveAuction()
@@ -379,7 +379,7 @@ public class ProfitChangeTests
             Uuid = Guid.NewGuid().ToString("N"),
             Tag = "ASPECT_OF_THE_VOID",
             HighestBidAmount = 10_000_000,
-            FlatenedNBT = new(){{"ethermerge", "1"}},
+            FlatenedNBT = new() { { "ethermerge", "1" } },
             Tier = Core.Tier.EPIC
         };
         var json = JsonConvert.SerializeObject(buy);
@@ -557,7 +557,8 @@ public class ProfitChangeTests
             Uuid = Guid.NewGuid().ToString("N"),
             Tag = "HYPERION",
             HighestBidAmount = 879_000_000,
-            FlatenedNBT = new(),
+            FlatenedNBT = new(){
+                {"upgrade_level", "1"}},
             Enchantments = new(),
             Tier = Core.Tier.EPIC
         };
@@ -575,17 +576,20 @@ public class ProfitChangeTests
         };
         var pricesApi = new Mock<Api.Client.Api.IPricesApi>();
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), null, 0, default)).ReturnsAsync(() => new() { Median = 10_000_000 });
-        service = new ProfitChangeService(pricesApi.Object, null, null, NullLogger<ProfitChangeService>.Instance, null, null);
+        service = new ProfitChangeService(pricesApi.Object, null, null,
+            NullLogger<ProfitChangeService>.Instance, null,
+            new HypixelItemService(new System.Net.Http.HttpClient(), NullLogger<HypixelItemService>.Instance));
         var changes = await service.GetChanges(buy, sell).ToListAsync();
-        Assert.AreEqual(6, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
-        Assert.AreEqual(-69580000, changes.Sum(c => c.Amount));
+        Assert.AreEqual(10, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
+        Assert.AreEqual(-32069580000, changes.Sum(c => c.Amount));
         pricesApi.Verify(p => p.ApiItemPriceItemTagGetAsync("FOURTH_MASTER_STAR", null, 0, default), Times.Once);
         pricesApi.Verify(p => p.ApiItemPriceItemTagGetAsync("THIRD_MASTER_STAR", null, 0, default), Times.Once);
         pricesApi.Verify(p => p.ApiItemPriceItemTagGetAsync("SECOND_MASTER_STAR", null, 0, default), Times.Once);
         pricesApi.Verify(p => p.ApiItemPriceItemTagGetAsync("FIRST_MASTER_STAR", null, 0, default), Times.Once);
         pricesApi.Verify(p => p.ApiItemPriceItemTagGetAsync("THE_ART_OF_WAR", null, 0, default), Times.Once);
 
-        Assert.AreEqual("Used SECOND_MASTER_STAR to upgraded upgrade_level to 9", changes[3].Label);
+        Assert.AreEqual("WITHER essence x500 to add star", changes[2].Label);
+        Assert.AreEqual("Used SECOND_MASTER_STAR to upgraded upgrade_level to 9", changes[7].Label);
 
     }
 
