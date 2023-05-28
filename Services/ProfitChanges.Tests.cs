@@ -595,6 +595,41 @@ public class ProfitChangeTests
     }
 
     [Test]
+    public async Task AddedExp()
+    {
+        var buy = new Core.SaveAuction()
+        {
+            Uuid = Guid.NewGuid().ToString("N"),
+            Tag = "PET_BAT",
+            HighestBidAmount = 5_000_000,
+            FlatenedNBT = new(){
+                {"exp", "500000"}},
+            Enchantments = new(),
+            Tier = Core.Tier.EPIC
+        };
+        var sell = new Coflnet.Sky.Core.SaveAuction()
+        {
+            Uuid = Guid.NewGuid().ToString("N"),
+            Tag = "PET_BAT",
+            HighestBidAmount = 10_000_000,
+            FlatenedNBT = new() {
+                {"exp", "1000000"}
+            },
+            Enchantments = new(),
+            Tier = Core.Tier.EPIC
+        };
+        var pricesApi = new Mock<Api.Client.Api.IPricesApi>();
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("PET_BAT", new() { { "Level", "1" }, { "Rarity", "Legendary"}}, 0, default)).ReturnsAsync(() => new() { Median = 10_000_000 });
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("PET_BAT", new() { { "Level", "100" }, { "Rarity", "Legendary"}}, 0, default)).ReturnsAsync(() => new() { Median = 20_000_000 });
+        service = new ProfitChangeService(pricesApi.Object, null, null,
+            NullLogger<ProfitChangeService>.Instance, null,
+            new HypixelItemService(new System.Net.Http.HttpClient(), NullLogger<HypixelItemService>.Instance));
+        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        Assert.AreEqual(2, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
+        Assert.AreEqual(-594427, changes.Sum(c => c.Amount));
+    }
+
+    [Test]
     public async Task MultiLevelCraft()
     {
         var buy = new Core.SaveAuction()

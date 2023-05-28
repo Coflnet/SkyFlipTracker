@@ -312,6 +312,17 @@ public class ProfitChangeService
                         yield return await CostOf(cost.ItemId, $"{cost.ItemId}x{cost.Amount} for star", cost.Amount);
                 }
             }
+            if(item.Key == "exp")
+            {
+                var level1Cost = await pricesApi.ApiItemPriceItemTagGetAsync(sell.Tag, new() { { "Level", "1" }, { "Rarity", "Legendary"} });
+                var level100Cost = await pricesApi.ApiItemPriceItemTagGetAsync(sell.Tag, new() { { "Level", "100" }, { "Rarity", "Legendary"} });
+                var expCost = (float)(level100Cost.Median - level1Cost.Median) / 25353230;
+                yield return new PastFlip.ProfitChange()
+                {
+                    Label = $"Exp cost for {item.Value} exp",
+                    Amount = -(long)(expCost * int.Parse(item.Value))
+                };
+            }
             // missing nbt
             if (!mapper.TryGetIngredients(item.Key, item.Value, valueOnBuy.Value, out var items))
                 continue;
