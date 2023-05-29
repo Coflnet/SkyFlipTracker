@@ -621,8 +621,8 @@ public class ProfitChangeTests
             Tier = Core.Tier.EPIC
         };
         var pricesApi = new Mock<Api.Client.Api.IPricesApi>();
-        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("PET_BAT", new() { { "PetLevel", "1" }, { "Rarity", "Legendary"}}, 0, default)).ReturnsAsync(() => new() { Median = 10_000_000 });
-        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("PET_BAT", new() { { "PetLevel", "100" }, { "Rarity", "Legendary"}}, 0, default)).ReturnsAsync(() => new() { Median = 20_000_000 });
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("PET_BAT", new() { { "PetLevel", "1" }, { "Rarity", "LEGENDARY"}}, 0, default)).ReturnsAsync(() => new() { Median = 10_000_000 });
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("PET_BAT", new() { { "PetLevel", "100" }, { "Rarity", "LEGENDARY"}}, 0, default)).ReturnsAsync(() => new() { Median = 20_000_000 });
         service = new ProfitChangeService(pricesApi.Object, null, null,
             NullLogger<ProfitChangeService>.Instance, null,
             new HypixelItemService(new System.Net.Http.HttpClient(), NullLogger<HypixelItemService>.Instance));
