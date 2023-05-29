@@ -317,10 +317,11 @@ public class ProfitChangeService
                 var level1Cost = await pricesApi.ApiItemPriceItemTagGetAsync(sell.Tag, new() { { "PetLevel", "1" }, { "Rarity", "Legendary"} });
                 var level100Cost = await pricesApi.ApiItemPriceItemTagGetAsync(sell.Tag, new() { { "PetLevel", "100" }, { "Rarity", "Legendary"} });
                 var expCost = (float)(level100Cost.Median - level1Cost.Median) / 25353230;
+                float addedExp = ParseFloat(item.Value) - ParseFloat(valueOnBuy.Value ?? "0");
                 yield return new PastFlip.ProfitChange()
                 {
                     Label = $"Exp cost for {item.Value} exp",
-                    Amount = -(long)(expCost * float.Parse(item.Value, System.Globalization.CultureInfo.InvariantCulture))
+                    Amount = -(long)(expCost * addedExp)
                 };
             }
             // missing nbt
@@ -332,6 +333,11 @@ public class ProfitChangeService
                 yield return await CostOf(ingredient, $"Used {ingredient} to upgraded {item.Key} to {item.Value}");
             }
         }
+    }
+
+    private float ParseFloat(string value)
+    {
+        return float.Parse(value, System.Globalization.CultureInfo.InvariantCulture);
     }
 
     private async Task<PastFlip.ProfitChange> GetCostForEnchant(Core.Enchantment item, List<Core.Enchantment> enchantments)

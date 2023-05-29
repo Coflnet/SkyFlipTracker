@@ -628,7 +628,7 @@ public class ProfitChangeTests
             new HypixelItemService(new System.Net.Http.HttpClient(), NullLogger<HypixelItemService>.Instance));
         var changes = await service.GetChanges(buy, sell).ToListAsync();
         Assert.AreEqual(2, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
-        Assert.AreEqual(-594427, changes.Sum(c => c.Amount));
+        Assert.AreEqual(-397213, changes.Sum(c => c.Amount));
     }
 
     [Test]
