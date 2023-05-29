@@ -5,21 +5,23 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services;
 public class TrackerServiceTests
 {
     [Test]
-    public void CheckLevelDisplay()
+    [TestCase("§7[Lvl 1] §6Bat", "[Lvl 60] Bat", "[Lvl 1->60] Bat")]
+    [TestCase("[Lvl 30] Bat", "§7[Lvl 100] §6Bat", "§7[Lvl 30->100] §6Bat")]
+    public void CheckLevelDisplay(string startName, string sellName, string expected)
     {
         var buy = new ApiSaveAuction()
         {
-            ItemName = "[Lvl 30] Bat",
+            ItemName = startName,
             FlatenedNBT = new() { { "exp", "500000" } },
             Tag = "PET_BAT"
         };
         var sell = new ApiSaveAuction()
         {
-            ItemName = "[Lvl 60] Bat",
+            ItemName = sellName,
             FlatenedNBT = new() { { "exp", "1000000.1" } },
             Tag = "PET_BAT"
         };
         var name = TrackerService.GetDisplayName(buy, sell);
-        Assert.AreEqual("[Lvl 30->60] Bat", name);
+        Assert.AreEqual(expected, name);
     }
 }

@@ -339,9 +339,10 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             {
                 // level changed 
                 // get original level from string [Lvl 63] Bat
-                var level = ParseFloat(buy.ItemName.Substring(5, buy.ItemName.IndexOf(']') - 5));
-                // insert it as [Lvl 63->80] Bat
-                name = name.Insert(5, $"{level}->");
+                var start = buy.ItemName.IndexOf(' ');
+                var level = ParseFloat(buy.ItemName.Substring(start, buy.ItemName.IndexOf(']') - start));
+                var insertAt = name.IndexOf(' ') + 1;
+                name = name.Insert(insertAt, $"{level}->");
             }
 
             return name;
