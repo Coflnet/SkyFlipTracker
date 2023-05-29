@@ -314,8 +314,8 @@ public class ProfitChangeService
             }
             if(item.Key == "exp")
             {
-                var level1Cost = await pricesApi.ApiItemPriceItemTagGetAsync(sell.Tag, new() { { "Level", "1" }, { "Rarity", "Legendary"} });
-                var level100Cost = await pricesApi.ApiItemPriceItemTagGetAsync(sell.Tag, new() { { "Level", "100" }, { "Rarity", "Legendary"} });
+                var level1Cost = await pricesApi.ApiItemPriceItemTagGetAsync(sell.Tag, new() { { "PetLevel", "1" }, { "Rarity", "Legendary"} });
+                var level100Cost = await pricesApi.ApiItemPriceItemTagGetAsync(sell.Tag, new() { { "PetLevel", "100" }, { "Rarity", "Legendary"} });
                 var expCost = (float)(level100Cost.Median - level1Cost.Median) / 25353230;
                 yield return new PastFlip.ProfitChange()
                 {

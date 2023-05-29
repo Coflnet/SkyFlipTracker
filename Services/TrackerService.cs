@@ -300,10 +300,11 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     var profit = (long)(item.sell.HighestBidAmount - buy?.HighestBidAmount ?? 0) + changes.Sum(c => c.Amount);
                     if (sell.End - buy.End > TimeSpan.FromDays(14))
                         profit = 0; // no flip if it took more than 2 weeks
+                    var name = GetDisplayName(buy, sell);
                     var flip = new PastFlip()
                     {
                         Flipper = Guid.Parse(sell.AuctioneerId),
-                        ItemName = item.sell.ItemName,
+                        ItemName = name,
                         ItemTag = sell.Tag,
                         ItemTier = sell.Tier,
                         Profit = profit,
@@ -328,6 +329,22 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     throw;
                 }
             });
+        }
+
+        private static string GetDisplayName(ApiSaveAuction buy, SaveAuction sell)
+        {
+            string name = sell.ItemName;
+            if (sell.Tag.StartsWith("PET_") && sell.FlatenedNBT.Any(f => f.Key == "exp") && sell.ItemName != buy.ItemName
+                                    && int.Parse(sell.FlatenedNBT.First(f => f.Key == "exp").Value) - int.Parse(buy.FlatenedNBT.First(f => f.Key == "exp").Value) > 100_000)
+            {
+                // level changed 
+                // get original level from string [Lvl 63] Bat
+                var level = int.Parse(name.Substring(5, name.IndexOf(']') - 1));
+                // insert it as [Lvl 63->80] Bat
+                name = name.Insert(5, $"{level}->");
+            }
+
+            return name;
         }
 
         internal long GetId(string uuid)

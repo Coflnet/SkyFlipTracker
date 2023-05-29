@@ -605,6 +605,7 @@ public class ProfitChangeTests
             FlatenedNBT = new(){
                 {"exp", "500000"}},
             Enchantments = new(),
+            ItemName = "[Lvl 30] Bat",
             Tier = Core.Tier.EPIC
         };
         var sell = new Coflnet.Sky.Core.SaveAuction()
@@ -616,11 +617,12 @@ public class ProfitChangeTests
                 {"exp", "1000000"}
             },
             Enchantments = new(),
+            ItemName = "[Lvl 60] Bat",
             Tier = Core.Tier.EPIC
         };
         var pricesApi = new Mock<Api.Client.Api.IPricesApi>();
-        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("PET_BAT", new() { { "Level", "1" }, { "Rarity", "Legendary"}}, 0, default)).ReturnsAsync(() => new() { Median = 10_000_000 });
-        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("PET_BAT", new() { { "Level", "100" }, { "Rarity", "Legendary"}}, 0, default)).ReturnsAsync(() => new() { Median = 20_000_000 });
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("PET_BAT", new() { { "PetLevel", "1" }, { "Rarity", "Legendary"}}, 0, default)).ReturnsAsync(() => new() { Median = 10_000_000 });
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("PET_BAT", new() { { "PetLevel", "100" }, { "Rarity", "Legendary"}}, 0, default)).ReturnsAsync(() => new() { Median = 20_000_000 });
         service = new ProfitChangeService(pricesApi.Object, null, null,
             NullLogger<ProfitChangeService>.Instance, null,
             new HypixelItemService(new System.Net.Http.HttpClient(), NullLogger<HypixelItemService>.Instance));
