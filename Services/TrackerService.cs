@@ -335,16 +335,21 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
         {
             string name = sell.ItemName;
             if (sell.Tag.StartsWith("PET_") && sell.FlatenedNBT.Any(f => f.Key == "exp") && sell.ItemName != buy.ItemName
-                                    && int.Parse(sell.FlatenedNBT.First(f => f.Key == "exp").Value) - int.Parse(buy.FlatenedNBT.First(f => f.Key == "exp").Value) > 100_000)
+                                    && ParseFloat(sell.FlatenedNBT.First(f => f.Key == "exp").Value) - ParseFloat(buy.FlatenedNBT.First(f => f.Key == "exp").Value) > 100_000)
             {
                 // level changed 
                 // get original level from string [Lvl 63] Bat
-                var level = int.Parse(name.Substring(5, name.IndexOf(']') - 1));
+                var level = ParseFloat(name.Substring(5, name.IndexOf(']') - 1));
                 // insert it as [Lvl 63->80] Bat
                 name = name.Insert(5, $"{level}->");
             }
 
             return name;
+        }
+
+        private static float ParseFloat(string value)
+        {
+            return float.Parse(value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture);
         }
 
         internal long GetId(string uuid)
