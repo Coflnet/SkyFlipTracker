@@ -331,7 +331,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             });
         }
 
-        private static string GetDisplayName(ApiSaveAuction buy, SaveAuction sell)
+        public static string GetDisplayName(ApiSaveAuction buy, SaveAuction sell)
         {
             string name = sell.ItemName;
             if (sell.Tag.StartsWith("PET_") && sell.FlatenedNBT.Any(f => f.Key == "exp") && sell.ItemName != buy.ItemName
@@ -339,7 +339,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             {
                 // level changed 
                 // get original level from string [Lvl 63] Bat
-                var level = ParseFloat(name.Substring(5, name.IndexOf(']') - 1));
+                var level = ParseFloat(buy.ItemName.Substring(5, buy.ItemName.IndexOf(']') - 5));
                 // insert it as [Lvl 63->80] Bat
                 name = name.Insert(5, $"{level}->");
             }
