@@ -614,7 +614,7 @@ public class ProfitChangeTests
             Tag = "PET_BAT",
             HighestBidAmount = 10_000_000,
             FlatenedNBT = new() {
-                {"exp", "1000000"}
+                {"exp", "1000000.1"}
             },
             Enchantments = new(),
             ItemName = "[Lvl 60] Bat",

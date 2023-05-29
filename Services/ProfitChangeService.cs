@@ -320,7 +320,7 @@ public class ProfitChangeService
                 yield return new PastFlip.ProfitChange()
                 {
                     Label = $"Exp cost for {item.Value} exp",
-                    Amount = -(long)(expCost * int.Parse(item.Value))
+                    Amount = -(long)(expCost * float.Parse(item.Value, System.Globalization.CultureInfo.InvariantCulture))
                 };
             }
             // missing nbt
