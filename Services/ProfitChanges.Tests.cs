@@ -160,10 +160,10 @@ public class ProfitChangeTests
         service = new ProfitChangeService(pricesApi.Object, katMock.Object, null, null, null, null);
         var changes = await service.GetChanges(buy, sell).ToListAsync();
         Assert.AreEqual(3, changes.Count);
-        Assert.AreEqual(-5001200, changes[0].Amount);
+        Assert.AreEqual(-7001200, changes[0].Amount);
         Assert.AreEqual(-64000000, changes[1].Amount, changes[1].Label);
         Assert.AreEqual("Kat cost for EPIC", changes[2].Label);
-        Assert.AreEqual(-193626200, changes.Sum(c => c.Amount));
+        Assert.AreEqual(-195626200, changes.Sum(c => c.Amount));
     }
 
     [Test]
@@ -206,10 +206,10 @@ public class ProfitChangeTests
         var changes = await service.GetChanges(buy, sell).ToListAsync();
         Console.WriteLine(JsonConvert.SerializeObject(changes, Formatting.Indented));
         Assert.AreEqual(3, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
-        Assert.AreEqual(-5_001_200, changes[0].Amount);
+        Assert.AreEqual(-7_001_200, changes[0].Amount);
         Assert.AreEqual(-64000000, changes[1].Amount, changes[1].Label);
         Assert.AreEqual("Kat cost for MYTHIC", changes[2].Label);
-        Assert.AreEqual(-193626200, changes.Sum(c => c.Amount));
+        Assert.AreEqual(-195626200, changes.Sum(c => c.Amount));
     }
 
     [Test]
@@ -265,7 +265,7 @@ public class ProfitChangeTests
         service = new ProfitChangeService(pricesApi.Object, null, null, NullLogger<ProfitChangeService>.Instance, null, null);
         var changes = await service.GetChanges(buy, sell).ToListAsync();
         Assert.AreEqual(2, changes.Count);
-        Assert.AreEqual(-(5_000_000 + 600_000 + 101200), changes.Sum(c => c.Amount));
+        Assert.AreEqual(-(5_000_000 + 600_000 + 201200), changes.Sum(c => c.Amount));
     }
     [Test]
     public async Task AoteReforgeNaming()
@@ -293,7 +293,7 @@ public class ProfitChangeTests
         service = new ProfitChangeService(pricesApi.Object, null, null, NullLogger<ProfitChangeService>.Instance, null, null);
         var changes = await service.GetChanges(buy, sell).ToListAsync();
         Assert.AreEqual(1, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
-        Assert.AreEqual(-101200, changes.Sum(c => c.Amount));
+        Assert.AreEqual(-201200, changes.Sum(c => c.Amount));
     }
 
     [Test]
@@ -417,7 +417,7 @@ public class ProfitChangeTests
         service = new ProfitChangeService(pricesApi.Object, null, null, NullLogger<ProfitChangeService>.Instance, null, null);
         var changes = await service.GetChanges(buy, sell).ToListAsync();
         Assert.AreEqual(2, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
-        Assert.AreEqual(-80101200, changes.Sum(c => c.Amount));
+        Assert.AreEqual(-80201200, changes.Sum(c => c.Amount));
         Assert.AreEqual("80x Thunder in a bottle", changes[1].Label);
     }
     [Test]
@@ -444,7 +444,7 @@ public class ProfitChangeTests
         service = new ProfitChangeService(pricesApi.Object, null, null, NullLogger<ProfitChangeService>.Instance, null, null);
         var changes = await service.GetChanges(buy, sell).ToListAsync();
         Assert.AreEqual(2, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
-        Assert.AreEqual(-100101200, changes.Sum(c => c.Amount));
+        Assert.AreEqual(-100201200, changes.Sum(c => c.Amount));
         Assert.AreEqual("100x Thunder in a bottle", changes[1].Label);
     }
 
@@ -475,7 +475,7 @@ public class ProfitChangeTests
         service = new ProfitChangeService(pricesApi.Object, null, null, NullLogger<ProfitChangeService>.Instance, null, null);
         var changes = await service.GetChanges(buy, sell).ToListAsync();
         Assert.AreEqual(2, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
-        Assert.AreEqual(-2_101_200, changes.Sum(c => c.Amount));
+        Assert.AreEqual(-2_201_200, changes.Sum(c => c.Amount));
         pricesApi.Verify(p => p.ApiItemPriceItemTagGetAsync("ENCHANTMENT_SHARPNESS_6", null, 0, default), Times.Once);
     }
 
@@ -506,7 +506,7 @@ public class ProfitChangeTests
         service = new ProfitChangeService(pricesApi.Object, null, null, NullLogger<ProfitChangeService>.Instance, null, null);
         var changes = await service.GetChanges(buy, sell).ToListAsync();
         Assert.AreEqual(2, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
-        Assert.AreEqual(-20_101_200, changes.Sum(c => c.Amount));
+        Assert.AreEqual(-20_201_200, changes.Sum(c => c.Amount));
         pricesApi.Verify(p => p.ApiItemPriceItemTagGetAsync("ENCHANTMENT_ULTIMATE_CHIMERA_3", null, 0, default), Times.Once);
     }
 
@@ -546,7 +546,7 @@ public class ProfitChangeTests
         var changes = await service.GetChanges(buy, sell).ToListAsync();
 
         Assert.AreEqual(2, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
-        Assert.AreEqual(-60101200, changes.Sum(c => c.Amount));
+        Assert.AreEqual(-60201200, changes.Sum(c => c.Amount));
     }
 
     [Test]
@@ -581,7 +581,7 @@ public class ProfitChangeTests
             new HypixelItemService(new System.Net.Http.HttpClient(), NullLogger<HypixelItemService>.Instance));
         var changes = await service.GetChanges(buy, sell).ToListAsync();
         Assert.AreEqual(10, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
-        Assert.AreEqual(-32083266200, changes.Sum(c => c.Amount));
+        Assert.AreEqual(-32084266200, changes.Sum(c => c.Amount));
         pricesApi.Verify(p => p.ApiItemPriceItemTagGetAsync("FOURTH_MASTER_STAR", null, 0, default), Times.Once);
         pricesApi.Verify(p => p.ApiItemPriceItemTagGetAsync("THIRD_MASTER_STAR", null, 0, default), Times.Once);
         pricesApi.Verify(p => p.ApiItemPriceItemTagGetAsync("SECOND_MASTER_STAR", null, 0, default), Times.Once);
@@ -628,7 +628,7 @@ public class ProfitChangeTests
             new HypixelItemService(new System.Net.Http.HttpClient(), NullLogger<HypixelItemService>.Instance));
         var changes = await service.GetChanges(buy, sell).ToListAsync();
         Assert.AreEqual(2, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
-        Assert.AreEqual(-348413, changes.Sum(c => c.Amount));
+        Assert.AreEqual(-398413, changes.Sum(c => c.Amount));
     }
 
     [Test]

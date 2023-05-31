@@ -74,7 +74,7 @@ public class ProfitChangeService
         {
             Amount = (long)-(
                 sell.HighestBidAmount * listCostFactor / 100 // listing fee
-                + (buy.HighestBidAmount > 1_000_000 ? buy.HighestBidAmount * 0.01 : 0) // claiming fee
+                + (sell.HighestBidAmount > 1_000_000 ? sell.HighestBidAmount * 0.01 : 0) // claiming fee
                 + 1200 // time fee
                 ),
             Label = "ah tax"
