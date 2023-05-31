@@ -65,9 +65,18 @@ public class ProfitChangeService
     public async IAsyncEnumerable<PastFlip.ProfitChange> GetChanges(Coflnet.Sky.Core.SaveAuction buy, Coflnet.Sky.Core.SaveAuction sell)
     {
         var changes = new List<PastFlip.ProfitChange>();
+        var listCostFactor = 1f;
+        if (sell.HighestBidAmount > 10_000_000)
+            listCostFactor = 2;
+        if (sell.HighestBidAmount > 100_000_000)
+            listCostFactor = 2.5f;
         yield return new PastFlip.ProfitChange()
         {
-            Amount = -sell.HighestBidAmount / 50,
+            Amount = (long)-(
+                sell.HighestBidAmount * listCostFactor / 100 // listing fee
+                + (buy.HighestBidAmount > 1_000_000 ? buy.HighestBidAmount * 0.01 : 0) // claiming fee
+                + 1200 // time fee
+                ),
             Label = "ah tax"
         };
         if (IsNotcaluclateable(sell))
@@ -301,7 +310,7 @@ public class ProfitChangeService
                         yield return await CostOf(cost.ItemId, $"Slot unlock item {cost.ItemId}x{cost.Amount}", cost.Amount ?? 1);
                 }
             }
-            if(item.Key == "upgrade_level")
+            if (item.Key == "upgrade_level")
             {
                 var upgradeCost = await hypixelItemService.GetStarCost(sell.Tag, int.Parse(valueOnBuy.Value ?? "0"), int.Parse(item.Value));
                 foreach (var cost in upgradeCost)
@@ -312,10 +321,10 @@ public class ProfitChangeService
                         yield return await CostOf(cost.ItemId, $"{cost.ItemId}x{cost.Amount} for star", cost.Amount);
                 }
             }
-            if(item.Key == "exp")
+            if (item.Key == "exp")
             {
-                var level1Cost = await pricesApi.ApiItemPriceItemTagGetAsync(sell.Tag, new() { { "PetLevel", "1" }, { "Rarity", "LEGENDARY"} });
-                var level100Cost = await pricesApi.ApiItemPriceItemTagGetAsync(sell.Tag, new() { { "PetLevel", "100" }, { "Rarity", "LEGENDARY"} });
+                var level1Cost = await pricesApi.ApiItemPriceItemTagGetAsync(sell.Tag, new() { { "PetLevel", "1" }, { "Rarity", "LEGENDARY" } });
+                var level100Cost = await pricesApi.ApiItemPriceItemTagGetAsync(sell.Tag, new() { { "PetLevel", "100" }, { "Rarity", "LEGENDARY" } });
                 var expCost = (float)(level100Cost.Median - level1Cost.Median) / 25353230;
                 float addedExp = ParseFloat(item.Value) - ParseFloat(valueOnBuy.Value ?? "0");
                 yield return new PastFlip.ProfitChange()
@@ -408,12 +417,9 @@ public class ProfitChangeService
         }
     }
 
-    private static string GetCorrectKey(KeyValuePair<string, string> gem, Dictionary<string, string> flat)
+    private string GetCorrectKey(KeyValuePair<string, string> gem, Dictionary<string, string> flat)
     {
-        var type = gem.Key.Split("_")[0];
-        if (type == "UNIVERSAL" || type == "COMBAT" || type == "DEFENSIVE" || type == "MINING")
-            type = flat.Where(f => f.Key == gem.Key + "_gem").FirstOrDefault().Value;
-        return type;
+        return mapper.GetCorrectGemType(gem, flat);
     }
 
     private static bool IsNotcaluclateable(Core.SaveAuction sell)
