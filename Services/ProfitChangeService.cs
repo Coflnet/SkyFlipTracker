@@ -14,6 +14,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services;
 /// </summary>
 public class ProfitChangeService
 {
+    private const int ExpPetMaxLevel = 25353230;
     private Coflnet.Sky.Api.Client.Api.IPricesApi pricesApi;
     private Crafts.Client.Api.IKatApi katApi;
     private ICraftsApi craftsApi;
@@ -325,13 +326,15 @@ public class ProfitChangeService
             {
                 var level1Cost = await pricesApi.ApiItemPriceItemTagGetAsync(sell.Tag, new() { { "PetLevel", "1" }, { "Rarity", "LEGENDARY" } });
                 var level100Cost = await pricesApi.ApiItemPriceItemTagGetAsync(sell.Tag, new() { { "PetLevel", "100" }, { "Rarity", "LEGENDARY" } });
-                var expCost = (float)(level100Cost.Median - level1Cost.Median) / 25353230;
-                float addedExp = ParseFloat(item.Value) - ParseFloat(valueOnBuy.Value ?? "0");
-                yield return new PastFlip.ProfitChange()
-                {
-                    Label = $"Exp cost for {item.Value} exp",
-                    Amount = -(long)(expCost * addedExp)
-                };
+                var expCost = (float)(level100Cost.Median - level1Cost.Median) / ExpPetMaxLevel;
+                var currentExp = ParseFloat(item.Value);
+                float addedExp = Math.Min(currentExp, ExpPetMaxLevel) - ParseFloat(valueOnBuy.Value ?? "0");
+                if (addedExp > 0)
+                    yield return new PastFlip.ProfitChange()
+                    {
+                        Label = $"Exp cost for {item.Value} exp",
+                        Amount = -(long)(expCost * addedExp)
+                    };
             }
             // missing nbt
             if (!mapper.TryGetIngredients(item.Key, item.Value, valueOnBuy.Value, out var items))

@@ -620,15 +620,46 @@ public class ProfitChangeTests
             ItemName = "[Lvl 60] Bat",
             Tier = Core.Tier.EPIC
         };
+        SetupPetLevelService();
+        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        Assert.AreEqual(2, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
+        Assert.AreEqual(-398413, changes.Sum(c => c.Amount));
+    }
+
+    private void SetupPetLevelService()
+    {
         var pricesApi = new Mock<Api.Client.Api.IPricesApi>();
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("PET_BAT", new() { { "PetLevel", "1" }, { "Rarity", "LEGENDARY" } }, 0, default)).ReturnsAsync(() => new() { Median = 10_000_000 });
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("PET_BAT", new() { { "PetLevel", "100" }, { "Rarity", "LEGENDARY" } }, 0, default)).ReturnsAsync(() => new() { Median = 20_000_000 });
         service = new ProfitChangeService(pricesApi.Object, null, null,
             NullLogger<ProfitChangeService>.Instance, null,
             new HypixelItemService(new System.Net.Http.HttpClient(), NullLogger<HypixelItemService>.Instance));
+    }
+
+    private static Core.SaveAuction CreateAuction(string tag, string itemName, int highestBidAmount, Core.Tier tier = Core.Tier.EPIC)
+    {
+        return new()
+        {
+            Uuid = Guid.NewGuid().ToString("N"),
+            Tag = tag,
+            HighestBidAmount = highestBidAmount,
+            Enchantments = new(),
+            FlatenedNBT = new(),
+            ItemName = itemName,
+            Tier = tier
+        };
+    }
+
+    [Test]
+    public async Task AddedExpOverLvl100()
+    {
+        var buy = CreateAuction("PET_BAT", "[Lvl 30] Bat", 5_000_000, Core.Tier.LEGENDARY);
+        buy.FlatenedNBT["exp"] = "125996318";
+        var sell = CreateAuction("PET_BAT", "[Lvl 60] Bat", 10_000_000, Core.Tier.LEGENDARY);
+        sell.FlatenedNBT["exp"] = "128176815.6";
+        SetupPetLevelService();
         var changes = await service.GetChanges(buy, sell).ToListAsync();
-        Assert.AreEqual(2, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
-        Assert.AreEqual(-398413, changes.Sum(c => c.Amount));
+        Assert.AreEqual(1, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
     }
 
     [Test]
