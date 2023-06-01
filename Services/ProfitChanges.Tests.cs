@@ -511,6 +511,36 @@ public class ProfitChangeTests
     }
 
     [Test]
+    public async Task ImpossibleEnchantUpgrade()
+    {
+        var buy = new Core.SaveAuction()
+        {
+            Uuid = Guid.NewGuid().ToString("N"),
+            Tag = "HYPERION",
+            HighestBidAmount = 1000,
+            FlatenedNBT = new(),
+            Enchantments = new() { new() { Type = Core.Enchantment.EnchantmentType.sharpness, Level = 6 } },
+            Tier = Core.Tier.LEGENDARY
+        };
+        var sell = new Coflnet.Sky.Core.SaveAuction()
+        {
+            Uuid = Guid.NewGuid().ToString("N"),
+            Tag = "HYPERION",
+            HighestBidAmount = 10_000_000,
+            FlatenedNBT = new(),
+            Enchantments = new() {
+                new(){Type = Core.Enchantment.EnchantmentType.sharpness, Level = 7} },
+            Tier = Core.Tier.LEGENDARY
+        };
+        var pricesApi = new Mock<Api.Client.Api.IPricesApi>();
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("ENCHANTMENT_SHARPNESS_7", null, 0, default)).ReturnsAsync(() => new() { Median = 20_000_000 });
+        service = new ProfitChangeService(pricesApi.Object, null, null, NullLogger<ProfitChangeService>.Instance, null, null);
+        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        Assert.AreEqual(2, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
+        Assert.AreEqual(-20_201_200, changes.Sum(c => c.Amount));
+        pricesApi.Verify(p => p.ApiItemPriceItemTagGetAsync("ENCHANTMENT_SHARPNESS_7", null, 0, default), Times.Once);
+    }
+    [Test]
     public async Task FieryKuudraCore()
     {
         var buy = new Core.SaveAuction()

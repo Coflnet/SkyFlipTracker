@@ -359,7 +359,7 @@ public class ProfitChangeService
         PastFlip.ProfitChange found = null;
         int requiredLevel = item.Level;
         var matchingEnchant = enchantments.Where(e => e.Type == item.Type).FirstOrDefault();
-        if (matchingEnchant != null && matchingEnchant.Level == item.Level - 1)
+        if (matchingEnchant != null && matchingEnchant.Level == item.Level - 1 && item.Level < 7)
         {
             // only required one level lower book
             requiredLevel = item.Level - 1;
