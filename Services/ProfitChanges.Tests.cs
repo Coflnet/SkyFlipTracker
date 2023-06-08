@@ -711,6 +711,24 @@ public class ProfitChangeTests
         var changes = await service.GetChanges(buy, sell).ToListAsync();
         Assert.AreEqual(1, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
     }
+    [Test]
+    public async Task AddedExpOverLvl100GoldenDragon()
+    {
+        var buy = CreateAuction("PET_GOLDEN_DRAGON", "[Lvl 102] Golden Dragon", 5_000_000, Core.Tier.LEGENDARY);
+        buy.FlatenedNBT["exp"] = "25360717.32";
+        var sell = CreateAuction("PET_GOLDEN_DRAGON", "[Lvl 103] Golden Dragon", 10_000_000, Core.Tier.LEGENDARY);
+        sell.FlatenedNBT["exp"] = "29095472.42";
+        var pricesApi = new Mock<Api.Client.Api.IPricesApi>();
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("PET_GOLDEN_DRAGON", new() { { "PetLevel", "1" }, { "Rarity", "LEGENDARY" } }, 0, default)).ReturnsAsync(() => new() { Median = 600_000_000 });
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("PET_GOLDEN_DRAGON", new() { { "PetLevel", "200" }, { "Rarity", "LEGENDARY" } }, 0, default)).ReturnsAsync(() => new() { Median = 1200_000_000 });
+        service = new ProfitChangeService(pricesApi.Object, null, null,
+            NullLogger<ProfitChangeService>.Instance, null,
+            new HypixelItemService(new System.Net.Http.HttpClient(), NullLogger<HypixelItemService>.Instance));
+        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        pricesApi.Verify(p => p.ApiItemPriceItemTagGetAsync("PET_GOLDEN_DRAGON", new() { { "PetLevel", "200" }, { "Rarity", "LEGENDARY" } }, 0, default), Times.Once);
+        Assert.AreEqual(2, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
+        Assert.AreEqual(-10657764, changes[1].Amount);
+    }
 
     [Test]
     public async Task MultiLevelCraft()

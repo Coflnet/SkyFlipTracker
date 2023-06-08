@@ -15,6 +15,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services;
 public class ProfitChangeService
 {
     private const int ExpPetMaxLevel = 25353230;
+    private const int ExpMaxLevelGoldenDragon = 210255385;
     private Coflnet.Sky.Api.Client.Api.IPricesApi pricesApi;
     private Crafts.Client.Api.IKatApi katApi;
     private ICraftsApi craftsApi;
@@ -291,11 +292,18 @@ public class ProfitChangeService
         }
         if (item.Key == "exp")
         {
+            var endLevel = "100";
+            var maxExpForPet = ExpPetMaxLevel;
+            if(sell.Tag == "PET_GOLDEN_DRAGON")
+            {
+                endLevel = "200";
+                maxExpForPet = ExpMaxLevelGoldenDragon;
+            }
             var level1Cost = await pricesApi.ApiItemPriceItemTagGetAsync(sell.Tag, new() { { "PetLevel", "1" }, { "Rarity", "LEGENDARY" } });
-            var level100Cost = await pricesApi.ApiItemPriceItemTagGetAsync(sell.Tag, new() { { "PetLevel", "100" }, { "Rarity", "LEGENDARY" } });
-            var expCost = (float)(level100Cost.Median - level1Cost.Median) / ExpPetMaxLevel;
+            var level100Cost = await pricesApi.ApiItemPriceItemTagGetAsync(sell.Tag, new() { { "PetLevel", endLevel }, { "Rarity", "LEGENDARY" } }) ?? new();
+            var expCost = (float)(level100Cost.Median - level1Cost.Median) / maxExpForPet;
             var currentExp = ParseFloat(item.Value);
-            float addedExp = Math.Min(currentExp, ExpPetMaxLevel) - ParseFloat(valueOnBuy.Value ?? "0");
+            float addedExp = Math.Min(currentExp, maxExpForPet) - ParseFloat(valueOnBuy.Value ?? "0");
             if (addedExp > 0)
                 yield return new PastFlip.ProfitChange()
                 {
