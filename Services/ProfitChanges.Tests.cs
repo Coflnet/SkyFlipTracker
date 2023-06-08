@@ -449,6 +449,26 @@ public class ProfitChangeTests
     }
 
     [Test]
+    public async Task CombinedAttributes()
+    {
+        var buy = CreateAuction("ATTRIBUTE_SHARD");
+        buy.FlatenedNBT["mana_pool"] = "2";
+        var sell = CreateAuction("ATTRIBUTE_SHARD");
+        sell.FlatenedNBT["mana_pool"] = "3";
+        sell.HighestBidAmount = 10000;
+        var pricesApi = new Mock<Api.Client.Api.IPricesApi>();
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("ATTRIBUTE_SHARD", new (){{"mana_pool","2"}}, 0, default)).ReturnsAsync(() => new() { Median = 5000 });
+        service = new ProfitChangeService(pricesApi.Object, null, null, NullLogger<ProfitChangeService>.Instance, null, null);
+        var result = await service.GetChanges(buy, sell).ToListAsync();
+        Assert.AreEqual(2, result.Count);
+        Assert.AreEqual(-5000, result[1].Amount);
+        sell.FlatenedNBT["mana_pool"] = "5";
+        result = await service.GetChanges(buy, sell).ToListAsync();
+        Assert.AreEqual(2, result.Count);
+        Assert.AreEqual(-35000, result[1].Amount);
+    }
+
+    [Test]
     public async Task Enchantments()
     {
         var buy = new Core.SaveAuction()
@@ -666,7 +686,7 @@ public class ProfitChangeTests
             new HypixelItemService(new System.Net.Http.HttpClient(), NullLogger<HypixelItemService>.Instance));
     }
 
-    private static Core.SaveAuction CreateAuction(string tag, string itemName, int highestBidAmount, Core.Tier tier = Core.Tier.EPIC)
+    private static Core.SaveAuction CreateAuction(string tag, string itemName = "test", int highestBidAmount = 1000, Core.Tier tier = Core.Tier.EPIC)
     {
         return new()
         {

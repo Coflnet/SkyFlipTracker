@@ -95,41 +95,9 @@ public class ProfitChangeService
         var tagOnPurchase = buy.Tag;
         if (tagOnPurchase != sell.Tag)
         {
-            if (tagOnPurchase.Contains("_WITHER_"))
+            await foreach (var item in GetCraftCosts(buy, sell))
             {
-                // special case for wither items they are craftable into one another
-                tagOnPurchase = tagOnPurchase.Substring(tagOnPurchase.IndexOf('_') + 1);
-            }
-            if (tagOnPurchase == "HYPERION" || tagOnPurchase == "ASTRAEA" || tagOnPurchase == "SCYLLA" || tagOnPurchase == "VALKYRIE")
-            {
-                tagOnPurchase = "NECRON_BLADE";
-            }
-            var allCrafts = await craftsApi.CraftsAllGetAsync();
-            var craft = allCrafts.Where(c => c.ItemId == sell.Tag).FirstOrDefault();
-            if (craft == null)
-            {
-                logger.LogWarning($"could not find craft for {sell.Tag} {buy.Uuid} -> {sell.Uuid}");
-                yield break;
-            }
-            var allIngredients = craft.Ingredients.ToList();
-            AddCraftPathIngredients(tagOnPurchase, allCrafts, allIngredients);
-            foreach (var item in allIngredients)
-            {
-                var count = item.Count;
-                if (item.ItemId == tagOnPurchase)
-                    count--;
-                if (count > 0)
-                    yield return await CostOf(item.ItemId, $"crafting material {item.ItemId}" + (count > 1 ? $" x{count}" : ""), count);
-            }
-            var itemMetadata = await GetItemMetadata(sell.Tag);
-            if ((int)buy.Tier < (int)sell.Tier)
-            {
-                if ((int)sell.Tier + 1 == (int)itemMetadata.Tier.Value)
-                {
-                    // the rarity upgraded due to craft
-                    buy.Tier++;
-                    logger.LogInformation($"upgraded rarity of {buy.Uuid} due to craft");
-                }
+                yield return item;
             }
         }
 
@@ -154,61 +122,9 @@ public class ProfitChangeService
         if ((int)buy.Tier < (int)sell.Tier)
             if (sell.Tag.StartsWith("PET_"))
             {
-                if (sell.FlatenedNBT.Where(l => l.Key == "heldItem" && l.Value == "PET_ITEM_TIER_BOOST").Any())
-                    yield return await CostOf("PET_ITEM_TIER_BOOST", "tier Boost cost");
-                else
+                await foreach (var item in GetPetRarityUpgrades(buy, sell))
                 {
-                    Console.WriteLine($"buy tier {(int)buy.Tier} {buy.Tier} sell tier {(int)sell.Tier} {sell.Tier}");
-                    for (int i = ((int)buy.Tier); i < (int)sell.Tier; i++)
-                    {
-                        var allCosts = await katApi.KatAllGetAsync(0, default);
-                        if (allCosts == null)
-                            throw new Exception("could not get kat costs from crafts api");
-                        var cost = allCosts.Where(c => ((int)c.TargetRarity) > i + 1 && c.CoreData.ItemTag == sell.Tag)
-                                    .OrderBy(c => c.TargetRarity).FirstOrDefault();
-                        var upgradeCost = cost?.UpgradeCost;
-                        var tierName = (i >= (int)Core.Tier.LEGENDARY) ? sell.Tier.ToString() : ((Core.Tier)i + 1).ToString();
-                        var materialTitle = $"Kat materials for {tierName}";
-                        var level = 1;
-                        try
-                        {
-                            level = string.IsNullOrEmpty(buy.ItemName) ? 1 : int.Parse(Regex.Replace(buy.ItemName?.Split(' ')[1], @"[^\d]", ""));
-                        }
-                        catch (Exception)
-                        {
-                            logger.LogWarning($"could not parse level from {buy.ItemName}");
-                        }
-                        var costAdded = false;
-                        if (cost == null || cost.MaterialCost >= int.MaxValue || level > 2)
-                        {
-                            // approximate cost with raw
-                            var rawCost = await katApi.KatRawGetAsync();
-                            var rarityInt = i + 1;
-                            if (i > (int)Core.Tier.LEGENDARY)
-                                break;
-                            //  rarityInt = (int)Crafts.Client.Model.Tier.LEGENDARY;
-                            Console.WriteLine($"kat upgrade cost {(Core.Tier)rarityInt}({rarityInt}) {cost?.TargetRarity} {sell.Tier}");
-                            var raw = rawCost.Where(c => ((int)c.BaseRarity) == rarityInt && sell.Tag.EndsWith(c.Name.Replace(' ', '_').ToUpper())).FirstOrDefault();
-                            if (i == 5 && sell.Tag == "PET_JERRY")
-                            {
-                                yield return await CostOf("PET_ITEM_TOY_JERRY", "Jerry 3d glasses");
-                                break;
-                            }
-                            if (raw == null)
-                                throw new Exception($"could not find kat cost for tier {i}({(Core.Tier)rarityInt}) and tag {sell.Tag} {buy.Uuid} -> {sell.Uuid}");
-                            upgradeCost = raw.Cost * (1.0 - 0.003 * level);
-                            if (raw.Material != null)
-                            {
-                                costAdded = true;
-                                yield return await CostOf(raw.Material, materialTitle, raw.Amount);
-                            }
-                        }
-                        yield return new($"Kat cost for {tierName}", (long)-upgradeCost);
-                        if (cost?.MaterialCost > 0 && !costAdded)
-                            yield return new(materialTitle, (long)-cost.MaterialCost);
-                        if (i == (int)Core.Tier.LEGENDARY)
-                            break;
-                    }
+                    yield return item;
                 }
             }
             else
@@ -290,59 +206,186 @@ public class ProfitChangeService
         }
         foreach (var item in sell.FlatenedNBT.Where(s => !buy.FlatenedNBT.Any(b => b.Key == s.Key && b.Value == s.Value)))
         {
-            if (item.Key == "rarity_upgrades")
-                continue;
-            var valueOnBuy = buy.FlatenedNBT.Where(f => f.Key == item.Key).FirstOrDefault();
-            if (item.Key == "unlocked_slots")
+            await foreach (var res in GetRemainingDifference(buy, sell, item))
             {
-                var slotCost = await hypixelItemService.GetSlotCost(
-                    sell.Tag,
-                    buy.FlatenedNBT.Where(f => f.Key == "unlocked_slots").SelectMany(f => f.Value.Split(',')).ToList(),
-                    item.Value.Split(',').ToList());
-                foreach (var cost in slotCost)
-                {
-                    if (cost.Coins != 0)
-                        yield return new PastFlip.ProfitChange()
-                        {
-                            Label = "Slot unlock cost",
-                            Amount = -cost.Coins
-                        };
-                    else if (cost.Type == "ITEM")
-                        yield return await CostOf(cost.ItemId, $"Slot unlock item {cost.ItemId}x{cost.Amount}", cost.Amount ?? 1);
-                }
+                yield return res;
             }
-            if (item.Key == "upgrade_level")
+        }
+
+    }
+
+    private async IAsyncEnumerable<PastFlip.ProfitChange> GetCraftCosts(Core.SaveAuction buy, Core.SaveAuction sell)
+    {
+        var tagOnPurchase = buy.Tag;
+        if (tagOnPurchase.Contains("_WITHER_"))
+        {
+            // special case for wither items they are craftable into one another
+            tagOnPurchase = tagOnPurchase.Substring(tagOnPurchase.IndexOf('_') + 1);
+        }
+        if (tagOnPurchase == "HYPERION" || tagOnPurchase == "ASTRAEA" || tagOnPurchase == "SCYLLA" || tagOnPurchase == "VALKYRIE")
+        {
+            tagOnPurchase = "NECRON_BLADE";
+        }
+        var allCrafts = await craftsApi.CraftsAllGetAsync();
+        var craft = allCrafts.Where(c => c.ItemId == sell.Tag).FirstOrDefault();
+        if (craft == null)
+        {
+            logger.LogWarning($"could not find craft for {sell.Tag} {buy.Uuid} -> {sell.Uuid}");
+            yield break;
+        }
+        var allIngredients = craft.Ingredients.ToList();
+        AddCraftPathIngredients(tagOnPurchase, allCrafts, allIngredients);
+        foreach (var item in allIngredients)
+        {
+            var count = item.Count;
+            if (item.ItemId == tagOnPurchase)
+                count--;
+            if (count > 0)
+                yield return await CostOf(item.ItemId, $"crafting material {item.ItemId}" + (count > 1 ? $" x{count}" : ""), count);
+        }
+        var itemMetadata = await GetItemMetadata(sell.Tag);
+        if ((int)buy.Tier < (int)sell.Tier)
+        {
+            if ((int)sell.Tier + 1 == (int)itemMetadata.Tier.Value)
             {
-                var upgradeCost = await hypixelItemService.GetStarCost(sell.Tag, int.Parse(valueOnBuy.Value ?? "0"), int.Parse(item.Value));
-                foreach (var cost in upgradeCost)
-                {
-                    if (cost.Type == "ESSENCE")
-                        yield return await CostOf($"ESSENCE_{cost.EssenceType}", $"{cost.EssenceType} essence x{cost.Amount} to add star", cost.Amount);
-                    else if (cost.Type == "ITEM")
-                        yield return await CostOf(cost.ItemId, $"{cost.ItemId}x{cost.Amount} for star", cost.Amount);
-                }
+                // the rarity upgraded due to craft
+                buy.Tier++;
+                logger.LogInformation($"upgraded rarity of {buy.Uuid} due to craft");
             }
-            if (item.Key == "exp")
+        }
+    }
+
+    private async IAsyncEnumerable<PastFlip.ProfitChange> GetRemainingDifference(Core.SaveAuction buy, Core.SaveAuction sell, KeyValuePair<string, string> item)
+    {
+        if (item.Key == "rarity_upgrades")
+            yield break;
+        var valueOnBuy = buy.FlatenedNBT.Where(f => f.Key == item.Key).FirstOrDefault();
+        if (item.Key == "unlocked_slots")
+        {
+            var slotCost = await hypixelItemService.GetSlotCost(
+                sell.Tag,
+                buy.FlatenedNBT.Where(f => f.Key == "unlocked_slots").SelectMany(f => f.Value.Split(',')).ToList(),
+                item.Value.Split(',').ToList());
+            foreach (var cost in slotCost)
             {
-                var level1Cost = await pricesApi.ApiItemPriceItemTagGetAsync(sell.Tag, new() { { "PetLevel", "1" }, { "Rarity", "LEGENDARY" } });
-                var level100Cost = await pricesApi.ApiItemPriceItemTagGetAsync(sell.Tag, new() { { "PetLevel", "100" }, { "Rarity", "LEGENDARY" } });
-                var expCost = (float)(level100Cost.Median - level1Cost.Median) / ExpPetMaxLevel;
-                var currentExp = ParseFloat(item.Value);
-                float addedExp = Math.Min(currentExp, ExpPetMaxLevel) - ParseFloat(valueOnBuy.Value ?? "0");
-                if (addedExp > 0)
+                if (cost.Coins != 0)
                     yield return new PastFlip.ProfitChange()
                     {
-                        Label = $"Exp cost for {item.Value} exp",
-                        Amount = -(long)(expCost * addedExp)
+                        Label = "Slot unlock cost",
+                        Amount = -cost.Coins
                     };
+                else if (cost.Type == "ITEM")
+                    yield return await CostOf(cost.ItemId, $"Slot unlock item {cost.ItemId}x{cost.Amount}", cost.Amount ?? 1);
             }
-            // missing nbt
-            if (!mapper.TryGetIngredients(item.Key, item.Value, valueOnBuy.Value, out var items))
-                continue;
-
-            foreach (var ingredient in items)
+        }
+        if (item.Key == "upgrade_level")
+        {
+            var upgradeCost = await hypixelItemService.GetStarCost(sell.Tag, int.Parse(valueOnBuy.Value ?? "0"), int.Parse(item.Value));
+            foreach (var cost in upgradeCost)
             {
-                yield return await CostOf(ingredient, $"Used {ingredient} to upgraded {item.Key} to {item.Value}");
+                if (cost.Type == "ESSENCE")
+                    yield return await CostOf($"ESSENCE_{cost.EssenceType}", $"{cost.EssenceType} essence x{cost.Amount} to add star", cost.Amount);
+                else if (cost.Type == "ITEM")
+                    yield return await CostOf(cost.ItemId, $"{cost.ItemId}x{cost.Amount} for star", cost.Amount);
+            }
+        }
+        if (item.Key == "exp")
+        {
+            var level1Cost = await pricesApi.ApiItemPriceItemTagGetAsync(sell.Tag, new() { { "PetLevel", "1" }, { "Rarity", "LEGENDARY" } });
+            var level100Cost = await pricesApi.ApiItemPriceItemTagGetAsync(sell.Tag, new() { { "PetLevel", "100" }, { "Rarity", "LEGENDARY" } });
+            var expCost = (float)(level100Cost.Median - level1Cost.Median) / ExpPetMaxLevel;
+            var currentExp = ParseFloat(item.Value);
+            float addedExp = Math.Min(currentExp, ExpPetMaxLevel) - ParseFloat(valueOnBuy.Value ?? "0");
+            if (addedExp > 0)
+                yield return new PastFlip.ProfitChange()
+                {
+                    Label = $"Exp cost for {item.Value} exp",
+                    Amount = -(long)(expCost * addedExp)
+                };
+        }
+        if (Constants.AttributeKeys.Contains(item.Key))
+        {
+            var baseLevel = ParseFloat(valueOnBuy.Value ?? "0");
+            var difference = ParseFloat(item.Value) - baseLevel;
+            // is exponential
+            var costOfLvl2 = await pricesApi.ApiItemPriceItemTagGetAsync(sell.Tag, new() { { item.Key, "2" } });
+            if (costOfLvl2 == null || costOfLvl2.Median == 0)
+            {
+                logger.LogInformation($"could not find attribute cost for {item.Key} lvl 2 on {sell.Tag}");
+                yield break;
+            }
+            yield return new PastFlip.ProfitChange()
+            {
+                Label = $"Cost for {item.Key} lvl {item.Value}",
+                Amount = -(long)(costOfLvl2.Median * (Math.Pow(2, difference) - 1))
+            };
+
+        }
+        // missing nbt
+        if (!mapper.TryGetIngredients(item.Key, item.Value, valueOnBuy.Value, out var items))
+            yield break;
+
+        foreach (var ingredient in items)
+        {
+            yield return await CostOf(ingredient, $"Used {ingredient} to upgraded {item.Key} to {item.Value}");
+        }
+    }
+
+    private async IAsyncEnumerable<PastFlip.ProfitChange> GetPetRarityUpgrades(Core.SaveAuction buy, Core.SaveAuction sell)
+    {
+        if (sell.FlatenedNBT.Where(l => l.Key == "heldItem" && l.Value == "PET_ITEM_TIER_BOOST").Any())
+            yield return await CostOf("PET_ITEM_TIER_BOOST", "tier Boost cost");
+        else
+        {
+            Console.WriteLine($"buy tier {(int)buy.Tier} {buy.Tier} sell tier {(int)sell.Tier} {sell.Tier}");
+            for (int i = ((int)buy.Tier); i < (int)sell.Tier; i++)
+            {
+                var allCosts = await katApi.KatAllGetAsync(0, default);
+                if (allCosts == null)
+                    throw new Exception("could not get kat costs from crafts api");
+                var cost = allCosts.Where(c => ((int)c.TargetRarity) > i + 1 && c.CoreData.ItemTag == sell.Tag)
+                            .OrderBy(c => c.TargetRarity).FirstOrDefault();
+                var upgradeCost = cost?.UpgradeCost;
+                var tierName = (i >= (int)Core.Tier.LEGENDARY) ? sell.Tier.ToString() : ((Core.Tier)i + 1).ToString();
+                var materialTitle = $"Kat materials for {tierName}";
+                var level = 1;
+                try
+                {
+                    level = string.IsNullOrEmpty(buy.ItemName) ? 1 : int.Parse(Regex.Replace(buy.ItemName?.Split(' ')[1], @"[^\d]", ""));
+                }
+                catch (Exception)
+                {
+                    logger.LogWarning($"could not parse level from {buy.ItemName}");
+                }
+                var costAdded = false;
+                if (cost == null || cost.MaterialCost >= int.MaxValue || level > 2)
+                {
+                    // approximate cost with raw
+                    var rawCost = await katApi.KatRawGetAsync();
+                    var rarityInt = i + 1;
+                    if (i > (int)Core.Tier.LEGENDARY)
+                        break;
+                    Console.WriteLine($"kat upgrade cost {(Core.Tier)rarityInt}({rarityInt}) {cost?.TargetRarity} {sell.Tier}");
+                    var raw = rawCost.Where(c => ((int)c.BaseRarity) == rarityInt && sell.Tag.EndsWith(c.Name.Replace(' ', '_').ToUpper())).FirstOrDefault();
+                    if (i == 5 && sell.Tag == "PET_JERRY")
+                    {
+                        yield return await CostOf("PET_ITEM_TOY_JERRY", "Jerry 3d glasses");
+                        break;
+                    }
+                    if (raw == null)
+                        throw new Exception($"could not find kat cost for tier {i}({(Core.Tier)rarityInt}) and tag {sell.Tag} {buy.Uuid} -> {sell.Uuid}");
+                    upgradeCost = raw.Cost * (1.0 - 0.003 * level);
+                    if (raw.Material != null)
+                    {
+                        costAdded = true;
+                        yield return await CostOf(raw.Material, materialTitle, raw.Amount);
+                    }
+                }
+                yield return new($"Kat cost for {tierName}", (long)-upgradeCost);
+                if (cost?.MaterialCost > 0 && !costAdded)
+                    yield return new(materialTitle, (long)-cost.MaterialCost);
+                if (i == (int)Core.Tier.LEGENDARY)
+                    break;
             }
         }
     }
