@@ -12,6 +12,7 @@ using Coflnet.Sky.SkyAuctionTracker.Controllers;
 using System.Linq;
 using Coflnet.Sky.Core;
 using Coflnet.Kafka;
+using Coflnet.Sky.Proxy.Client.Api;
 
 namespace Coflnet.Sky.SkyAuctionTracker.Services
 {
@@ -102,7 +103,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 AutoCommitIntervalMs = 0,
                 PartitionAssignmentStrategy = PartitionAssignmentStrategy.CooperativeSticky
             };
-            var sellConsumeConfig = new ConsumerConfig(consumeConfig.ToDictionary(c=>c.Key,c=>c.Value))
+            var sellConsumeConfig = new ConsumerConfig(consumeConfig.ToDictionary(c => c.Key, c => c.Value))
             {
                 GroupId = "sky-fliptracker-sell",
                 SessionTimeoutMs = 10000,
@@ -113,8 +114,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             {
                 if (flipEvents.All(e => e.End < DateTime.UtcNow - TimeSpan.FromHours(8)))
                 {
-                    if(Random.Shared.NextDouble() < 0.1)
-                    logger.LogInformation("skipping old sell");
+                    if (Random.Shared.NextDouble() < 0.1)
+                        logger.LogInformation("skipping old sell");
                     return;
                 }
                 for (int i = 0; i < 3; i++)
@@ -184,6 +185,20 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     TargetPrice = (int)(int.MaxValue > lp.TargetPrice ? lp.TargetPrice : int.MaxValue)
                 }));
                 consumeCounter.Inc(lps.Count());
+                try
+                {
+                    var rerequestService = scope.ServiceProvider.GetRequiredService<IBaseApi>();
+                    foreach (var item in lps.Where(lp => lp.TargetPrice - lp.Auction.StartingBid > 5_000_000))
+                    {
+                        if (DateTime.Now - item.Auction.Start < TimeSpan.FromSeconds(12))
+                            await Task.Delay(4000);
+                        await rerequestService.BaseAhPlayerIdPostAsync(item.Auction.AuctioneerId, "recheck");
+                    }
+                }
+                catch (System.Exception e)
+                {
+                    logger.LogError(e, "could not rerequest player auctions");
+                }
             }, stoppingToken, "sky-fliptracker", 50);
         }
 
