@@ -18,6 +18,7 @@ using Coflnet.Sky.Crafts.Client.Api;
 using Coflnet.Sky.Api.Client.Api;
 using Prometheus;
 using Coflnet.Sky.Items.Client.Api;
+using Coflnet.Sky.Proxy.Client.Api;
 
 namespace Coflnet.Sky.SkyAuctionTracker
 {
@@ -62,9 +63,11 @@ namespace Coflnet.Sky.SkyAuctionTracker
             services.AddHostedService<TrackerBackgroundService>();
             services.AddSingleton<IAuctionsApi>(conf => new AuctionsApi(Configuration["API_BASE_URL"]));
             services.AddSingleton<IPricesApi>(conf => new PricesApi(Configuration["API_BASE_URL"]));
+            services.AddSingleton<IPlayerApi>(conf => new PlayerApi(Configuration["API_BASE_URL"]));
             services.AddSingleton<ICraftsApi>(conf => new CraftsApi(Configuration["CRAFTS_BASE_URL"]));
             services.AddSingleton<IItemsApi>(conf => new ItemsApi(Configuration["ITEMS_BASE_URL"]));
             services.AddSingleton<Crafts.Client.Api.IKatApi>(conf => new Crafts.Client.Api.KatApi(Configuration["CRAFTS_BASE_URL"]));
+            services.AddSingleton<IBaseApi>(sp => new BaseApi(Configuration["PROXY_BASE_URL"]));
             services.AddSingleton<ProfitChangeService>();
             services.AddSingleton<FlipStorageService>();
             services.AddJaeger(Configuration);

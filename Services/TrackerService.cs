@@ -13,6 +13,7 @@ using System.Diagnostics;
 using AutoMapper;
 using Newtonsoft.Json;
 using Prometheus;
+using System.Globalization;
 
 namespace Coflnet.Sky.SkyAuctionTracker.Services
 {
@@ -25,6 +26,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
         private IServiceScopeFactory scopeFactory;
         private ProfitChangeService profitChangeService;
         private FlipStorageService flipStorageService;
+        private IPlayerApi playerApi;
         private ActivitySource activitySource;
         private const short Version = 1;
         Counter flipFoundCounter = Metrics.CreateCounter("sky_fliptracker_saved_finding", "How many found flips were saved");
@@ -39,7 +41,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             IServiceScopeFactory scopeFactory,
             ProfitChangeService profitChangeService,
             FlipStorageService flipStorageService,
-            ActivitySource activitySource)
+            ActivitySource activitySource,
+            IPlayerApi playerApi)
         {
             this.db = db;
             this.logger = logger;
@@ -49,6 +52,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             this.profitChangeService = profitChangeService;
             this.flipStorageService = flipStorageService;
             this.activitySource = activitySource;
+            this.playerApi = playerApi;
         }
 
         public async Task<Flip> AddFlip(Flip flip)
@@ -237,6 +241,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             var sellLookup = sells.Where(s => s.FlatenedNBT.Where(n => n.Key == "uid").Any() && s.HighestBidAmount > 0)
                                 .GroupBy(s => new { uid = s.FlatenedNBT.Where(n => n.Key == "uid").First(), s.End }).Select(g => g.First())
                                 .ToDictionary(s => s.FlatenedNBT.Where(n => n.Key == "uid").Select(n => n.Value).FirstOrDefault());
+
             var buyLookup = await auctionsApi.ApiAuctionsUidsSoldPostWithHttpInfoAsync(new Api.Client.Model.InventoryBatchLookup() { Uuids = sellLookup.Keys.ToList() });
             if (buyLookup.StatusCode != System.Net.HttpStatusCode.OK)
                 throw new Exception("Could not reach api to load purchases " + buyLookup.StatusCode);
@@ -260,19 +265,16 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             {
                 finders = await dbScoped.Flips.Where(f => purchaseUid.Contains(f.AuctionId)).ToListAsync();
             }
-
-
-            // Console.WriteLine(Newtonsoft.Json.JsonConvert.SerializeObject(soldAuctions, Newtonsoft.Json.Formatting.Indented));
-            await Parallel.ForEachAsync(soldAuctions, new ParallelOptions()
+            var parallelOptions = new ParallelOptions()
             {
                 MaxDegreeOfParallelism = 2,
                 CancellationToken = new CancellationTokenSource(20000).Token
-            }, async (item, token) =>
+            };
+            var noUidTask = CheckNoIdAuctions(sells, parallelOptions);
+            // Console.WriteLine(Newtonsoft.Json.JsonConvert.SerializeObject(soldAuctions, Newtonsoft.Json.Formatting.Indented));
+            await Parallel.ForEachAsync(soldAuctions, parallelOptions, async (item, token) =>
             {
-                var buyResp = await auctionsApi.ApiAuctionAuctionUuidGetWithHttpInfoAsync(item.buy.Uuid, 0, token).ConfigureAwait(false);
-                var buy = JsonConvert.DeserializeObject<ApiSaveAuction>(buyResp.RawContent);
-                if (buy == null)
-                    throw new Exception($"could not load buy {item.buy.Uuid} {buyResp.StatusCode} Content: {buyResp.RawContent}");
+                var buy = await GetAuction(item.buy.Uuid, token).ConfigureAwait(false);
 
                 flipSumaryEventProducer.Produce(new FlipSumaryEvent()
                 {
@@ -329,18 +331,86 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     throw;
                 }
             });
+            await noUidTask;
+        }
+
+        private async Task CheckNoIdAuctions(IEnumerable<SaveAuction> sells, ParallelOptions parallelOptions)
+        {
+
+            var noUidCheck = sells.Where(s => !s.FlatenedNBT.Where(n => n.Key == "uid").Any() && s.HighestBidAmount > 0)
+                                .GroupBy(s => new { s.AuctioneerId, s.Tag });
+            await Parallel.ForEachAsync(noUidCheck, async (item, token) =>
+            {
+                var query = new Dictionary<string, string>() { { "tag", item.Key.Tag } };
+                var purchases = await playerApi.ApiPlayerPlayerUuidBidsGetAsync(item.Key.AuctioneerId, 0, query);
+                foreach (var purchase in purchases.OrderByDescending(p => p.End).Where(p => p.End < item.First().End))
+                {
+                    var buyResp = await GetAuction(purchase.AuctionId, token).ConfigureAwait(false);
+                    var match = buyResp.FlatenedNBT.FirstOrDefault(n => item.Any(i => i.FlatenedNBT.Any(f => f.Key == n.Key && f.Value == n.Value)));
+                    if (match.Key == null)
+                        continue;
+                    var sell = item.Where(i => i.FlatenedNBT.Any(f => f.Key == match.Key && f.Value == match.Value)).FirstOrDefault();
+                    if (sell == null)
+                        continue;
+                    var profit = (long)(sell.HighestBidAmount - buyResp.HighestBidAmount);
+                    if (sell.End - buyResp.End > TimeSpan.FromDays(14))
+                        profit = 0; // no flip if it took more than 2 weeks
+                    var flip = new PastFlip()
+                    {
+                        Flipper = Guid.Parse(sell.AuctioneerId),
+                        ItemName = sell.ItemName,
+                        ItemTag = sell.Tag,
+                        ItemTier = sell.Tier,
+                        Profit = profit,
+                        SellPrice = sell.HighestBidAmount,
+                        SellTime = sell.End,
+                        PurchaseCost = buyResp.HighestBidAmount,
+                        PurchaseTime = buyResp.End,
+                        Uid = sell.UId,
+                        PurchaseAuctionId = Guid.Parse(buyResp.Uuid),
+                        SellAuctionId = Guid.Parse(sell.Uuid),
+                        Version = 1,
+                        TargetPrice = 0,
+                        FinderType = LowPricedAuction.FinderType.UNKOWN,
+                        ProfitChanges = new List<PastFlip.ProfitChange>()
+                    };
+                    await flipStorageService.SaveFlip(flip);
+                    Console.WriteLine($"Found flip https://sky.coflnet.com/a/{buyResp.Uuid} -> https://sky.coflnet.com/a/{sell.Uuid}");
+                  //  return;
+                }
+            });
+        }
+
+        private async Task<ApiSaveAuction> GetAuction(string uuid, CancellationToken token)
+        {
+            var buyResp = await auctionsApi.ApiAuctionAuctionUuidGetWithHttpInfoAsync(uuid, 0, token).ConfigureAwait(false);
+            var buy = JsonConvert.DeserializeObject<ApiSaveAuction>(buyResp.RawContent);
+            if (buy == null)
+                throw new Exception($"could not load buy {uuid} {buyResp.StatusCode} Content: {buyResp.RawContent}");
+            return buy;
         }
 
         public static string GetDisplayName(ApiSaveAuction buy, SaveAuction sell)
         {
             string name = sell.ItemName;
+            if(name.Length < 10 || buy.ItemName.Length < 10)
+            {
+                return name;
+            }
             if (sell.Tag.StartsWith("PET_") && sell.FlatenedNBT.Any(f => f.Key == "exp") && sell.ItemName != buy.ItemName
                                     && ParseFloat(sell.FlatenedNBT.First(f => f.Key == "exp").Value) - ParseFloat(buy.FlatenedNBT.First(f => f.Key == "exp").Value) > 100_000)
             {
                 // level changed 
                 // get original level from string [Lvl 63] Bat
                 var start = buy.ItemName.IndexOf(' ');
-                var level = ParseFloat(buy.ItemName.Substring(start, buy.ItemName.IndexOf(']') - start));
+                var endIndex = buy.ItemName.IndexOf(']') - start;
+                if(endIndex < 0)
+                {
+                    Console.Write($"Could not find level in {buy.ItemName}");
+                    Task.Delay(1000).Wait();
+                    return name;
+                }
+                var level = ParseFloat(buy.ItemName.Substring(start, endIndex));
                 var insertAt = name.IndexOf(' ') + 1;
                 name = name.Insert(insertAt, $"{level}->");
             }
@@ -350,7 +420,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
 
         private static float ParseFloat(string value)
         {
-            return float.Parse(value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture);
+            return float.Parse(value, NumberStyles.Float | NumberStyles.AllowThousands, System.Globalization.CultureInfo.InvariantCulture);
         }
 
         internal long GetId(string uuid)
