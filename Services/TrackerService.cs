@@ -376,7 +376,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     };
                     await flipStorageService.SaveFlip(flip);
                     Console.WriteLine($"Found flip https://sky.coflnet.com/a/{buyResp.Uuid} -> https://sky.coflnet.com/a/{sell.Uuid}");
-                  //  return;
+                    return;
                 }
             });
         }
