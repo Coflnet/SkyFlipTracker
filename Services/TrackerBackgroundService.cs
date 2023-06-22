@@ -112,12 +112,12 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
 
             var sellConsume = KafkaConsumer.ConsumeBatch<SaveAuction>(sellConsumeConfig, config["TOPICS:SOLD_AUCTION"], async flipEvents =>
             {
-                if (flipEvents.All(e => e.End < DateTime.UtcNow - TimeSpan.FromHours(8)))
+                /*if (flipEvents.All(e => e.End < DateTime.UtcNow - TimeSpan.FromHours(8)))
                 {
                     if (Random.Shared.NextDouble() < 0.1)
                         logger.LogInformation("skipping old sell");
                     return;
-                }
+                }*/
                 for (int i = 0; i < 3; i++)
                     try
                     {
@@ -145,6 +145,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     {
                         using var scope = scopeFactory.CreateScope();
                         var service = scope.ServiceProvider.GetRequiredService<TrackerService>();
+                        return;
                         await service.IndexCassandra(flipEvents);
                         consumeEvent.Inc(flipEvents.Count());
                         return;
@@ -188,12 +189,24 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 try
                 {
                     var rerequestService = scope.ServiceProvider.GetRequiredService<IBaseApi>();
-                    foreach (var item in lps.Where(lp => lp.TargetPrice - lp.Auction.StartingBid > 5_000_000))
+                    var events = new List<FlipEvent>();
+                    foreach (var item in lps.Where(lp => lp.TargetPrice - lp.Auction.StartingBid > 3_000_000))
                     {
                         if (DateTime.Now - item.Auction.Start < TimeSpan.FromSeconds(12))
                             await Task.Delay(4000);
                         await rerequestService.BaseAhPlayerIdPostAsync(item.Auction.AuctioneerId, "recheck");
+
+                        var startTime = new FlipEvent()
+                        {
+                            AuctionId = item.Auction.UId,
+                            PlayerId = service.GetId(item.Auction.AuctioneerId),
+                            Timestamp = item.Auction.Start,
+                            Type = FlipEventType.START
+                        };
+                        events.Add(startTime);
                     }
+                    if (events.Count > 0)
+                        await service.AddEvents(events);
                 }
                 catch (System.Exception e)
                 {

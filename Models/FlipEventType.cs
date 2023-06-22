@@ -32,6 +32,10 @@ namespace Coflnet.Sky.SkyAuctionTracker.Models
         /// <summary>
         /// 
         /// </summary>
-        DOWNVOTE = 7
+        DOWNVOTE = 7,
+        /// <summary>
+        /// Start time
+        /// </summary>
+        START = 8,
     }
 }

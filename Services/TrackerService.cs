@@ -393,7 +393,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
         public static string GetDisplayName(ApiSaveAuction buy, SaveAuction sell)
         {
             string name = sell.ItemName;
-            if(name.Length < 10 || buy.ItemName.Length < 10)
+            if (name.Length < 10 || buy.ItemName.Length < 10)
             {
                 return name;
             }
@@ -404,7 +404,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 // get original level from string [Lvl 63] Bat
                 var start = buy.ItemName.IndexOf(' ');
                 var endIndex = buy.ItemName.IndexOf(']') - start;
-                if(endIndex < 0)
+                if (endIndex < 0)
                 {
                     Console.Write($"Could not find level in {buy.ItemName}");
                     Task.Delay(1000).Wait();
