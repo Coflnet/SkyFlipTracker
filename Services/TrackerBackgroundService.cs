@@ -189,10 +189,10 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 {
                     var rerequestService = scope.ServiceProvider.GetRequiredService<IBaseApi>();
                     var events = new List<FlipEvent>();
-                    foreach (var item in lps.Where(lp => lp.TargetPrice - lp.Auction.StartingBid > 3_000_000))
+                    foreach (var item in lps.Where(lp => lp.TargetPrice - lp.Auction.StartingBid > 1_000_000))
                     {
                         if (DateTime.Now - item.Auction.Start < TimeSpan.FromSeconds(12))
-                            await Task.Delay(4000);
+                            await Task.Delay(6000);
                         await rerequestService.BaseAhPlayerIdPostAsync(item.Auction.AuctioneerId, "recheck");
 
                         var startTime = new FlipEvent()
