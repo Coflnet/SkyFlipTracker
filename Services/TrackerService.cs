@@ -257,7 +257,6 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                                     .OrderByDescending(u => u.Timestamp).FirstOrDefault()
             }).Where(item => item.buy != null).ToList();
             var purchaseUid = soldAuctions.Select(u => GetId(u.buy.Uuid)).ToHashSet();
-            var flipsSoldFromTfm = purchaseUid.Select(f => new Flip() { AuctionId = f, FinderType = LowPricedAuction.FinderType.TFM }).ToList();
 
             List<Flip> finders = new();
             using (var scope = scopeFactory.CreateScope())

@@ -112,12 +112,12 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
 
             var sellConsume = KafkaConsumer.ConsumeBatch<SaveAuction>(sellConsumeConfig, config["TOPICS:SOLD_AUCTION"], async flipEvents =>
             {
-                /*if (flipEvents.All(e => e.End < DateTime.UtcNow - TimeSpan.FromHours(8)))
+                if (flipEvents.All(e => e.End < DateTime.UtcNow - TimeSpan.FromHours(8)))
                 {
                     if (Random.Shared.NextDouble() < 0.1)
                         logger.LogInformation("skipping old sell");
                     return;
-                }*/
+                }
                 for (int i = 0; i < 3; i++)
                     try
                     {
@@ -145,7 +145,6 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     {
                         using var scope = scopeFactory.CreateScope();
                         var service = scope.ServiceProvider.GetRequiredService<TrackerService>();
-                        return;
                         await service.IndexCassandra(flipEvents);
                         consumeEvent.Inc(flipEvents.Count());
                         return;
