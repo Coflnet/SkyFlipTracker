@@ -314,6 +314,22 @@ public class ProfitChangeService
         if (Constants.AttributeKeys.Contains(item.Key))
         {
             var baseLevel = ParseFloat(valueOnBuy.Value ?? "0");
+            if(baseLevel == 0) // wheel of fate applied
+            {
+                var previousAttributes = buy.FlatenedNBT.Where(f => Constants.AttributeKeys.Contains(f.Key)).ToList();
+                var currentAttri = sell.FlatenedNBT.Where(f => Constants.AttributeKeys.Contains(f.Key)).ToList();
+                if(currentAttri.First().Key == item.Key)
+                {
+                    // add only for first attribute
+                    yield return await CostOf("WHEEL_OF_FATE", "Wheel of fate cost");
+                }
+                var val = previousAttributes.Select(f => (f, ParseFloat(f.Value), diff:Math.Abs(ParseFloat(f.Value) - ParseFloat(item.Value))))
+                        .OrderBy(f => f.diff).First();
+                Console.WriteLine($"base level {val} for {baseLevel}");
+                if(val.diff == 0)
+                    yield break;
+                baseLevel = ParseFloat(val.f.Value);
+            }
             var difference = ParseFloat(item.Value) - baseLevel;
             // is exponential
             var costOfLvl2 = await pricesApi.ApiItemPriceItemTagGetAsync(sell.Tag, new() { { item.Key, "2" } });

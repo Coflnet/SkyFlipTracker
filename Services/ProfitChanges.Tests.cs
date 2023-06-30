@@ -467,6 +467,27 @@ public class ProfitChangeTests
         Assert.AreEqual(2, result.Count);
         Assert.AreEqual(-35000, result[1].Amount);
     }
+    [Test]
+    public async Task WheelOfFateChangesAttributeType()
+    {
+        var buy = CreateAuction("MOLTEN_CLOAK");
+        buy.FlatenedNBT["blazing_resistance"] = "5";
+        buy.FlatenedNBT["breeze"] = "4";
+        var sell = new Core.SaveAuction(buy);
+        sell.FlatenedNBT = new(){
+            {"mana_regeneration","4"},
+            {"dominance","5"}
+        };
+        var pricesApi = new Mock<Api.Client.Api.IPricesApi>();
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("WHEEL_OF_FATE", null, 0, default)).ReturnsAsync(() => new() { Median = 12_000_000 });
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("MOLTEN_CLOAK", new (){{"mana_regeneration","2"}}, 0, default)).ReturnsAsync(() => new() { Median = 5000 });
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("MOLTEN_CLOAK", new (){{"dominance","2"}}, 0, default)).ReturnsAsync(() => new() { Median = 5000 });
+        service = new ProfitChangeService(pricesApi.Object, null, null, NullLogger<ProfitChangeService>.Instance, null, null);
+        var result = await service.GetChanges(buy, sell).ToListAsync();
+        Assert.AreEqual(2, result.Count);
+        Assert.AreEqual(-12000000, result[1].Amount);
+        pricesApi.Verify(p=>p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), It.IsAny<Dictionary<string, string>>(), 0, default), Times.Once);
+    }
 
     [Test]
     public async Task Enchantments()
