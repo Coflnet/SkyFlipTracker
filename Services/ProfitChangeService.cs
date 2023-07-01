@@ -331,9 +331,10 @@ public class ProfitChangeService
                 baseLevel = ParseFloat(val.f.Value);
             }
             var difference = ParseFloat(item.Value) - baseLevel;
-            // is exponential
+            var attributeShardCost = await pricesApi.ApiItemPriceItemTagGetAsync("ATTRIBUTE_SHARD", new() { { item.Key, "2" } });
             var costOfLvl2 = await pricesApi.ApiItemPriceItemTagGetAsync(sell.Tag, new() { { item.Key, "2" } });
-            if (costOfLvl2 == null || costOfLvl2.Median == 0)
+            var target = Math.Min(attributeShardCost?.Median ?? 0, costOfLvl2?.Median ?? 0);
+            if (target == 0)
             {
                 logger.LogInformation($"could not find attribute cost for {item.Key} lvl 2 on {sell.Tag}");
                 yield break;
@@ -341,7 +342,7 @@ public class ProfitChangeService
             yield return new PastFlip.ProfitChange()
             {
                 Label = $"Cost for {item.Key} lvl {item.Value}",
-                Amount = -(long)(costOfLvl2.Median * (Math.Pow(2, difference) - 1))
+                Amount = -(long)(target * (Math.Pow(2, difference) - 1))
             };
 
         }

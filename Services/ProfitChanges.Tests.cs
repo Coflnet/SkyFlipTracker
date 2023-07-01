@@ -455,7 +455,6 @@ public class ProfitChangeTests
         buy.FlatenedNBT["mana_pool"] = "2";
         var sell = CreateAuction("ATTRIBUTE_SHARD");
         sell.FlatenedNBT["mana_pool"] = "3";
-        sell.HighestBidAmount = 10000;
         var pricesApi = new Mock<Api.Client.Api.IPricesApi>();
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("ATTRIBUTE_SHARD", new (){{"mana_pool","2"}}, 0, default)).ReturnsAsync(() => new() { Median = 5000 });
         service = new ProfitChangeService(pricesApi.Object, null, null, NullLogger<ProfitChangeService>.Instance, null, null);
@@ -487,6 +486,22 @@ public class ProfitChangeTests
         Assert.AreEqual(2, result.Count);
         Assert.AreEqual(-12000000, result[1].Amount);
         pricesApi.Verify(p=>p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), It.IsAny<Dictionary<string, string>>(), 0, default), Times.Once);
+    }
+
+    [Test]
+    public async Task UseShardCostIfCheaper()
+    {
+        var buy = CreateAuction("GAUNTLET_OF_CONTAGION");
+        buy.FlatenedNBT["mana_regeneration"] = "2";
+        var sell = CreateAuction("GAUNTLET_OF_CONTAGION");
+        sell.FlatenedNBT["mana_regeneration"] = "3";
+        var pricesApi = new Mock<Api.Client.Api.IPricesApi>();
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("GAUNTLET_OF_CONTAGION", new (){{"mana_regeneration","2"}}, 0, default)).ReturnsAsync(() => new() { Median = 13_000_000 });
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("ATTRIBUTE_SHARD", new (){{"mana_regeneration","2"}}, 0, default)).ReturnsAsync(() => new() { Median = 2_000_000 });
+        service = new ProfitChangeService(pricesApi.Object, null, null, NullLogger<ProfitChangeService>.Instance, null, null);
+        var result = await service.GetChanges(buy, sell).ToListAsync();
+        Assert.AreEqual(2, result.Count);
+        Assert.AreEqual(-2000000, result[1].Amount);
     }
 
     [Test]
