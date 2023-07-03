@@ -14,6 +14,8 @@ using AutoMapper;
 using Newtonsoft.Json;
 using Prometheus;
 using System.Globalization;
+using Coflnet.Leaderboard.Client.Api;
+using Coflnet.Sky.Settings.Client.Api;
 
 namespace Coflnet.Sky.SkyAuctionTracker.Services
 {
@@ -26,6 +28,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
         private IServiceScopeFactory scopeFactory;
         private ProfitChangeService profitChangeService;
         private FlipStorageService flipStorageService;
+        private IScoresApi scoresApi;
+        private ISettingsApi settingsApi;
         private IPlayerApi playerApi;
         private ActivitySource activitySource;
         private const short Version = 1;
@@ -42,7 +46,9 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             ProfitChangeService profitChangeService,
             FlipStorageService flipStorageService,
             ActivitySource activitySource,
-            IPlayerApi playerApi)
+            IPlayerApi playerApi,
+            IScoresApi scoresApi,
+            ISettingsApi settingsApi)
         {
             this.db = db;
             this.logger = logger;
@@ -53,6 +59,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             this.flipStorageService = flipStorageService;
             this.activitySource = activitySource;
             this.playerApi = playerApi;
+            this.scoresApi = scoresApi;
+            this.settingsApi = settingsApi;
         }
 
         public async Task<Flip> AddFlip(Flip flip)
@@ -164,6 +172,34 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             var count = await db.SaveChangesAsync();
             if (count > 0)
                 Console.WriteLine($"Saved sells {count}");
+        }
+
+        public async Task PutBuySpeedOnBoard(IEnumerable<SaveAuction> sells)
+        {
+            var relevantSells = sells.Where(s => s.Bin && s.Bids.Count > 0).ToList();
+            var relevantLookup = relevantSells.Select(s => s.UId).ToHashSet();
+            var creationTimes = await db.FlipEvents
+                                .Where(e => relevantLookup.Contains(e.AuctionId) && e.Type == FlipEventType.START)
+                                .ToDictionaryAsync(e => e.AuctionId, e => e.Timestamp);
+            foreach (var item in relevantSells)
+            {
+                if (!creationTimes.TryGetValue(item.UId, out var creationTime))
+                    continue;
+                var timeToBuy = item.End - creationTime - TimeSpan.FromSeconds(16);
+                if(timeToBuy > TimeSpan.FromSeconds(10))
+                    continue;
+                var playerUuid = item.Bids.First().Bidder;
+                var disabled = await settingsApi.SettingsUserIdSettingKeyGetAsync(playerUuid, "disable-buy-speed-board");
+                if (disabled != null)
+                    continue;
+                var leaderboardSlug = "sky-buyspeed-" + DateTime.UtcNow.ToString("yyyy-MM-dd");
+                await scoresApi.ScoresLeaderboardSlugPostAsync(leaderboardSlug, new Leaderboard.Client.Model.ScoreCreate()
+                {
+                    UserId = playerUuid,
+                    Score = (long)(timeToBuy.TotalSeconds * -1000),
+                    HighScore = true
+                });
+            }
         }
 
         /// <summary>

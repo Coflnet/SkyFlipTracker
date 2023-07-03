@@ -17,8 +17,10 @@
   <ItemGroup>
     <PackageReference Include="AutoMapper" Version="12.0.1" />
     <PackageReference Include="CassandraCSharpDriver" Version="3.18.0" />
+    <PackageReference Include="Coflnet.Leaderboard.Client" Version="0.2.0" />
     <PackageReference Include="Coflnet.Sky.Crafts.Client" Version="0.2.1" />
     <PackageReference Include="Coflnet.Sky.Proxy.Client" Version="0.1.0" />
+    <PackageReference Include="Coflnet.Sky.Settings.Client" Version="0.2.0" />
     <PackageReference Include="Confluent.Kafka" Version="1.7.0" />
     <PackageReference Include="Jaeger.Core" Version="1.0.3" />
     <PackageReference Include="Jaeger.Senders.Thrift" Version="1.0.3" />

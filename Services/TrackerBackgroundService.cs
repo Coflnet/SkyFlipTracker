@@ -110,9 +110,9 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             };
             await kafkaCreator.CreateTopicIfNotExist(config["TOPICS:SOLD_AUCTION"], 9);
 
-            var sellConsume = KafkaConsumer.ConsumeBatch<SaveAuction>(sellConsumeConfig, config["TOPICS:SOLD_AUCTION"], async flipEvents =>
+            var sellConsume = KafkaConsumer.ConsumeBatch<SaveAuction>(sellConsumeConfig, config["TOPICS:SOLD_AUCTION"], async sells =>
             {
-                if (flipEvents.All(e => e.End < DateTime.UtcNow - TimeSpan.FromHours(8)))
+                if (sells.All(e => e.End < DateTime.UtcNow - TimeSpan.FromHours(8)))
                 {
                     if (Random.Shared.NextDouble() < 0.1)
                         logger.LogInformation("skipping old sell");
@@ -123,8 +123,9 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     {
                         using var scope = scopeFactory.CreateScope();
                         var service = scope.ServiceProvider.GetRequiredService<TrackerService>();
-                        await service.AddSells(flipEvents);
-                        consumedSells.Inc(flipEvents.Count());
+                        await service.AddSells(sells);
+                        consumedSells.Inc(sells.Count());
+                        await service.PutBuySpeedOnBoard(sells);
                         return;
                     }
                     catch (Exception e)
