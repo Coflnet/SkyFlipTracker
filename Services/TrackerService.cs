@@ -187,7 +187,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 if (!creationTimes.TryGetValue(item.UId, out var creationTime))
                     continue;
                 var timeToBuy = item.End - creationTime - TimeSpan.FromSeconds(16);
-                if(timeToBuy > TimeSpan.FromSeconds(10))
+                if (timeToBuy > TimeSpan.FromSeconds(10))
                     continue;
                 var playerUuid = item.Bids.First().Bidder;
                 var disabled = await settingsApi.SettingsUserIdSettingKeyGetAsync(playerUuid, "disable-buy-speed-board");
@@ -284,7 +284,10 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 throw new Exception("Could not reach api to load purchases " + buyLookup.StatusCode);
             var exists = buyLookup.Data;
             if (exists.Count == 0)
+            {
+                logger.LogInformation($"no purchases found {sells.Count()}");
                 return;
+            }
             var soldAuctions = exists.Select(item => new
             {
                 sell = sellLookup.GetValueOrDefault(item.Key),

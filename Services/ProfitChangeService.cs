@@ -448,7 +448,6 @@ public class ProfitChangeService
 
     private static Crafts.Client.Model.ProfitableCraft AddCraftPathIngredients(string tagOnPurchase, List<Crafts.Client.Model.ProfitableCraft> allCrafts, List<Crafts.Client.Model.Ingredient> allIngredients, int depth = 0)
     {
-        Console.WriteLine($"searching for {tagOnPurchase}");
         if (allIngredients.Where(i => i.ItemId == tagOnPurchase).Any())
             return null;
         if (depth > 10)
@@ -456,7 +455,6 @@ public class ProfitChangeService
         // search deeper
         foreach (var item in allIngredients.ToList())
         {
-            Console.WriteLine($"searching for {item.ItemId} in {tagOnPurchase}");
             var subCraft = allCrafts.Where(c => c.ItemId == item.ItemId).FirstOrDefault();
             if (subCraft == null)
                 continue;
