@@ -180,6 +180,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             var relevantLookup = relevantSells.Select(s => s.UId).ToHashSet();
             var creationTimes = await db.FlipEvents
                                 .Where(e => relevantLookup.Contains(e.AuctionId) && e.Type == FlipEventType.START)
+                                .GroupBy(e => e.AuctionId).Select(g => g.First())
                                 .ToDictionaryAsync(e => e.AuctionId, e => e.Timestamp);
             foreach (var item in relevantSells)
             {
