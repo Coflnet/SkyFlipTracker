@@ -29,6 +29,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             "d1acafbfd04644cdaabcffe508829c47", // skipped delay -- aka aestic
             "c051226ddfc643a6b49b5074ecd3a658", // ^ alt
             "fd490a7d6bbe4201b55b5239544a3dbe", // credit card fraud
+            "961fc0c390b64687830b6e3ca6478433", // delay bypass
             "d472ab290c0f4cbbaccefdce90176d32" // See https://discord.com/channels/267680588666896385/1006897388641853470/1011757951087820911
         };
         private static readonly HashSet<string> CoolMacroers = new() { };
@@ -172,9 +173,13 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             var interestingList = await db.FlipEvents.Where(f => ids.Contains(f.AuctionId) && f.Type == FlipEventType.FLIP_RECEIVE)
                                 .ToListAsync();
 
-            var receiveMost = interestingList.Where(f => f.Timestamp - TimeSpan.FromSeconds(4.5) < buyTimes[f.AuctionId]).GroupBy(f => f.PlayerId).OrderByDescending(f => f.Count()).FirstOrDefault();
+            var receiveMost = interestingList.Where(f => f.Timestamp - TimeSpan.FromSeconds(3.8) < buyTimes[f.AuctionId] && f.Timestamp + TimeSpan.FromSeconds(4) > buyTimes[f.AuctionId])
+                                .GroupBy(f => f.PlayerId).OrderByDescending(f => f.Count()).FirstOrDefault();
             if (receiveMost == null)
                 return new AltResult();
+
+            var targetBought = await db.FlipEvents.Where(f => ids.Contains(f.AuctionId) && f.Type == FlipEventType.AUCTION_SOLD && f.PlayerId == receiveMost.Key)
+                                .CountAsync();
 
             return new AltResult()
             {
@@ -183,7 +188,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
                 BoughtCount = relevantBuys.Count(),
                 SentOut = receiveMost,
                 TargetBought = relevantBuys,
-
+                SelfBought = targetBought
             };
         }
 
@@ -213,7 +218,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
 
             var numeric = request.PlayerIds.Where(p => p != null).Select(playerId =>
             {
-                if(string.IsNullOrEmpty(playerId))
+                if (string.IsNullOrEmpty(playerId))
                     throw new CoflnetException("invalid_player_id", "One of the player ids is invalid " + string.Join(',', request.PlayerIds));
                 if (!long.TryParse(playerId, out long val))
                     val = service.GetId(playerId);

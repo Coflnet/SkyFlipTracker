@@ -21,6 +21,10 @@ namespace Coflnet.Sky.SkyAuctionTracker.Models
         /// </summary>
         public int BoughtCount { get; internal set; }
         /// <summary>
+        /// How many flips were bought by the checked player
+        /// </summary>
+        public int SelfBought { get; internal set; }
+        /// <summary>
         /// Which flips were bought
         /// </summary>
         public IGrouping<long, FlipEvent> SentOut { get; set; }
