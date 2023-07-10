@@ -192,7 +192,10 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 var playerUuid = item.Bids.First().Bidder;
                 var disabled = await settingsApi.SettingsUserIdSettingKeyGetAsync(playerUuid, "disable-buy-speed-board");
                 if (disabled != null)
+                {
+                    logger.LogInformation($"user {playerUuid} disabled buy speed board");
                     continue;
+                }
                 var leaderboardSlug = "sky-buyspeed-" + DateTime.UtcNow.ToString("yyyy-MM-dd");
                 await scoresApi.ScoresLeaderboardSlugPostAsync(leaderboardSlug, new Leaderboard.Client.Model.ScoreCreate()
                 {
