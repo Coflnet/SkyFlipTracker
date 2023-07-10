@@ -411,7 +411,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                         Version = 1,
                         TargetPrice = 0,
                         FinderType = LowPricedAuction.FinderType.UNKOWN,
-                        ProfitChanges = new List<PastFlip.ProfitChange>()
+                        ProfitChanges = new List<PastFlip.ProfitChange>() { profitChangeService.GetAhTax(sell) }
                     };
                     await flipStorageService.SaveFlip(flip);
                     Console.WriteLine($"Found flip https://sky.coflnet.com/a/{buyResp.Uuid} -> https://sky.coflnet.com/a/{sell.Uuid}");

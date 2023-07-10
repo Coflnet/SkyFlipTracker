@@ -67,20 +67,7 @@ public class ProfitChangeService
     public async IAsyncEnumerable<PastFlip.ProfitChange> GetChanges(Coflnet.Sky.Core.SaveAuction buy, Coflnet.Sky.Core.SaveAuction sell)
     {
         var changes = new List<PastFlip.ProfitChange>();
-        var listCostFactor = 1f;
-        if (sell.HighestBidAmount > 10_000_000)
-            listCostFactor = 2;
-        if (sell.HighestBidAmount > 100_000_000)
-            listCostFactor = 2.5f;
-        yield return new PastFlip.ProfitChange()
-        {
-            Amount = (long)-(
-                sell.HighestBidAmount * listCostFactor / 100 // listing fee
-                + (sell.HighestBidAmount > 1_000_000 ? sell.HighestBidAmount * 0.01 : 0) // claiming fee
-                + 1200 // time fee
-                ),
-            Label = "ah tax"
-        };
+        yield return GetAhTax(sell);
         if (IsNotcaluclateable(sell))
             yield break;
         if (buy.Tier == Core.Tier.UNKNOWN)
@@ -213,6 +200,25 @@ public class ProfitChangeService
             }
         }
 
+    }
+
+    public PastFlip.ProfitChange GetAhTax(Core.SaveAuction sell)
+    {
+        var listCostFactor = 1f;
+        if (sell.HighestBidAmount > 10_000_000)
+            listCostFactor = 2;
+        if (sell.HighestBidAmount > 100_000_000)
+            listCostFactor = 2.5f;
+        var ahTax = new PastFlip.ProfitChange()
+        {
+            Amount = (long)-(
+                sell.HighestBidAmount * listCostFactor / 100 // listing fee
+                + (sell.HighestBidAmount > 1_000_000 ? sell.HighestBidAmount * 0.01 : 0) // claiming fee
+                + 1200 // time fee
+                ),
+            Label = "ah tax"
+        };
+        return ahTax;
     }
 
     private async IAsyncEnumerable<PastFlip.ProfitChange> GetCraftCosts(Core.SaveAuction buy, Core.SaveAuction sell)
