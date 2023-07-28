@@ -213,6 +213,54 @@ public class ProfitChangeTests
     }
 
     [Test]
+    public async Task DropletWispUpgrade()
+    {
+        // {"enchantments":[],"uuid":"00fdf0dffe0f4f4497b60f12192df007","count":1,"startingBid":18799000,"tag":"PET_DROPLET_WISP","itemName":"[Lvl 25] Droplet Wisp","start":"2023-05-25T20:56:53","end":"2023-05-27T00:48:02","auctioneerId":"92a06abd576c4e56bde3b4298016ec57","profileId":null,"coop":null,"coopMembers":null,"highestBidAmount":18799000,"bids":[{"bidder":"e93dc3450d1f428a9acd60ee768ad750","profileId":"unknown","amount":18799000,"timestamp":"2023-05-27T00:48:02"}],"anvilUses":0,"nbtData":{"data":{"petInfo":"{\"type\":\"DROPLET_WISP\",\"active\":false,\"exp\":15616.0,\"tier\":\"UNCOMMON\",\"hideInfo\":false,\"candyUsed\":0,\"uuid\":\"94b9855c-72d6-4cc0-b046-345863b9ee51\",\"hideRightClick\":false,\"extraData\":{\"blaze_kills\":200500}}","uid":"345863b9ee51"}},"itemCreatedAt":"2023-05-25T16:55:00","reforge":"None","category":"MISC","tier":"UNCOMMON","bin":true,"flatNbt":{"type":"DROPLET_WISP","active":"False","exp":"15616","tier":"UNCOMMON","hideInfo":"False","candyUsed":"0","uuid":"94b9855c-72d6-4cc0-b046-345863b9ee51","hideRightClick":"False","uid":"345863b9ee51","blaze_kills":"200500"}}
+        var buy = new Core.SaveAuction()
+        {
+            Uuid = Guid.NewGuid().ToString("N"),
+            Tag = "PET_DROPLET_WISP",
+            HighestBidAmount = 1000,
+            FlatenedNBT = new(),
+            Tier = Core.Tier.RARE
+        };
+        // {"enchantments":[],"uuid":"0d328f25303f49e189805d9507a73ced","count":1,"startingBid":200000000,"tag":"PET_FROST_WISP","itemName":"[Lvl 100] Frost Wisp","start":"2023-07-28T10:53:18","end":"2023-07-28T10:53:54","auctioneerId":"e93dc3450d1f428a9acd60ee768ad750","profileId":null,"coop":null,"coopMembers":null,"highestBidAmount":200000000,"bids":[{"bidder":"75eaf1d0664f49e69d1b61857b864393","profileId":"5fa85f9232b3405f93780fa5e7a0bf31","amount":200000000,"timestamp":"2023-07-28T10:53:58"}],"anvilUses":0,"nbtData":{"data":{"petInfo":"{\"type\":\"FROST_WISP\",\"active\":false,\"exp\":1.2773376E7,\"tier\":\"RARE\",\"hideInfo\":false,\"heldItem\":\"CROCHET_TIGER_PLUSHIE\",\"candyUsed\":0,\"uuid\":\"94b9855c-72d6-4cc0-b046-345863b9ee51\",\"hideRightClick\":false,\"extraData\":{\"blaze_kills\":205712.0}}","uid":"345863b9ee51"}},"itemCreatedAt":"2023-07-27T22:45:00","reforge":"None","category":"MISC","tier":"RARE","bin":true,"flatNbt":{"type":"FROST_WISP","active":"False","exp":"12773376","tier":"RARE","hideInfo":"False","heldItem":"CROCHET_TIGER_PLUSHIE","candyUsed":"0","uuid":"94b9855c-72d6-4cc0-b046-345863b9ee51","hideRightClick":"False","uid":"345863b9ee51","blaze_kills":"205712"}}
+        var sell = new Coflnet.Sky.Core.SaveAuction()
+        {
+            Uuid = Guid.NewGuid().ToString("N"),
+            Tag = "PET_FROST_WISP",
+            HighestBidAmount = 1000,
+            FlatenedNBT = new(),
+            Tier = Core.Tier.EPIC
+        };
+        var katMock = new Mock<Crafts.Client.Api.IKatApi>();
+        katMock.Setup(k => k.KatAllGetAsync(0, default)).ReturnsAsync(KatResponse("PET_ENDER_DRAGON"));
+        katMock.Setup(k => k.KatRawGetAsync(0, default)).ReturnsAsync(new List<Crafts.Client.Model.KatUpgradeCost>()
+        {
+            new Crafts.Client.Model.KatUpgradeCost()
+            {
+                Name = "Droplet Wisp",
+                BaseRarity = Crafts.Client.Model.Tier.RARE,
+                Hours = 168,
+                Cost = 125000000,
+                Material = "ENCHANTED_HARD_STONE",
+                Amount = 64
+            }
+        });
+        var craftsApi = new Mock<Crafts.Client.Api.ICraftsApi>();
+        craftsApi.Setup(c => c.CraftsAllGetAsync(0, default)).ReturnsAsync(() => new() {
+            new() { ItemId = "UPGRADE_STONE_FROST", CraftCost = 500_000}});
+        var pricesApi = new Mock<Api.Client.Api.IPricesApi>();
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), null, 0, default))
+                .ReturnsAsync(() => new() { Median = 1_000_000 });
+        service = new ProfitChangeService(pricesApi.Object, katMock.Object, craftsApi.Object, NullLogger<ProfitChangeService>.Instance, null, null);
+        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        Assert.AreEqual(2, changes.Count);
+        Assert.AreEqual(-500_000, changes[1].Amount);
+        Assert.AreEqual("Wisp upgrade stone for FROST", changes[1].Label);
+    }
+
+    [Test]
     public async Task TierBoostAddition()
     {
         var buy = new Core.SaveAuction()

@@ -403,6 +403,21 @@ public class ProfitChangeService
                         yield return await CostOf("PET_ITEM_TOY_JERRY", "Jerry 3d glasses");
                         break;
                     }
+                    // special pet upgrades 
+                    if(sell.Tag.EndsWith("_WISP"))
+                    {
+                        var allCrafts = await craftsApi.CraftsAllGetAsync();
+                        var kind = sell.Tag.Split('_')[1];
+                        var craft = allCrafts.Where(c => c.ItemId == $"UPGRADE_STONE_{kind}").FirstOrDefault();
+                        if(craft == null)
+                            throw new Exception($"could not find craft for wisp UPGRADE_STONE_{kind}");
+                        yield return new PastFlip.ProfitChange()
+                        {
+                            Label = $"Wisp upgrade stone for {kind}",
+                            Amount = (long)-craft.CraftCost
+                        };
+                        break;
+                    }
                     if (raw == null)
                         throw new Exception($"could not find kat cost for tier {i}({(Core.Tier)rarityInt}) and tag {sell.Tag} {buy.Uuid} -> {sell.Uuid}");
                     upgradeCost = raw.Cost * (1.0 - 0.003 * level);
