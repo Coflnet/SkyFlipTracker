@@ -300,7 +300,7 @@ public class ProfitChangeService
         {
             var endLevel = "100";
             var maxExpForPet = ExpPetMaxLevel;
-            if(sell.Tag == "PET_GOLDEN_DRAGON")
+            if (sell.Tag == "PET_GOLDEN_DRAGON")
             {
                 endLevel = "200";
                 maxExpForPet = ExpMaxLevelGoldenDragon;
@@ -320,35 +320,46 @@ public class ProfitChangeService
         if (Constants.AttributeKeys.Contains(item.Key))
         {
             var baseLevel = ParseFloat(valueOnBuy.Value ?? "0");
-            if(baseLevel == 0) // wheel of fate applied
+            if (baseLevel == 0) // wheel of fate applied
             {
                 var previousAttributes = buy.FlatenedNBT.Where(f => Constants.AttributeKeys.Contains(f.Key)).ToList();
                 var currentAttri = sell.FlatenedNBT.Where(f => Constants.AttributeKeys.Contains(f.Key)).ToList();
-                if(currentAttri.First().Key == item.Key)
+                if (currentAttri.First().Key == item.Key)
                 {
                     // add only for first attribute
                     yield return await CostOf("WHEEL_OF_FATE", "Wheel of fate cost");
                 }
-                var val = previousAttributes.Select(f => (f, ParseFloat(f.Value), diff:Math.Abs(ParseFloat(f.Value) - ParseFloat(item.Value))))
+                var val = previousAttributes.Select(f => (f, ParseFloat(f.Value), diff: Math.Abs(ParseFloat(f.Value) - ParseFloat(item.Value))))
                         .OrderBy(f => f.diff).First();
                 Console.WriteLine($"base level {val} for {baseLevel}");
-                if(val.diff == 0)
+                if (val.diff == 0)
                     yield break;
                 baseLevel = ParseFloat(val.f.Value);
             }
-            var difference = ParseFloat(item.Value) - baseLevel;
+            var sellLevel = ParseFloat(item.Value);
+            var difference = sellLevel - baseLevel;
             var attributeShardCost = await pricesApi.ApiItemPriceItemTagGetAsync("ATTRIBUTE_SHARD", new() { { item.Key, "2" } });
             var costOfLvl2 = await pricesApi.ApiItemPriceItemTagGetAsync(sell.Tag, new() { { item.Key, "2" } });
-            var target = Math.Min(attributeShardCost?.Median ?? 0, costOfLvl2?.Median ?? 0);
+            var target = Math.Min(attributeShardCost?.Median ?? 2_000_000, costOfLvl2?.Median ?? 0);
             if (target == 0)
             {
                 logger.LogInformation($"could not find attribute cost for {item.Key} lvl 2 on {sell.Tag}");
                 yield break;
             }
+            var sellValue = Math.Pow(2, sellLevel - 2) * target;
+            if (sellLevel > 5)
+            {
+                // check for higher level
+                var costOfLvl5 = await pricesApi.ApiItemPriceItemTagGetAsync(sell.Tag, new() { { item.Key, "5" } });
+                var above5Cost = Math.Min(costOfLvl5?.Median ?? int.MaxValue, Math.Pow(2, 5) * target);
+                sellValue = Math.Pow(2, sellLevel - 5) * above5Cost;
+            }
+            var buyValue = Math.Pow(2, baseLevel - 2) * target;
+
             yield return new PastFlip.ProfitChange()
             {
                 Label = $"Cost for {item.Key} lvl {item.Value}",
-                Amount = -(long)(target * (Math.Pow(2, difference) - 1))
+                Amount = -(long)(sellValue - buyValue)
             };
 
         }
@@ -404,12 +415,12 @@ public class ProfitChangeService
                         break;
                     }
                     // special pet upgrades 
-                    if(sell.Tag.EndsWith("_WISP"))
+                    if (sell.Tag.EndsWith("_WISP"))
                     {
                         var allCrafts = await craftsApi.CraftsAllGetAsync();
                         var kind = sell.Tag.Split('_')[1];
                         var craft = allCrafts.Where(c => c.ItemId == $"UPGRADE_STONE_{kind}").FirstOrDefault();
-                        if(craft == null)
+                        if (craft == null)
                             throw new Exception($"could not find craft for wisp UPGRADE_STONE_{kind}");
                         yield return new PastFlip.ProfitChange()
                         {

@@ -515,6 +515,22 @@ public class ProfitChangeTests
         Assert.AreEqual(-35000, result[1].Amount);
     }
     [Test]
+    public async Task CombineHighLevelAttribut()
+    {
+        var buy = CreateAuction("AURORA_CHESTPLATE");
+        buy.FlatenedNBT["mana_pool"] = "4";
+        var sell = CreateAuction("AURORA_CHESTPLATE");
+        sell.FlatenedNBT["mana_pool"] = "10";
+        var pricesApi = new Mock<Api.Client.Api.IPricesApi>();
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("ATTRIBUTE_SHARD", new (){{"mana_pool","2"}}, 0, default)).ReturnsAsync(() => new() { Median = 2_000_000 });
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("AURORA_CHESTPLATE", new (){{"mana_pool","2"}}, 0, default)).ReturnsAsync(() => new() { Median = 5_000_000 });
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("AURORA_CHESTPLATE", new (){{"mana_pool","5"}}, 0, default)).ReturnsAsync(() => new() { Median = 10_000_000 });
+        service = new ProfitChangeService(pricesApi.Object, null, null, NullLogger<ProfitChangeService>.Instance, null, null);
+        var result = await service.GetChanges(buy, sell).ToListAsync();
+        Assert.AreEqual(2, result.Count);
+        Assert.AreEqual(-312000000, result[1].Amount);
+    }
+    [Test]
     public async Task WheelOfFateChangesAttributeType()
     {
         var buy = CreateAuction("MOLTEN_CLOAK");
