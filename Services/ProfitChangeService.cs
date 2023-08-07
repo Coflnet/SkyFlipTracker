@@ -469,6 +469,13 @@ public class ProfitChangeService
             found = await CostOf($"ENCHANTMENT_{item.Type}_{requiredLevel}".ToUpper(), $"Enchant {item.Type} lvl {requiredLevel} added");
             if (found.Amount == 0)
                 return null; // ignore 0 cost enchants
+            if(matchingEnchant != null && matchingEnchant.Level != item.Level - 1 && item.Level < 7)
+            {
+                // remove the matching enchant cost
+                var matchingEnchantCost = await CostOf($"ENCHANTMENT_{matchingEnchant.Type}_{matchingEnchant.Level}".ToUpper(), $"Enchant {matchingEnchant.Type} lvl {matchingEnchant.Level} removed");
+                found.Amount += matchingEnchantCost.Amount;
+                Console.WriteLine($"found {found.Amount} for {item.Type} lvl {item.Level} with matching {matchingEnchant.Type} lvl {matchingEnchant.Level}");
+            }
         }
         catch (System.Exception e)
         {
@@ -544,8 +551,15 @@ public class ProfitChangeService
                 Label = title,
                 Amount = -1
             };
-        var median = (await pricesApi.ApiItemPriceItemTagGetAsync(item)
-                    ?? throw new Exception($"Failed to find price for {item}")).Median;
+        var itemPrice = await pricesApi.ApiItemPriceItemTagGetAsync(item)
+                    ?? throw new Exception($"Failed to find price for {item}");
+        var median = itemPrice.Median;
+        if(itemPrice.Max == 0 && item.StartsWith("ENCHANTMENT"))
+        {
+            // get lvl 1 and scale up, sample ENCHANTMENT_ULTIMATE_CHIMERA_4
+            var lvl1Price = await pricesApi.ApiItemPriceItemTagGetAsync(item.Substring(0, item.LastIndexOf('_') + 1) + "1");
+            median = lvl1Price.Median * int.Parse(item.Substring(item.LastIndexOf('_') + 1));
+        }
         if (median >= int.MaxValue)
             median = 0;
         return new PastFlip.ProfitChange()

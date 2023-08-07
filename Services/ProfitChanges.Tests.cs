@@ -504,7 +504,7 @@ public class ProfitChangeTests
         var sell = CreateAuction("ATTRIBUTE_SHARD");
         sell.FlatenedNBT["mana_pool"] = "3";
         var pricesApi = new Mock<Api.Client.Api.IPricesApi>();
-        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("ATTRIBUTE_SHARD", new (){{"mana_pool","2"}}, 0, default)).ReturnsAsync(() => new() { Median = 5000 });
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("ATTRIBUTE_SHARD", new() { { "mana_pool", "2" } }, 0, default)).ReturnsAsync(() => new() { Median = 5000 });
         service = new ProfitChangeService(pricesApi.Object, null, null, NullLogger<ProfitChangeService>.Instance, null, null);
         var result = await service.GetChanges(buy, sell).ToListAsync();
         Assert.AreEqual(2, result.Count);
@@ -522,9 +522,9 @@ public class ProfitChangeTests
         var sell = CreateAuction("AURORA_CHESTPLATE");
         sell.FlatenedNBT["mana_pool"] = "10";
         var pricesApi = new Mock<Api.Client.Api.IPricesApi>();
-        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("ATTRIBUTE_SHARD", new (){{"mana_pool","2"}}, 0, default)).ReturnsAsync(() => new() { Median = 2_000_000 });
-        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("AURORA_CHESTPLATE", new (){{"mana_pool","2"}}, 0, default)).ReturnsAsync(() => new() { Median = 5_000_000 });
-        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("AURORA_CHESTPLATE", new (){{"mana_pool","5"}}, 0, default)).ReturnsAsync(() => new() { Median = 10_000_000 });
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("ATTRIBUTE_SHARD", new() { { "mana_pool", "2" } }, 0, default)).ReturnsAsync(() => new() { Median = 2_000_000 });
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("AURORA_CHESTPLATE", new() { { "mana_pool", "2" } }, 0, default)).ReturnsAsync(() => new() { Median = 5_000_000 });
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("AURORA_CHESTPLATE", new() { { "mana_pool", "5" } }, 0, default)).ReturnsAsync(() => new() { Median = 10_000_000 });
         service = new ProfitChangeService(pricesApi.Object, null, null, NullLogger<ProfitChangeService>.Instance, null, null);
         var result = await service.GetChanges(buy, sell).ToListAsync();
         Assert.AreEqual(2, result.Count);
@@ -543,13 +543,13 @@ public class ProfitChangeTests
         };
         var pricesApi = new Mock<Api.Client.Api.IPricesApi>();
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("WHEEL_OF_FATE", null, 0, default)).ReturnsAsync(() => new() { Median = 12_000_000 });
-        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("MOLTEN_CLOAK", new (){{"mana_regeneration","2"}}, 0, default)).ReturnsAsync(() => new() { Median = 5000 });
-        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("MOLTEN_CLOAK", new (){{"dominance","2"}}, 0, default)).ReturnsAsync(() => new() { Median = 5000 });
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("MOLTEN_CLOAK", new() { { "mana_regeneration", "2" } }, 0, default)).ReturnsAsync(() => new() { Median = 5000 });
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("MOLTEN_CLOAK", new() { { "dominance", "2" } }, 0, default)).ReturnsAsync(() => new() { Median = 5000 });
         service = new ProfitChangeService(pricesApi.Object, null, null, NullLogger<ProfitChangeService>.Instance, null, null);
         var result = await service.GetChanges(buy, sell).ToListAsync();
         Assert.AreEqual(2, result.Count);
         Assert.AreEqual(-12000000, result[1].Amount);
-        pricesApi.Verify(p=>p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), It.IsAny<Dictionary<string, string>>(), 0, default), Times.Once);
+        pricesApi.Verify(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), It.IsAny<Dictionary<string, string>>(), 0, default), Times.Once);
     }
 
     [Test]
@@ -560,8 +560,8 @@ public class ProfitChangeTests
         var sell = CreateAuction("GAUNTLET_OF_CONTAGION");
         sell.FlatenedNBT["mana_regeneration"] = "3";
         var pricesApi = new Mock<Api.Client.Api.IPricesApi>();
-        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("GAUNTLET_OF_CONTAGION", new (){{"mana_regeneration","2"}}, 0, default)).ReturnsAsync(() => new() { Median = 13_000_000 });
-        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("ATTRIBUTE_SHARD", new (){{"mana_regeneration","2"}}, 0, default)).ReturnsAsync(() => new() { Median = 2_000_000 });
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("GAUNTLET_OF_CONTAGION", new() { { "mana_regeneration", "2" } }, 0, default)).ReturnsAsync(() => new() { Median = 13_000_000 });
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("ATTRIBUTE_SHARD", new() { { "mana_regeneration", "2" } }, 0, default)).ReturnsAsync(() => new() { Median = 2_000_000 });
         service = new ProfitChangeService(pricesApi.Object, null, null, NullLogger<ProfitChangeService>.Instance, null, null);
         var result = await service.GetChanges(buy, sell).ToListAsync();
         Assert.AreEqual(2, result.Count);
@@ -591,12 +591,30 @@ public class ProfitChangeTests
             Tier = Core.Tier.LEGENDARY
         };
         var pricesApi = new Mock<Api.Client.Api.IPricesApi>();
-        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), null, 0, default)).ReturnsAsync(() => new() { Median = 2_000_000 });
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), null, 0, default))
+            .ReturnsAsync(() => new() { Median = 2_000_000, Max = 3_000_000 });
         service = new ProfitChangeService(pricesApi.Object, null, null, NullLogger<ProfitChangeService>.Instance, null, null);
         var changes = await service.GetChanges(buy, sell).ToListAsync();
         Assert.AreEqual(2, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
         Assert.AreEqual(-2_201_200, changes.Sum(c => c.Amount));
         pricesApi.Verify(p => p.ApiItemPriceItemTagGetAsync("ENCHANTMENT_SHARPNESS_6", null, 0, default), Times.Once);
+    }
+
+    [Test]
+    public async Task NoVolumeEnchantFallbackToLvl1()
+    {
+        var buy = CreateAuction("HYPERION");
+        buy.Enchantments = new() { new() { Type = Core.Enchantment.EnchantmentType.ultimate_chimera, Level = 2 } };
+        var sell = CreateAuction("HYPERION");
+        sell.Enchantments = new() { new() { Type = Core.Enchantment.EnchantmentType.ultimate_chimera, Level = 4 } };
+        var pricesApi = new Mock<Api.Client.Api.IPricesApi>();
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("ENCHANTMENT_ULTIMATE_CHIMERA_1", null, 0, default)).ReturnsAsync(() => new() { Median = 100_000_000, Max = 105900000 });
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("ENCHANTMENT_ULTIMATE_CHIMERA_4", null, 0, default)).ReturnsAsync(() => new() { Median = 231527, Max = 0 });
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("ENCHANTMENT_ULTIMATE_CHIMERA_2", null, 0, default)).ReturnsAsync(() => new() { Median = 3231527, Max = 0 });
+        service = new ProfitChangeService(pricesApi.Object, null, null, NullLogger<ProfitChangeService>.Instance, null, null);
+        var result = await service.GetChanges(buy, sell).ToListAsync();
+        Assert.AreEqual(2, result.Count);
+        Assert.AreEqual(-600_000_000, result[1].Amount);
     }
 
     [Test]
@@ -622,7 +640,8 @@ public class ProfitChangeTests
             Tier = Core.Tier.LEGENDARY
         };
         var pricesApi = new Mock<Api.Client.Api.IPricesApi>();
-        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), null, 0, default)).ReturnsAsync(() => new() { Median = 20_000_000 });
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), null, 0, default))
+            .ReturnsAsync(() => new() { Median = 20_000_000, Max = 30_000_000 });
         service = new ProfitChangeService(pricesApi.Object, null, null, NullLogger<ProfitChangeService>.Instance, null, null);
         var changes = await service.GetChanges(buy, sell).ToListAsync();
         Assert.AreEqual(2, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
@@ -653,7 +672,7 @@ public class ProfitChangeTests
             Tier = Core.Tier.LEGENDARY
         };
         var pricesApi = new Mock<Api.Client.Api.IPricesApi>();
-        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("ENCHANTMENT_SHARPNESS_7", null, 0, default)).ReturnsAsync(() => new() { Median = 20_000_000 });
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("ENCHANTMENT_SHARPNESS_7", null, 0, default)).ReturnsAsync(() => new() { Median = 20_000_000, Max = 20_000_000 });
         service = new ProfitChangeService(pricesApi.Object, null, null, NullLogger<ProfitChangeService>.Instance, null, null);
         var changes = await service.GetChanges(buy, sell).ToListAsync();
         Assert.AreEqual(2, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
