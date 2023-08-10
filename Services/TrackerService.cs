@@ -397,6 +397,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     var profit = (long)(sell.HighestBidAmount - buyResp.HighestBidAmount);
                     if (sell.End - buyResp.End > TimeSpan.FromDays(14))
                         profit = 0; // no flip if it took more than 2 weeks
+                    var tax = profitChangeService.GetAhTax(sell);
+                    profit += tax.Amount;
                     var flip = new PastFlip()
                     {
                         Flipper = Guid.Parse(sell.AuctioneerId),
@@ -414,7 +416,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                         Version = 1,
                         TargetPrice = 0,
                         FinderType = LowPricedAuction.FinderType.UNKOWN,
-                        ProfitChanges = new List<PastFlip.ProfitChange>() { profitChangeService.GetAhTax(sell) }
+                        ProfitChanges = new List<PastFlip.ProfitChange>() { tax }
                     };
                     await flipStorageService.SaveFlip(flip);
                     Console.WriteLine($"Found flip https://sky.coflnet.com/a/{buyResp.Uuid} -> https://sky.coflnet.com/a/{sell.Uuid}");
