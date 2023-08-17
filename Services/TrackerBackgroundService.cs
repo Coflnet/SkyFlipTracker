@@ -187,28 +187,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 consumeCounter.Inc(lps.Count());
                 try
                 {
-                    var rerequestService = scope.ServiceProvider.GetRequiredService<IBaseApi>();
-                    var events = new List<FlipEvent>();
-                    foreach (var item in lps.Where(lp => lp.TargetPrice - lp.Auction.StartingBid > 950_000))
-                    {
-                        if (item.Auction.Start > DateTime.UtcNow - TimeSpan.FromMinutes(1))
-                        {
-                            if (DateTime.Now - item.Auction.Start < TimeSpan.FromSeconds(12))
-                                await Task.Delay(6000);
-                            await rerequestService.BaseAhPlayerIdPostAsync(item.Auction.AuctioneerId, "recheck");
-                        }
-
-                        var startTime = new FlipEvent()
-                        {
-                            AuctionId = item.Auction.UId,
-                            PlayerId = service.GetId(item.Auction.AuctioneerId),
-                            Timestamp = item.Auction.Start,
-                            Type = FlipEventType.START
-                        };
-                        events.Add(startTime);
-                    }
-                    if (events.Count > 0)
-                        await service.AddEvents(events);
+                    await StoreFlips(lps, scope, service);
                 }
                 catch (System.Exception e)
                 {
@@ -217,5 +196,30 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             }, stoppingToken, "sky-fliptracker", 50);
         }
 
+        private static async Task StoreFlips(IEnumerable<LowPricedAuction> lps, IServiceScope scope, TrackerService service)
+        {
+            var rerequestService = scope.ServiceProvider.GetRequiredService<IBaseApi>();
+            var events = new List<FlipEvent>();
+            foreach (var item in lps.Where(lp => lp.TargetPrice - lp.Auction.StartingBid > 950_000))
+            {
+                if (item.Auction.Start > DateTime.UtcNow - TimeSpan.FromMinutes(1))
+                {
+                    if (DateTime.Now - item.Auction.Start < TimeSpan.FromSeconds(12))
+                        await Task.Delay(6000);
+                    await rerequestService.BaseAhPlayerIdPostAsync(item.Auction.AuctioneerId, "recheck");
+                }
+
+                var startTime = new FlipEvent()
+                {
+                    AuctionId = item.Auction.UId,
+                    PlayerId = service.GetId(item.Auction.AuctioneerId),
+                    Timestamp = item.Auction.Start,
+                    Type = FlipEventType.START
+                };
+                events.Add(startTime);
+            }
+            if (events.Count > 0)
+                await service.AddEvents(events);
+        }
     }
 }
