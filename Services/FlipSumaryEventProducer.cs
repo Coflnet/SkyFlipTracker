@@ -1,6 +1,5 @@
 using System;
 using Confluent.Kafka;
-using Confluent.SchemaRegistry.Serdes;
 using Microsoft.Extensions.Configuration;
 using Newtonsoft.Json;
 
