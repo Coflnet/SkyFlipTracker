@@ -196,7 +196,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             }, stoppingToken, "sky-fliptracker", 50);
         }
 
-        private static async Task StoreFlips(IEnumerable<LowPricedAuction> lps, IServiceScope scope, TrackerService service)
+        private async Task StoreFlips(IEnumerable<LowPricedAuction> lps, IServiceScope scope, TrackerService service)
         {
             var rerequestService = scope.ServiceProvider.GetRequiredService<IBaseApi>();
             var events = new List<FlipEvent>();
@@ -204,9 +204,20 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             {
                 if (item.Auction.Start > DateTime.UtcNow - TimeSpan.FromMinutes(1))
                 {
-                    if (DateTime.Now - item.Auction.Start < TimeSpan.FromSeconds(12))
-                        await Task.Delay(6000);
-                    await rerequestService.BaseAhPlayerIdPostAsync(item.Auction.AuctioneerId, "recheck");
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            var purchaseableIn = DateTime.UtcNow - item.Auction.Start;
+                            if (purchaseableIn > TimeSpan.FromSeconds(2))
+                                await Task.Delay(purchaseableIn);
+                            await rerequestService.BaseAhPlayerIdPostAsync(item.Auction.AuctioneerId, "recheck");
+                        }
+                        catch (System.Exception e)
+                        {
+                            logger.LogError(e, "could not rerequest player auctions");
+                        }
+                    });
                 }
 
                 var startTime = new FlipEvent()
