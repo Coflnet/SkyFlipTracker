@@ -719,6 +719,54 @@ public class ProfitChangeTests
     }
 
     [Test]
+    public async Task SosFlareCraft()
+    {
+        var craftCost = 1_000_000_000 + Random.Shared.Next(0, 100_000_000);
+        var ahFees = 135101200;
+        var buy = new Core.SaveAuction()
+        {
+            Uuid = Guid.NewGuid().ToString("N"),
+            Tag = "WARNING_FLARE",
+            HighestBidAmount = 5_000_000,
+            FlatenedNBT = new(),
+            Enchantments = new(),
+            Tier = Core.Tier.UNCOMMON
+        };
+        var sell = new Coflnet.Sky.Core.SaveAuction()
+        {
+            Uuid = Guid.NewGuid().ToString("N"),
+            Tag = "SOS_FLARE",
+            HighestBidAmount = 3_860_000_000,
+            FlatenedNBT = new() {
+                {"mana_disintegrator_count", "10"},
+                {"jalapeno_count", "1"}
+            },
+            Enchantments = new(),
+            Tier = Core.Tier.LEGENDARY
+        };
+        var pricesApi = new Mock<Api.Client.Api.IPricesApi>();
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("INFERNO_APEX", null, 0, default)).ReturnsAsync(() => new() { Median = 500_000_000 });
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("WARNING_FLARE", null, 0, default)).ReturnsAsync(() => new() { Median = 5_000_000 });
+        var craftsApi = new Mock<Crafts.Client.Api.ICraftsApi>();
+        craftsApi.Setup(c => c.CraftsAllGetAsync(0, default)).ReturnsAsync(() => new() {
+            new() { ItemId = "SOS_FLARE", Ingredients = new() {
+                new() { ItemId = "WARNING_FLARE", Count = 1 },
+                new(){ItemId = "INFERNO_APEX", Count = 1},
+                }},
+                new(){ItemId = "INFERNO_APEX", CraftCost = craftCost,
+                 Ingredients = new() {
+                    new() { ItemId = "STONE", Count = 500 }
+                }}});
+        var itemsApi = new Mock<Items.Client.Api.IItemsApi>();
+        itemsApi.Setup(i => i.ItemItemTagGetAsync("SOS_FLARE", It.IsAny<bool?>(), It.IsAny<int>(), default))
+            .ReturnsAsync(() => new() { Tag = "SOS_FLARE", Tier = Items.Client.Model.Tier.LEGENDARY });
+        service = new ProfitChangeService(pricesApi.Object, null, craftsApi.Object, NullLogger<ProfitChangeService>.Instance, itemsApi.Object, null);
+        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        Assert.AreEqual(2, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
+        Assert.AreEqual(craftCost + ahFees, -changes.Sum(c => (int)c.Amount));
+    }
+
+    [Test]
     public async Task AddedMasterStars()
     {
         var buy = new Core.SaveAuction()

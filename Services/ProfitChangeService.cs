@@ -560,6 +560,11 @@ public class ProfitChangeService
             var lvl1Price = await pricesApi.ApiItemPriceItemTagGetAsync(item.Substring(0, item.LastIndexOf('_') + 1) + "1");
             median = lvl1Price.Median * int.Parse(item.Substring(item.LastIndexOf('_') + 1));
         }
+        else if(itemPrice.Median == 500_000_000)
+        {
+            var allCrafts = await craftsApi.CraftsAllGetAsync();
+            median = (long)(allCrafts.Where(c => c.ItemId == item).FirstOrDefault()?.CraftCost ?? 500_000_000);
+        }
         if (median >= int.MaxValue)
             median = 0;
         return new PastFlip.ProfitChange()
