@@ -721,7 +721,7 @@ public class ProfitChangeTests
     [Test]
     public async Task SosFlareCraft()
     {
-        var craftCost = 1_000_000_000 + Random.Shared.Next(0, 100_000_000);
+        var craftCost = 3_000_000_000 + Random.Shared.Next(0, 100_000_000);
         var ahFees = 135101200;
         var buy = new Core.SaveAuction()
         {
@@ -755,7 +755,7 @@ public class ProfitChangeTests
                 }},
                 new(){ItemId = "INFERNO_APEX", CraftCost = craftCost,
                  Ingredients = new() {
-                    new() { ItemId = "STONE", Count = 500 }
+                    new() { ItemId = "INFERNO_VERTEX", Count = 64 }
                 }}});
         var itemsApi = new Mock<Items.Client.Api.IItemsApi>();
         itemsApi.Setup(i => i.ItemItemTagGetAsync("SOS_FLARE", It.IsAny<bool?>(), It.IsAny<int>(), default))
@@ -763,7 +763,7 @@ public class ProfitChangeTests
         service = new ProfitChangeService(pricesApi.Object, null, craftsApi.Object, NullLogger<ProfitChangeService>.Instance, itemsApi.Object, null);
         var changes = await service.GetChanges(buy, sell).ToListAsync();
         Assert.AreEqual(2, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
-        Assert.AreEqual(craftCost + ahFees, -changes.Sum(c => (int)c.Amount));
+        Assert.AreEqual(craftCost + ahFees, -changes.Sum(c => c.Amount));
     }
 
     [Test]

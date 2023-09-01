@@ -565,8 +565,6 @@ public class ProfitChangeService
             var allCrafts = await craftsApi.CraftsAllGetAsync();
             median = (long)(allCrafts.Where(c => c.ItemId == item).FirstOrDefault()?.CraftCost ?? 500_000_000);
         }
-        if (median >= int.MaxValue)
-            median = 0;
         return new PastFlip.ProfitChange()
         {
             Label = title,
