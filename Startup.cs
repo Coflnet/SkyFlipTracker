@@ -69,6 +69,7 @@ namespace Coflnet.Sky.SkyAuctionTracker
             services.AddSingleton<ICraftsApi>(conf => new CraftsApi(Configuration["CRAFTS_BASE_URL"]));
             services.AddSingleton<IItemsApi>(conf => new ItemsApi(Configuration["ITEMS_BASE_URL"]));
             services.AddSingleton<ISettingsApi>(conf => new SettingsApi(Configuration["SETTINGS_BASE_URL"]));
+            services.AddSingleton<Bazaar.Client.Api.IBazaarApi>(conf => new Bazaar.Client.Api.BazaarApi(Configuration["BAZAAR_BASE_URL"]));
             services.AddSingleton<IScoresApi>(conf => new ScoresApi(Configuration["LEADERBOARD_BASE_URL"]));
             services.AddSingleton<Crafts.Client.Api.IKatApi>(conf => new Crafts.Client.Api.KatApi(Configuration["CRAFTS_BASE_URL"]));
             services.AddSingleton<IBaseApi>(sp => new BaseApi(Configuration["PROXY_BASE_URL"]));
