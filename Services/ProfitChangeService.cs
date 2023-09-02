@@ -465,13 +465,13 @@ public class ProfitChangeService
         {
             var allBazaar = await bazaarApi.ApiBazaarPricesGetAsync();
             var itemValues = allBazaar.ToDictionary(b => b.ProductId, b => b.SellPrice);
-            var sellValue = mapper.EnchantValue(item, sell, itemValues);
+            var sellValue = mapper.EnchantValue(item, sell.FlatenedNBT, itemValues);
             var buyValue = 0L;
             var enchantAtBuy = buy.Enchantments.Where(e => e.Type == item.Type).FirstOrDefault();
             if (enchantAtBuy != default && (enchantAtBuy.Level != item.Level - 1 && item.Level < 7
                 || Constants.EnchantToAttribute.ContainsKey(item.Type)))
             {
-                buyValue = mapper.EnchantValue(enchantAtBuy, buy, itemValues);
+                buyValue = mapper.EnchantValue(enchantAtBuy, buy.FlatenedNBT, itemValues);
                 found = new PastFlip.ProfitChange()
                 {
                     Label = $"Enchant {item.Type} from {enchantAtBuy.Level} to {item.Level}",
@@ -489,7 +489,7 @@ public class ProfitChangeService
                 return new PastFlip.ProfitChange()
                 {
                     Label = $"Enchant {item.Type} {item.Level} added",
-                    Amount = -mapper.EnchantValue(enchantDummy, buy, itemValues)
+                    Amount = -mapper.EnchantValue(enchantDummy, buy.FlatenedNBT, itemValues)
                 };
             }
             else
