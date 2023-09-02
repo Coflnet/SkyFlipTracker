@@ -22,6 +22,7 @@ public class ProfitChangeService
     private IItemsApi itemApi;
     private readonly ILogger<ProfitChangeService> logger;
     private Core.PropertyMapper mapper = new();
+    private Bazaar.Client.Api.IBazaarApi bazaarApi;
     private HypixelItemService hypixelItemService;
     /// <summary>
     /// Keys containing itemTags that can be removed
@@ -42,13 +43,15 @@ public class ProfitChangeService
     /// <param name="logger"></param>
     /// <param name="itemApi"></param>
     /// <param name="hypixelItemService"></param>
+    /// <param name="bazaarApi"></param>
     public ProfitChangeService(
         Coflnet.Sky.Api.Client.Api.IPricesApi pricesApi,
         Crafts.Client.Api.IKatApi katApi,
         ICraftsApi craftsApi,
         ILogger<ProfitChangeService> logger,
         IItemsApi itemApi,
-        HypixelItemService hypixelItemService)
+        HypixelItemService hypixelItemService,
+        Bazaar.Client.Api.IBazaarApi bazaarApi)
     {
         this.pricesApi = pricesApi;
         this.katApi = katApi;
@@ -56,6 +59,7 @@ public class ProfitChangeService
         this.logger = logger;
         this.itemApi = itemApi;
         this.hypixelItemService = hypixelItemService;
+        this.bazaarApi = bazaarApi;
     }
 
     /// <summary>
@@ -172,7 +176,7 @@ public class ProfitChangeService
             {
                 if (buy.Enchantments.Any(e => e.Type == Core.Enchantment.EnchantmentType.unknown && e.Level == item.Level))
                     continue; // skip unkown enchants that would match
-                PastFlip.ProfitChange found = await GetCostForEnchant(item, buy.Enchantments);
+                PastFlip.ProfitChange found = await GetCostForEnchant(item, buy, sell);
                 if (found != null)
                     yield return found;
             }
@@ -452,34 +456,54 @@ public class ProfitChangeService
         return float.Parse(value, System.Globalization.CultureInfo.InvariantCulture);
     }
 
-    private async Task<PastFlip.ProfitChange> GetCostForEnchant(Core.Enchantment item, List<Core.Enchantment> enchantments)
+    private async Task<PastFlip.ProfitChange> GetCostForEnchant(Core.Enchantment item, Core.SaveAuction buy, Core.SaveAuction sell)
     {
         if (item.Type == Core.Enchantment.EnchantmentType.telekinesis)
             return null; // not a book anymore
         PastFlip.ProfitChange found = null;
-        int requiredLevel = item.Level;
-        var matchingEnchant = enchantments.Where(e => e.Type == item.Type).FirstOrDefault();
-        if (matchingEnchant != null && matchingEnchant.Level == item.Level - 1 && item.Level < 7)
-        {
-            // only required one level lower book
-            requiredLevel = item.Level - 1;
-        }
         try
         {
-            found = await CostOf($"ENCHANTMENT_{item.Type}_{requiredLevel}".ToUpper(), $"Enchant {item.Type} lvl {requiredLevel} added");
-            if (found.Amount == 0)
-                return null; // ignore 0 cost enchants
-            if(matchingEnchant != null && matchingEnchant.Level != item.Level - 1 && item.Level < 7)
+            var allBazaar = await bazaarApi.ApiBazaarPricesGetAsync();
+            var itemValues = allBazaar.ToDictionary(b => b.ProductId, b => b.SellPrice);
+            var sellValue = mapper.EnchantValue(item, sell, itemValues);
+            var buyValue = 0L;
+            var enchantAtBuy = buy.Enchantments.Where(e => e.Type == item.Type).FirstOrDefault();
+            if (enchantAtBuy != default && (enchantAtBuy.Level != item.Level - 1 && item.Level < 7
+                || Constants.EnchantToAttribute.ContainsKey(item.Type)))
             {
-                // remove the matching enchant cost
-                var matchingEnchantCost = await CostOf($"ENCHANTMENT_{matchingEnchant.Type}_{matchingEnchant.Level}".ToUpper(), $"Enchant {matchingEnchant.Type} lvl {matchingEnchant.Level} removed");
-                found.Amount += matchingEnchantCost.Amount;
-                Console.WriteLine($"found {found.Amount} for {item.Type} lvl {item.Level} with matching {matchingEnchant.Type} lvl {matchingEnchant.Level}");
+                buyValue = mapper.EnchantValue(enchantAtBuy, buy, itemValues);
+                found = new PastFlip.ProfitChange()
+                {
+                    Label = $"Enchant {item.Type} from {enchantAtBuy.Level} to {item.Level}",
+                    Amount = buyValue - sellValue
+                };
+            }
+            else if (enchantAtBuy != default && enchantAtBuy.Level == item.Level - 1 && item.Level < 6)
+            {
+                // only requires another book of the same level
+                var enchantDummy = new Core.Enchantment()
+                {
+                    Type = item.Type,
+                    Level = (byte)(item.Level - 1)
+                };
+                return new PastFlip.ProfitChange()
+                {
+                    Label = $"Enchant {item.Type} {item.Level} added",
+                    Amount = -mapper.EnchantValue(enchantDummy, buy, itemValues)
+                };
+            }
+            else
+            {
+                return new PastFlip.ProfitChange()
+                {
+                    Label = $"Enchant {item.Type} {item.Level}",
+                    Amount = -sellValue
+                };
             }
         }
         catch (System.Exception e)
         {
-            logger.LogError(e, $"could not find enchant cost for {item.Type} lvl {requiredLevel}");
+            logger.LogError(e, $"could not find enchant cost for {item.Type}");
         }
 
         return found;
@@ -554,13 +578,13 @@ public class ProfitChangeService
         var itemPrice = await pricesApi.ApiItemPriceItemTagGetAsync(item)
                     ?? throw new Exception($"Failed to find price for {item}");
         var median = itemPrice.Median;
-        if(itemPrice.Max == 0 && item.StartsWith("ENCHANTMENT"))
+        if (itemPrice.Max == 0 && item.StartsWith("ENCHANTMENT"))
         {
             // get lvl 1 and scale up, sample ENCHANTMENT_ULTIMATE_CHIMERA_4
             var lvl1Price = await pricesApi.ApiItemPriceItemTagGetAsync(item.Substring(0, item.LastIndexOf('_') + 1) + "1");
             median = lvl1Price.Median * int.Parse(item.Substring(item.LastIndexOf('_') + 1));
         }
-        else if(itemPrice.Median == 500_000_000)
+        else if (itemPrice.Median == 500_000_000)
         {
             var allCrafts = await craftsApi.CraftsAllGetAsync();
             median = (long)(allCrafts.Where(c => c.ItemId == item).FirstOrDefault()?.CraftCost ?? 500_000_000);
