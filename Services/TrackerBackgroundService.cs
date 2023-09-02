@@ -209,9 +209,16 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                         try
                         {
                             var purchaseableIn = DateTime.UtcNow - item.Auction.Start;
-                            if (purchaseableIn > TimeSpan.FromSeconds(2))
+                            if (purchaseableIn > TimeSpan.FromSeconds(1))
                                 await Task.Delay(purchaseableIn);
-                            await rerequestService.BaseAhPlayerIdPostAsync(item.Auction.AuctioneerId, "recheck");
+                            try 
+                            {
+                                await rerequestService.BaseAhPlayerIdPostAsync(item.Auction.AuctioneerId, "recheck");
+                            } catch(Exception)
+                            {
+                                await Task.Delay(500);
+                                await rerequestService.BaseAhPlayerIdPostAsync(item.Auction.AuctioneerId, "recheck2");
+                            }
                         }
                         catch (System.Exception e)
                         {
