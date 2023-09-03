@@ -395,10 +395,10 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     if (sell == null)
                         continue;
                     var profit = (long)(sell.HighestBidAmount - buyResp.HighestBidAmount);
-                    if (sell.End - buyResp.End > TimeSpan.FromDays(14))
-                        profit = 0; // no flip if it took more than 2 weeks
                     var tax = profitChangeService.GetAhTax(sell);
                     profit += tax.Amount;
+                    if (sell.End - buyResp.End > TimeSpan.FromDays(14))
+                        profit = 0; // no flip if it took more than 2 weeks
                     var flip = new PastFlip()
                     {
                         Flipper = Guid.Parse(sell.AuctioneerId),
