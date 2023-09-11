@@ -466,8 +466,6 @@ public class ProfitChangeService
             var allBazaar = await bazaarApi.ApiBazaarPricesGetAsync();
             var itemValues = allBazaar.ToDictionary(b => b.ProductId, b => b.SellPrice);
             var sellValue = mapper.EnchantValue(item, sell.FlatenedNBT, itemValues);
-            if(sellValue < 0)
-                return null; // enchant not on bazaar, ignore
             var buyValue = 0L;
             var enchantAtBuy = buy.Enchantments.Where(e => e.Type == item.Type).FirstOrDefault();
             if (enchantAtBuy != default && (enchantAtBuy.Level != item.Level - 1 && item.Level < 7
@@ -496,6 +494,8 @@ public class ProfitChangeService
             }
             else
             {
+                if (sellValue == -1)
+                    return null; // enchant not on bazaar, ignore
                 return new PastFlip.ProfitChange()
                 {
                     Label = $"Enchant {item.Type} {item.Level}",
