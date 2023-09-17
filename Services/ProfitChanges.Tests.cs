@@ -806,6 +806,23 @@ public class ProfitChangeTests
     }
 
     [Test]
+    public async Task EfficiencyUpgradeSilex()
+    {
+        var buy = CreateAuction("DRILL", "drill", 1_000_000);
+        var sell = CreateAuction("DRILL", "drill", 100_000_000);
+        sell.Enchantments = new(){
+                new() { Type = Core.Enchantment.EnchantmentType.efficiency, Level = 10  }};
+        var bazaarApi = new Mock<Bazaar.Client.Api.IBazaarApi>();
+        bazaarApi.Setup(p => p.ApiBazaarPricesGetAsync(0, default))
+            .ReturnsAsync(() => new() { new("SIL_EX", 17_000_000, 16_000_000) });
+        service = new ProfitChangeService(null, null, null, NullLogger<ProfitChangeService>.Instance, null, null, bazaarApi.Object);
+        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        Assert.AreEqual(2, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
+        Assert.AreEqual(-83001200, changes.Sum(c => c.Amount));
+        Assert.AreEqual("Enchant efficiency 10", changes[1].Label);
+    }
+
+    [Test]
     public async Task AddedMasterStars()
     {
         var buy = new Core.SaveAuction()
