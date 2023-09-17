@@ -621,32 +621,38 @@ public class ProfitChangeTests
     [Test]
     public async Task EnchantmentUpgrade()
     {
-        var buy = new Core.SaveAuction()
-        {
-            Uuid = Guid.NewGuid().ToString("N"),
-            Tag = "HYPERION",
-            HighestBidAmount = 1000,
-            FlatenedNBT = new(),
-            Enchantments = new() { new() { Type = Core.Enchantment.EnchantmentType.ultimate_chimera, Level = 3 } },
-            Tier = Core.Tier.EPIC
-        };
-        var sell = new Coflnet.Sky.Core.SaveAuction()
-        {
-            Uuid = Guid.NewGuid().ToString("N"),
-            Tag = "HYPERION",
-            HighestBidAmount = 10_000_000,
-            FlatenedNBT = new(),
-            Enchantments = new() {
-                new(){Type = Core.Enchantment.EnchantmentType.ultimate_chimera, Level = 4} },
-            Tier = Core.Tier.LEGENDARY
-        };
+        var buy = CreateAuction("HYPERION");
+        buy.Enchantments = new() { new() { Type = Core.Enchantment.EnchantmentType.ultimate_chimera, Level = 3 } };
+        var sell = CreateAuction("HYPERION", highestBidAmount: 10_000_000);
+        sell.Enchantments = new() { new() { Type = Core.Enchantment.EnchantmentType.ultimate_chimera, Level = 4 } };
         var bazaarApi = new Mock<Bazaar.Client.Api.IBazaarApi>();
         bazaarApi.Setup(p => p.ApiBazaarPricesGetAsync(0, default))
             .ReturnsAsync(() => new() { new("ENCHANTMENT_ULTIMATE_CHIMERA_3", 30_000_000, 20_000_000) });
+
         service = new ProfitChangeService(null, null, null, NullLogger<ProfitChangeService>.Instance, null, null, bazaarApi.Object);
         var changes = await service.GetChanges(buy, sell).ToListAsync();
+
         Assert.AreEqual(2, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
         Assert.AreEqual(-20_201_200, changes.Sum(c => c.Amount));
+    }
+
+    [Test]
+    public async Task BazaarLimitEnchantUpgrade()
+    {
+        var buy = CreateAuction("HYPERION");
+        var sell = CreateAuction("HYPERION", highestBidAmount: 10_000_000);
+        sell.Enchantments = new() { new() { Type = Core.Enchantment.EnchantmentType.ultimate_chimera, Level = 5 } };
+        var bazaarApi = new Mock<Bazaar.Client.Api.IBazaarApi>();
+        bazaarApi.Setup(p => p.ApiBazaarPricesGetAsync(0, default))
+            .ReturnsAsync(() => new() { 
+                new("ENCHANTMENT_ULTIMATE_CHIMERA_1", 103_000_000, 102_000_000),
+                new("ENCHANTMENT_ULTIMATE_CHIMERA_5", 500_000_000, 500_000_000) });
+
+        service = new ProfitChangeService(null, null, null, NullLogger<ProfitChangeService>.Instance, null, null, bazaarApi.Object);
+        var changes = await service.GetChanges(buy, sell).ToListAsync();
+
+        Assert.AreEqual(2, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
+        Assert.AreEqual(-1632000000, changes[1].Amount);
     }
 
     [Test]
