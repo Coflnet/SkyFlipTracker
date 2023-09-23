@@ -111,6 +111,11 @@ public class ProfitChangeService
             logger.LogInformation($"upgraded rarity to {buy.Tier} of {buy.Uuid} due to pet tier");
         }
         var targetTier = sell.Tier;
+        if (buy.FlatenedNBT.Any(f => f.Key == "heldItem" && f.Value == "PET_ITEM_TIER_BOOST")
+         && buy.Tier <= targetTier)
+        {
+            buy.Tier--;
+        }
         if ((int)buy.Tier < (int)sell.Tier)
             if (sell.Tag.StartsWith("PET_"))
             {

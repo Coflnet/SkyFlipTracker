@@ -288,6 +288,42 @@ public class ProfitChangeTests
         Assert.AreEqual(-100001210, changes.Sum(c => c.Amount));
     }
 
+
+    [Test]
+    public async Task TierBoostRemoved()
+    {
+        var buy = new Core.SaveAuction()
+        {
+            Uuid = Guid.NewGuid().ToString("N"),
+            Tag = "PET_ENDER_DRAGON",
+            HighestBidAmount = 1000,
+            FlatenedNBT = new()
+            {
+                { "heldItem", "PET_ITEM_TIER_BOOST" }
+            },
+            Tier = Core.Tier.LEGENDARY
+        };
+        var sell = new Coflnet.Sky.Core.SaveAuction()
+        {
+            Uuid = Guid.NewGuid().ToString("N"),
+            Tag = "PET_ENDER_DRAGON",
+            HighestBidAmount = 10_000_000,
+            FlatenedNBT = new(),
+            Tier = Core.Tier.LEGENDARY
+        };
+        var pricesApi = new Mock<Api.Client.Api.IPricesApi>();
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), null, 0, default))
+                .ReturnsAsync(() => new() { Median = 5_000_000 });
+        var katApi = new Mock<Crafts.Client.Api.IKatApi>();
+        katApi.Setup(k => k.KatAllGetAsync(0, default)).ReturnsAsync(KatResponse("PET_ENDER_DRAGON"));
+
+        service = new ProfitChangeService(pricesApi.Object, katApi.Object, null, NullLogger<ProfitChangeService>.Instance, null, null, null);
+        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        Assert.AreEqual(3, changes.Count, JsonConvert.SerializeObject(changes));
+        Assert.AreEqual(-40_000_000, changes[1].Amount);
+        Assert.AreEqual("Kat cost for LEGENDARY", changes[1].Label);
+    }
+
     [Test]
     public async Task ReforgeChange()
     {
