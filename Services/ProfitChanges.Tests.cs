@@ -263,22 +263,9 @@ public class ProfitChangeTests
     [Test]
     public async Task TierBoostAddition()
     {
-        var buy = new Core.SaveAuction()
-        {
-            Uuid = Guid.NewGuid().ToString("N"),
-            Tag = "PET_ENDERMAN",
-            HighestBidAmount = 1000,
-            FlatenedNBT = new(),
-            Tier = Core.Tier.RARE
-        };
-        var sell = new Coflnet.Sky.Core.SaveAuction()
-        {
-            Uuid = Guid.NewGuid().ToString("N"),
-            Tag = "PET_ENDERMAN",
-            HighestBidAmount = 1000,
-            FlatenedNBT = new() { { "heldItem", "PET_ITEM_TIER_BOOST" } },
-            Tier = Core.Tier.MYTHIC
-        };
+        var buy = CreateAuction("PET_ENDERMAN", "", 1000, Core.Tier.RARE);
+        var sell = CreateAuction("PET_ENDERMAN", "PET_ITEM_TIER_BOOST", 1000, Core.Tier.MYTHIC);
+        sell.FlatenedNBT.Add("heldItem", "PET_ITEM_TIER_BOOST");
         var pricesApi = new Mock<Api.Client.Api.IPricesApi>();
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), null, 0, default))
                 .ReturnsAsync(() => new() { Median = 100_000_000 });
@@ -292,25 +279,9 @@ public class ProfitChangeTests
     [Test]
     public async Task TierBoostRemoved()
     {
-        var buy = new Core.SaveAuction()
-        {
-            Uuid = Guid.NewGuid().ToString("N"),
-            Tag = "PET_ENDER_DRAGON",
-            HighestBidAmount = 1000,
-            FlatenedNBT = new()
-            {
-                { "heldItem", "PET_ITEM_TIER_BOOST" }
-            },
-            Tier = Core.Tier.LEGENDARY
-        };
-        var sell = new Coflnet.Sky.Core.SaveAuction()
-        {
-            Uuid = Guid.NewGuid().ToString("N"),
-            Tag = "PET_ENDER_DRAGON",
-            HighestBidAmount = 10_000_000,
-            FlatenedNBT = new(),
-            Tier = Core.Tier.LEGENDARY
-        };
+        var buy = CreateAuction("PET_ENDER_DRAGON", "PET_ITEM_TIER_BOOST", 1000, Core.Tier.LEGENDARY);
+        buy.FlatenedNBT.Add("heldItem", "PET_ITEM_TIER_BOOST");
+        var sell = CreateAuction("PET_ENDER_DRAGON", "", 1000, Core.Tier.LEGENDARY);
         var pricesApi = new Mock<Api.Client.Api.IPricesApi>();
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), null, 0, default))
                 .ReturnsAsync(() => new() { Median = 5_000_000 });
@@ -322,6 +293,18 @@ public class ProfitChangeTests
         Assert.AreEqual(3, changes.Count, JsonConvert.SerializeObject(changes));
         Assert.AreEqual(-40_000_000, changes[1].Amount);
         Assert.AreEqual("Kat cost for LEGENDARY", changes[1].Label);
+    }
+
+    [Test]
+    public async Task TierBoostKeep()
+    {
+        var buy = CreateAuction("PET_ENDER_DRAGON", "PET_ITEM_TIER_BOOST", 1000, Core.Tier.LEGENDARY);
+        buy.FlatenedNBT.Add("heldItem", "PET_ITEM_TIER_BOOST");
+        var sell = CreateAuction("PET_ENDER_DRAGON", "PET_ITEM_TIER_BOOST", 1000, Core.Tier.LEGENDARY);
+        sell.FlatenedNBT.Add("heldItem", "PET_ITEM_TIER_BOOST");
+        var service = new ProfitChangeService(null, null, null, NullLogger<ProfitChangeService>.Instance, null, null, null);
+        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        Assert.AreEqual(1, changes.Count, JsonConvert.SerializeObject(changes));
     }
 
     [Test]

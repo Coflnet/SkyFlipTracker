@@ -112,7 +112,7 @@ public class ProfitChangeService
         }
         var targetTier = sell.Tier;
         if (buy.FlatenedNBT.Any(f => f.Key == "heldItem" && f.Value == "PET_ITEM_TIER_BOOST")
-         && buy.Tier <= targetTier)
+         && !sell.FlatenedNBT.Any(f => f.Key == "heldItem" && f.Value == "PET_ITEM_TIER_BOOST"))
         {
             buy.Tier--;
         }
