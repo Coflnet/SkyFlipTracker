@@ -93,17 +93,6 @@ public class ProfitChangeService
             }
         }
 
-        if (sell.FlatenedNBT.ContainsKey("ability_scroll"))
-        {
-            var scrollsOnPurchase = buy.FlatenedNBT.Where(l => l.Key == "ability_scroll").SelectMany(l => l.Value.Split(' ')).ToList();
-            var scrollsOnSell = sell.FlatenedNBT.Where(l => l.Key == "ability_scroll").SelectMany(l => l.Value.Split(' ')).ToList();
-            var scrollsAdded = scrollsOnSell.Except(scrollsOnPurchase).ToList();
-            foreach (var item in scrollsAdded)
-            {
-                yield return await CostOf(item, $"ability scroll {item}");
-            }
-        }
-
         if (buy.Tier == Core.Tier.UNKNOWN && buy.Tag.StartsWith("PET_"))
         {
             if (Enum.TryParse(buy.FlatenedNBT.Where(l => l.Key == "tier").FirstOrDefault().Value, out Core.Tier tier))
