@@ -663,7 +663,7 @@ public class ProfitChangeTests
         sell.Enchantments = new() { new() { Type = Core.Enchantment.EnchantmentType.ultimate_chimera, Level = 5 } };
         var bazaarApi = new Mock<Bazaar.Client.Api.IBazaarApi>();
         bazaarApi.Setup(p => p.ApiBazaarPricesGetAsync(0, default))
-            .ReturnsAsync(() => new() { 
+            .ReturnsAsync(() => new() {
                 new("ENCHANTMENT_ULTIMATE_CHIMERA_1", 103_000_000, 102_000_000),
                 new("ENCHANTMENT_ULTIMATE_CHIMERA_5", 500_000_000, 500_000_000) });
 
@@ -708,18 +708,19 @@ public class ProfitChangeTests
     /// Some enchants upgrade based on an attribute 
     /// (their value increases nonexponential based on level)
     /// </summary>
-    /// <returns></returns>
-    [Test]
-    public async Task LinearEnchantUpgrade()
+    [TestCase(Core.Enchantment.EnchantmentType.hecatomb, 6_000_000, "hecatomb_s_runs", 97, 100, -600000)]
+    [TestCase(Core.Enchantment.EnchantmentType.compact, 6_000_000, "compact_blocks", 900_000, 1_000_000, -200000)]
+    [TestCase(Core.Enchantment.EnchantmentType.expertise, 6_000_000, "expertise_kills", 10_000, 15_000, -5000000)]
+    public async Task LinearEnchantUpgrade(Core.Enchantment.EnchantmentType ench, int bazaarPrice, string attribName, int attrStart, int attrEnd, int expectedDiff)
     {
         var buy = new Core.SaveAuction()
         {
             Uuid = Guid.NewGuid().ToString("N"),
             Tag = "SHADOW_GOGGLES",
             HighestBidAmount = 1000,
-            FlatenedNBT = new() { { "hecatomb_s_runs", "97" } },
+            FlatenedNBT = new() { { attribName, attrStart.ToString() } },
             Enchantments = new() {
-                new(){Type = Core.Enchantment.EnchantmentType.hecatomb, Level = 9},
+                new(){Type = ench, Level = 9},
             },
             Tier = Core.Tier.LEGENDARY
         };
@@ -728,19 +729,19 @@ public class ProfitChangeTests
             Uuid = Guid.NewGuid().ToString("N"),
             Tag = "SHADOW_GOGGLES",
             HighestBidAmount = 10_000_000,
-            FlatenedNBT = new() { { "hecatomb_s_runs", "100" } },
+            FlatenedNBT = new() { { attribName, attrEnd.ToString() } },
             Enchantments = new() {
-                new(){Type = Core.Enchantment.EnchantmentType.hecatomb, Level = 10},
+                new(){Type = ench, Level = 10},
             },
             Tier = Core.Tier.LEGENDARY
         };
         var bazaarApi = new Mock<Bazaar.Client.Api.IBazaarApi>();
         bazaarApi.Setup(p => p.ApiBazaarPricesGetAsync(0, default))
-            .ReturnsAsync(() => new() { new("ENCHANTMENT_HECATOMB_1", 6_000_000, 5_500_000) });
+            .ReturnsAsync(() => new() { new($"ENCHANTMENT_{ench.ToString().ToUpper()}_1", bazaarPrice, bazaarPrice) });
         service = new ProfitChangeService(null, null, null, NullLogger<ProfitChangeService>.Instance, null, null, bazaarApi.Object);
         var changes = await service.GetChanges(buy, sell).ToListAsync();
         Assert.AreEqual(2, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
-        Assert.AreEqual(-600000, changes.Skip(1).First().Amount);
+        Assert.AreEqual(expectedDiff, changes.Skip(1).First().Amount);
     }
 
     [Test]
