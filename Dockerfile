@@ -6,7 +6,7 @@ COPY SkyFlipTracker.csproj SkyFlipTracker.csproj
 RUN dotnet restore
 COPY . .
 RUN dotnet test
-RUN dotnet publish -c release -o /app
+RUN dotnet publish -c release -o /app && rm /app/items.json
 
 FROM mcr.microsoft.com/dotnet/aspnet:7.0
 WORKDIR /app
