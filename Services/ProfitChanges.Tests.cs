@@ -117,8 +117,8 @@ public class ProfitChangeTests
         var changes = await service.GetChanges(buy, sell).ToListAsync();
         Assert.AreEqual(3, changes.Count);
         Assert.AreEqual(-1220, changes[0].Amount);
-        Assert.AreEqual(-40000000, changes[1].Amount, changes[1].Label);
         Assert.AreEqual("Kat materials for LEGENDARY", changes[2].Label);
+        Assert.AreEqual(-40000000, changes[1].Amount, changes[1].Label);
     }
 
     [Test]
@@ -160,9 +160,10 @@ public class ProfitChangeTests
         service = new ProfitChangeService(pricesApi.Object, katMock.Object, null, null, null, null, null);
         var changes = await service.GetChanges(buy, sell).ToListAsync();
         Assert.AreEqual(3, changes.Count);
+        var all = JsonConvert.SerializeObject(changes, Formatting.Indented);
         Assert.AreEqual(-7001200, changes[0].Amount);
+        Assert.AreEqual("Kat cost for EPIC", changes[2].Label, all);
         Assert.AreEqual(-64000000, changes[1].Amount, changes[1].Label);
-        Assert.AreEqual("Kat cost for EPIC", changes[2].Label);
         Assert.AreEqual(-195626200, changes.Sum(c => c.Amount));
     }
 
@@ -291,8 +292,8 @@ public class ProfitChangeTests
         service = new ProfitChangeService(pricesApi.Object, katApi.Object, null, NullLogger<ProfitChangeService>.Instance, null, null, null);
         var changes = await service.GetChanges(buy, sell).ToListAsync();
         Assert.AreEqual(3, changes.Count, JsonConvert.SerializeObject(changes));
-        Assert.AreEqual(-40_000_000, changes[1].Amount);
         Assert.AreEqual("Kat cost for LEGENDARY", changes[1].Label);
+        Assert.AreEqual(-40_000_000, changes[1].Amount);
     }
 
     [Test]

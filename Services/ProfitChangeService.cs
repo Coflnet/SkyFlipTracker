@@ -383,7 +383,7 @@ public class ProfitChangeService
                 var allCosts = await katApi.KatAllGetAsync(0, default);
                 if (allCosts == null)
                     throw new Exception("could not get kat costs from crafts api");
-                var cost = allCosts.Where(c => ((int)c.TargetRarity) > i + 1 && c.CoreData.ItemTag == sell.Tag)
+                var cost = allCosts.Where(c => ((int)c.TargetRarity) > i  && c.CoreData.ItemTag == sell.Tag)
                             .OrderBy(c => c.TargetRarity).FirstOrDefault();
                 var upgradeCost = cost?.UpgradeCost;
                 var tierName = (i >= (int)Core.Tier.LEGENDARY) ? sell.Tier.ToString() : ((Core.Tier)i + 1).ToString();
@@ -402,7 +402,7 @@ public class ProfitChangeService
                 {
                     // approximate cost with raw
                     var rawCost = await katApi.KatRawGetAsync();
-                    var rarityInt = i + 1;
+                    var rarityInt = i;
                     if (i > (int)Core.Tier.LEGENDARY)
                         break;
                     Console.WriteLine($"kat upgrade cost {(Core.Tier)rarityInt}({rarityInt}) {cost?.TargetRarity} {sell.Tier}");
