@@ -627,11 +627,11 @@ public class ProfitChangeTests
         var sell = CreateAuction("HYPERION");
         sell.Enchantments = new() { new() { Type = Core.Enchantment.EnchantmentType.ultimate_chimera, Level = 4 } };
         var pricesApi = new Mock<Api.Client.Api.IPricesApi>();
-        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("ENCHANTMENT_ULTIMATE_CHIMERA_1", null, 0, default)).ReturnsAsync(() => new() { Median = 100_000_000, Max = 105900000 });
-        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("ENCHANTMENT_ULTIMATE_CHIMERA_4", null, 0, default)).ReturnsAsync(() => new() { Median = 231527, Max = 0 });
-        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("ENCHANTMENT_ULTIMATE_CHIMERA_2", null, 0, default)).ReturnsAsync(() => new() { Median = 3231527, Max = 0 });
         var bazaarApi = new Mock<Bazaar.Client.Api.IBazaarApi>();
-        bazaarApi.Setup(p => p.ApiBazaarPricesGetAsync(0, default)).ReturnsAsync(() => new() { new("ENCHANTMENT_ULTIMATE_CHIMERA_1", 105900000, 100_000_000) });
+        bazaarApi.Setup(p => p.ApiBazaarPricesGetAsync(0, default)).ReturnsAsync(() => new() { 
+            new("ENCHANTMENT_ULTIMATE_CHIMERA_1", 105900000, 100_000_000),
+            new("ENCHANTMENT_ULTIMATE_CHIMERA_4", 0, 33),
+            });
         service = new ProfitChangeService(pricesApi.Object, null, null, NullLogger<ProfitChangeService>.Instance, null, null, bazaarApi.Object);
         var result = await service.GetChanges(buy, sell).ToListAsync();
         Assert.AreEqual(2, result.Count);
