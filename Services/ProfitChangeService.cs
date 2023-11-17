@@ -367,6 +367,11 @@ public class ProfitChangeService
 
         foreach (var ingredient in items)
         {
+            if(item.Key == "ability_scroll")
+            {
+                yield return await CostOf(ingredient, $"Applied {ingredient}");
+                continue;
+            }
             yield return await CostOf(ingredient, $"Used {ingredient} to upgraded {item.Key} to {item.Value}");
         }
     }

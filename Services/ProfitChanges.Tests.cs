@@ -400,6 +400,7 @@ public class ProfitChangeTests
         var changes = await service.GetChanges(buy, sell).ToListAsync();
         Assert.AreEqual(4, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
         Assert.AreEqual(-600001210, changes.Sum(c => c.Amount));
+        Assert.AreEqual("Applied IMPLOSION_SCROLL", changes[1].Label);
     }
 
     [Test]
