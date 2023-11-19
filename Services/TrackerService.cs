@@ -323,7 +323,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     Flipper = item.sell.AuctioneerId,
                     Buy = buy,
                     Sell = item.sell,
-                    Finder = finders.Where(f => f.AuctionId == GetId(item.buy.Uuid)).FirstOrDefault(),
+                    Finder = finders.Where(f => f.AuctionId == GetId(item.buy.Uuid)).OrderBy(f=>f.Timestamp).FirstOrDefault(),
                     Profit = (int)(item.sell.HighestBidAmount - buy?.HighestBidAmount ?? 0),
                 });
                 try
