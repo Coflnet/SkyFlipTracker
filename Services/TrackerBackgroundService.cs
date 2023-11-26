@@ -43,6 +43,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 var context = scope.ServiceProvider.GetRequiredService<TrackerDbContext>();
                 // make sure all migrations are applied
                 await context.Database.MigrateAsync();
+                var storageService = scope.ServiceProvider.GetRequiredService<FlipStorageService>();
+                await storageService.Migrate();
             }
 
             Task flipCons = ConsumeFlips(stoppingToken);
@@ -211,10 +213,11 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                             var purchaseableIn = DateTime.UtcNow - item.Auction.Start;
                             if (purchaseableIn > TimeSpan.FromSeconds(1))
                                 await Task.Delay(purchaseableIn);
-                            try 
+                            try
                             {
                                 await rerequestService.BaseAhPlayerIdPostAsync(item.Auction.AuctioneerId, "recheck");
-                            } catch(Exception)
+                            }
+                            catch (Exception)
                             {
                                 await Task.Delay(500);
                                 await rerequestService.BaseAhPlayerIdPostAsync(item.Auction.AuctioneerId, "recheck2");

@@ -21,20 +21,22 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
 {
     public class TrackerService
     {
-        private TrackerDbContext db;
-        private ILogger<TrackerService> logger;
-        private IAuctionsApi auctionsApi;
-        private FlipSumaryEventProducer flipSumaryEventProducer;
-        private IServiceScopeFactory scopeFactory;
-        private ProfitChangeService profitChangeService;
-        private FlipStorageService flipStorageService;
-        private IScoresApi scoresApi;
-        private ISettingsApi settingsApi;
-        private IPlayerApi playerApi;
-        private ActivitySource activitySource;
+        private readonly TrackerDbContext db;
+        private readonly ILogger<TrackerService> logger;
+        private readonly IAuctionsApi auctionsApi;
+        private readonly FlipSumaryEventProducer flipSumaryEventProducer;
+        private readonly IServiceScopeFactory scopeFactory;
+        private readonly ProfitChangeService profitChangeService;
+        private readonly FlipStorageService flipStorageService;
+        private readonly IScoresApi scoresApi;
+        private readonly ISettingsApi settingsApi;
+        private readonly IPlayerApi playerApi;
+        private readonly ActivitySource activitySource;
+        private readonly PlayerState.Client.Api.IItemsApi itemsApi;
+        private readonly PlayerState.Client.Api.ITransactionApi transactionApi;
         private const short Version = 1;
-        Counter flipFoundCounter = Metrics.CreateCounter("sky_fliptracker_saved_finding", "How many found flips were saved");
-        Counter userFlipCounter = Metrics.CreateCounter("sky_fliptracker_user_flip", "How many flips were done by a user");
+        readonly Counter flipFoundCounter = Metrics.CreateCounter("sky_fliptracker_saved_finding", "How many found flips were saved");
+        readonly Counter userFlipCounter = Metrics.CreateCounter("sky_fliptracker_user_flip", "How many flips were done by a user");
 
 
         public TrackerService(
@@ -48,7 +50,9 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             ActivitySource activitySource,
             IPlayerApi playerApi,
             IScoresApi scoresApi,
-            ISettingsApi settingsApi)
+            ISettingsApi settingsApi,
+            PlayerState.Client.Api.IItemsApi itemsApi,
+            PlayerState.Client.Api.ITransactionApi transactionApi)
         {
             this.db = db;
             this.logger = logger;
@@ -61,6 +65,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             this.playerApi = playerApi;
             this.scoresApi = scoresApi;
             this.settingsApi = settingsApi;
+            this.itemsApi = itemsApi;
+            this.transactionApi = transactionApi;
         }
 
         public async Task<Flip> AddFlip(Flip flip)
@@ -323,7 +329,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     Flipper = item.sell.AuctioneerId,
                     Buy = buy,
                     Sell = item.sell,
-                    Finder = finders.Where(f => f.AuctionId == GetId(item.buy.Uuid)).OrderBy(f=>f.Timestamp).FirstOrDefault(),
+                    Finder = finders.Where(f => f.AuctionId == GetId(item.buy.Uuid)).OrderBy(f => f.Timestamp).FirstOrDefault(),
                     Profit = (int)(item.sell.HighestBidAmount - buy?.HighestBidAmount ?? 0),
                 });
                 try
@@ -345,6 +351,35 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     if (sell.End - buy.End > TimeSpan.FromDays(14))
                         profit = 0; // no flip if it took more than 2 weeks
                     var name = GetDisplayName(buy, sell);
+                    var flags = FlipFlags.None;
+                    var itemUuid = sell.FlatenedNBT.Where(n => n.Key == "uuid").FirstOrDefault().Value;
+                    if (buy.Bids.OrderByDescending(b => b.Amount).First().Bidder != sell.AuctioneerId && itemUuid != default)
+                    {
+                        // check trade
+                        var items = await itemsApi.ApiItemsFindUuidPostAsync(new(){
+                            new (){
+                                Tag = sell.Tag,
+                                Uuid = Guid.Parse(sell.FlatenedNBT.Where(n => n.Key == "uuid").First().Value)
+                            }
+                        });
+                        if (items.Count > 0)
+                        {
+                            var itemInfo = items.First();
+                            var itemTrade = await transactionApi.TransactionItemItemIdGetAsync(itemInfo.Id ?? throw new Exception("no item id"), 0);
+                            if (itemTrade.Count > 0)
+                            {
+                                var time = itemTrade.First().TimeStamp;
+                                var tradeitems = await transactionApi.TransactionPlayerPlayerUuidGetAsync(itemTrade.First().PlayerUuid, 1, time);
+                                foreach (var tradePosition in tradeitems)
+                                {
+                                    Console.WriteLine($"trade: {tradePosition.PlayerUuid} {tradePosition.TimeStamp} {tradePosition.ItemId} {tradePosition.Amount}");
+                                }
+                            }
+                            
+                        }
+                        flags |= FlipFlags.DifferentBuyer;
+                        Console.WriteLine($"Different buyer {buy.Uuid} {buy.Bids.OrderByDescending(b => b.Amount).First().Bidder} {sell.AuctioneerId}");
+                    }
                     var flip = new PastFlip()
                     {
                         Flipper = Guid.Parse(sell.AuctioneerId),
@@ -362,7 +397,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                         Version = 1,
                         TargetPrice = flipFound?.TargetPrice ?? 0,
                         FinderType = flipFound?.FinderType ?? LowPricedAuction.FinderType.UNKOWN,
-                        ProfitChanges = changes
+                        ProfitChanges = changes,
+                        Flags = flags
                     };
                     await flipStorageService.SaveFlip(flip);
                     userFlipCounter.Inc();

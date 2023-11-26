@@ -6,6 +6,14 @@ using MessagePack;
 using System.Collections.Generic;
 namespace Coflnet.Sky.SkyAuctionTracker.Models;
 
+[Flags]
+public enum FlipFlags
+{
+    None = 0,
+    DifferentBuyer = 1,
+    ViaTrade = 2,
+}
+
 public class PastFlip
 {
     /// <summary>
@@ -20,7 +28,7 @@ public class PastFlip
     /// <summary>
     /// The tier of the sold item
     /// </summary>
-    public Tier ItemTier { get; set; } 
+    public Tier ItemTier { get; set; }
     /// <summary>
     /// Hypixel item tag
     /// </summary>
@@ -73,6 +81,10 @@ public class PastFlip
     /// The version of the profit changes, used to request updates the profit changes
     /// </summary>
     public short Version { get; set; }
+    /// <summary>
+    /// Special metadata about the flip
+    /// </summary>
+    public FlipFlags Flags { get; set; }
 
     /// <summary>
     /// A single change in the profit amount

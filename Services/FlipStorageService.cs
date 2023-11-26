@@ -134,6 +134,29 @@ public class FlipStorageService
             .ClusteringKey(c => c.Uid)
             .Column(c => c.FinderType, cm => cm.WithDbType<int>())
             .Column(c => c.ItemTier, cm => cm.WithDbType<int>())
-            .Column(c => c.ProfitChanges, cm => cm.Ignore())), "flips");
+            .Column(c => c.ProfitChanges, cm => cm.Ignore())
+            .Column(o => o.Flags, c => c.WithName("flags").WithDbType<int>())
+            ), "flips");
+    }
+
+    /// <summary>
+    /// Brings the db into the current state
+    /// </summary>
+    /// <returns></returns>
+    public async Task Migrate()
+    {
+        var session = await GetSession();
+        var table = GetFlipsTable(session);
+        await table.CreateIfNotExistsAsync();
+        try
+        {
+            session.Execute("ALTER TABLE flips ADD flags int;");
+            await SaveFlip(new PastFlip() { Flipper = Guid.Empty, SellTime = DateTime.UtcNow, Uid = 0, Flags = 0 });
+            logger.LogInformation("inserted flags column");
+        }
+        catch (Exception e)
+        {
+            logger.LogInformation(e, "flags exists already");
+        }
     }
 }

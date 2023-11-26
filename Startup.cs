@@ -73,6 +73,9 @@ namespace Coflnet.Sky.SkyAuctionTracker
             services.AddSingleton<IScoresApi>(conf => new ScoresApi(Configuration["LEADERBOARD_BASE_URL"]));
             services.AddSingleton<Crafts.Client.Api.IKatApi>(conf => new Crafts.Client.Api.KatApi(Configuration["CRAFTS_BASE_URL"]));
             services.AddSingleton<IBaseApi>(sp => new BaseApi(Configuration["PROXY_BASE_URL"]));
+            services.AddSingleton<PlayerState.Client.Api.IItemsApi>(sp => new PlayerState.Client.Api.ItemsApi(Configuration["PLAYERSTATE_BASE_URL"]));
+            services.AddSingleton<PlayerState.Client.Api.ITransactionApi>(sp => new PlayerState.Client.Api.TransactionApi(Configuration["PLAYERSTATE_BASE_URL"]));
+
             services.AddSingleton<ProfitChangeService>();
             services.AddSingleton<FlipStorageService>();
             services.AddJaeger(Configuration);

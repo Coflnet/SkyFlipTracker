@@ -245,6 +245,8 @@ public class ProfitChangeService
             var count = item.Count;
             if (item.ItemId == tagOnPurchase)
                 count--;
+            if (item.ItemId == "SKYBLOCK_COIN")
+                yield return new PastFlip.ProfitChange("Coins", -(long)item.Cost);
             if (count > 0)
                 yield return await CostOf(item.ItemId, $"crafting material {item.ItemId}" + (count > 1 ? $" x{count}" : ""), count);
         }
@@ -367,7 +369,7 @@ public class ProfitChangeService
 
         foreach (var ingredient in items)
         {
-            if(item.Key == "ability_scroll")
+            if (item.Key == "ability_scroll")
             {
                 yield return await CostOf(ingredient, $"Applied {ingredient}");
                 continue;
@@ -388,7 +390,7 @@ public class ProfitChangeService
                 var allCosts = await katApi.KatAllGetAsync(0, default);
                 if (allCosts == null)
                     throw new Exception("could not get kat costs from crafts api");
-                var cost = allCosts.Where(c => ((int)c.TargetRarity) > i  && c.CoreData.ItemTag == sell.Tag)
+                var cost = allCosts.Where(c => ((int)c.TargetRarity) > i && c.CoreData.ItemTag == sell.Tag)
                             .OrderBy(c => c.TargetRarity).FirstOrDefault();
                 var upgradeCost = cost?.UpgradeCost;
                 var tierName = (i >= (int)Core.Tier.LEGENDARY) ? sell.Tier.ToString() : ((Core.Tier)i + 1).ToString();
