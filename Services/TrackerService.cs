@@ -35,6 +35,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
         private readonly PlayerState.Client.Api.IItemsApi itemsApi;
         private readonly PlayerState.Client.Api.ITransactionApi transactionApi;
         private const short Version = 1;
+        private const int COIN_ID = 1_000_001;
         readonly Counter flipFoundCounter = Metrics.CreateCounter("sky_fliptracker_saved_finding", "How many found flips were saved");
         readonly Counter userFlipCounter = Metrics.CreateCounter("sky_fliptracker_user_flip", "How many flips were done by a user");
 
@@ -335,6 +336,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 try
                 {
                     var sell = item.sell;
+                    FlipFlags flags = await CheckTrade(buy, sell);
                     var purchaseId = GetId(buy.Uuid);
                     var flipFound = finders.Where(f => f != null && f.AuctionId == purchaseId).OrderByDescending(f => f.Timestamp).FirstOrDefault();
                     List<PastFlip.ProfitChange> changes = new();
@@ -351,35 +353,6 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     if (sell.End - buy.End > TimeSpan.FromDays(14))
                         profit = 0; // no flip if it took more than 2 weeks
                     var name = GetDisplayName(buy, sell);
-                    var flags = FlipFlags.None;
-                    var itemUuid = sell.FlatenedNBT.Where(n => n.Key == "uuid").FirstOrDefault().Value;
-                    if (buy.Bids.OrderByDescending(b => b.Amount).First().Bidder != sell.AuctioneerId && itemUuid != default)
-                    {
-                        // check trade
-                        var items = await itemsApi.ApiItemsFindUuidPostAsync(new(){
-                            new (){
-                                Tag = sell.Tag,
-                                Uuid = Guid.Parse(sell.FlatenedNBT.Where(n => n.Key == "uuid").First().Value)
-                            }
-                        });
-                        if (items.Count > 0)
-                        {
-                            var itemInfo = items.First();
-                            var itemTrade = await transactionApi.TransactionItemItemIdGetAsync(itemInfo.Id ?? throw new Exception("no item id"), 0);
-                            if (itemTrade.Count > 0)
-                            {
-                                var time = itemTrade.First().TimeStamp;
-                                var tradeitems = await transactionApi.TransactionPlayerPlayerUuidGetAsync(itemTrade.First().PlayerUuid, 1, time);
-                                foreach (var tradePosition in tradeitems)
-                                {
-                                    Console.WriteLine($"trade: {tradePosition.PlayerUuid} {tradePosition.TimeStamp} {tradePosition.ItemId} {tradePosition.Amount}");
-                                }
-                            }
-                            
-                        }
-                        flags |= FlipFlags.DifferentBuyer;
-                        Console.WriteLine($"Different buyer {buy.Uuid} {buy.Bids.OrderByDescending(b => b.Amount).First().Bidder} {sell.AuctioneerId}");
-                    }
                     var flip = new PastFlip()
                     {
                         Flipper = Guid.Parse(sell.AuctioneerId),
@@ -410,6 +383,50 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 }
             });
             await noUidTask;
+        }
+
+        private async Task<FlipFlags> CheckTrade(ApiSaveAuction buy, SaveAuction sell)
+        {
+            var flags = FlipFlags.None;
+            var itemUuid = sell.FlatenedNBT.Where(n => n.Key == "uuid").FirstOrDefault().Value;
+            if (buy.Bids.OrderByDescending(b => b.Amount).First().Bidder == sell.AuctioneerId || itemUuid == default)
+            {
+                return flags;
+            }
+            flags |= FlipFlags.DifferentBuyer;
+
+            // check trade
+            var items = await itemsApi.ApiItemsFindUuidPostAsync(new(){
+                            new (){
+                                Tag = sell.Tag,
+                                Uuid = Guid.Parse(sell.FlatenedNBT.Where(n => n.Key == "uuid").First().Value)
+                            }
+                        });
+            if (items.Count <= 0)
+            {
+                return flags;
+            }
+            // TODO: maybe make sure to use best match to sell modifiers
+            var itemInfo = items.First();
+            var itemTrade = await transactionApi.TransactionItemItemIdGetAsync(itemInfo.Id ?? throw new Exception("no item id"), 0);
+            if (itemTrade.Count > 0)
+            {
+                var time = itemTrade.First().TimeStamp;
+                var tradeitems = await transactionApi.TransactionPlayerPlayerUuidGetAsync(itemTrade.First().PlayerUuid, 1, time);
+                var coins = tradeitems.Where(t => t.ItemId == COIN_ID).Sum(t => t.Amount);
+                var itemCount = tradeitems.Where(t => t.ItemId != COIN_ID).Count();
+                // overwrite buy cost
+                buy.HighestBidAmount = coins / 10 / itemCount;
+                foreach (var tradePosition in tradeitems)
+                {
+                    Console.WriteLine($"trade: {tradePosition.PlayerUuid} {tradePosition.TimeStamp} {tradePosition.ItemId} {tradePosition.Amount}");
+                }
+                flags |= FlipFlags.ViaTrade;
+                if (itemCount > 1)
+                    flags |= FlipFlags.MultiItemTrade;
+            }
+
+            return flags;
         }
 
         private async Task CheckNoIdAuctions(IEnumerable<SaveAuction> sells, ParallelOptions parallelOptions)
