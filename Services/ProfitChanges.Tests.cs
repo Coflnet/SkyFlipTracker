@@ -272,7 +272,7 @@ public class ProfitChangeTests
                 .ReturnsAsync(() => new() { Median = 100_000_000 });
         service = new ProfitChangeService(pricesApi.Object, null, null, null, null, null, null);
         var changes = await service.GetChanges(buy, sell).ToListAsync();
-        Assert.AreEqual(2, changes.Count);
+        Assert.AreEqual(2, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
         Assert.AreEqual(-100001210, changes.Sum(c => c.Amount));
     }
 
@@ -814,6 +814,8 @@ public class ProfitChangeTests
         var pricesApi = new Mock<Api.Client.Api.IPricesApi>();
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("INFERNO_APEX", null, 0, default)).ReturnsAsync(() => new() { Median = 500_000_000 });
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("WARNING_FLARE", null, 0, default)).ReturnsAsync(() => new() { Median = 5_000_000 });
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("MANA_DISINTEGRATOR", null, 0, default)).ReturnsAsync(() => new() { Median = 100_000 });
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("JALAPENO_BOOK", null, 0, default)).ReturnsAsync(() => new() { Median = 3_000_000 });
         var craftsApi = new Mock<Crafts.Client.Api.ICraftsApi>();
         craftsApi.Setup(c => c.CraftsAllGetAsync(0, default)).ReturnsAsync(() => new() {
             new() { ItemId = "SOS_FLARE", Ingredients = new() {
@@ -829,8 +831,9 @@ public class ProfitChangeTests
             .ReturnsAsync(() => new() { Tag = "SOS_FLARE", Tier = Items.Client.Model.Tier.LEGENDARY });
         service = new ProfitChangeService(pricesApi.Object, null, craftsApi.Object, NullLogger<ProfitChangeService>.Instance, itemsApi.Object, null, null);
         var changes = await service.GetChanges(buy, sell).ToListAsync();
-        Assert.AreEqual(2, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
-        Assert.AreEqual(craftCost + ahFees, -changes.Sum(c => c.Amount));
+        Assert.AreEqual(4, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
+        var upgradeCost = 3_000_000 + 10 * 100_000;
+        Assert.AreEqual(craftCost + ahFees + upgradeCost, -changes.Sum(c => c.Amount));
     }
 
     [Test]

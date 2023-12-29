@@ -367,14 +367,19 @@ public class ProfitChangeService
         if (!mapper.TryGetIngredients(item.Key, item.Value, valueOnBuy.Value, out var items))
             yield break;
 
-        foreach (var ingredient in items)
+        foreach (var ingredient in items.GroupBy(i => i).Select(g => (g.Key, count: g.Count())))
         {
+            if (item.Value == "PET_ITEM_TIER_BOOST")
+                continue; // already handled
             if (item.Key == "ability_scroll")
             {
-                yield return await CostOf(ingredient, $"Applied {ingredient}");
+                yield return await CostOf(ingredient.Key, $"Applied {ingredient.Key}");
                 continue;
             }
-            yield return await CostOf(ingredient, $"Used {ingredient} to upgraded {item.Key} to {item.Value}");
+            if (ingredient.count == 1)
+                yield return await CostOf(ingredient.Key, $"Used {ingredient.Key} to upgraded {item.Key} to {item.Value}", ingredient.count);
+            else
+                yield return await CostOf(ingredient.Key, $"Used {ingredient.count}x {ingredient.Key} to upgraded {item.Key} to {item.Value}", ingredient.count);
         }
     }
 
