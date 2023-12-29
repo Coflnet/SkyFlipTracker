@@ -433,6 +433,37 @@ public class ProfitChangeTests
     }
 
     [Test]
+    public async Task AppliedSkinToPet()
+    {
+        var buy = new Core.SaveAuction()
+        {
+            Uuid = Guid.NewGuid().ToString("N"),
+            Tag = "PET_BAT",
+            HighestBidAmount = 1000,
+            FlatenedNBT = new(),
+            Tier = Core.Tier.EPIC
+        };
+        var sell = new Coflnet.Sky.Core.SaveAuction()
+        {
+            Uuid = Guid.NewGuid().ToString("N"),
+            Tag = "PET_BAT",
+            HighestBidAmount = 10_000_000,
+            FlatenedNBT = new()
+            {
+                { "skin", "ENDERMITE_DYNAMITE" }
+            },
+            Tier = Core.Tier.EPIC
+        };
+        var pricesApi = new Mock<IPricesApi>();
+        var price = Random.Shared.Next();
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("PET_SKIN_ENDERMITE_DYNAMITE", null, 0, default)).ReturnsAsync(() => new() { Median = price });
+        service = new ProfitChangeService(pricesApi.Object, null, null, NullLogger<ProfitChangeService>.Instance, null, null, null);
+        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        Assert.AreEqual(2, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
+        Assert.AreEqual(-price, changes.Last().Amount);
+    }
+
+    [Test]
     public async Task NotAddedEthermerge()
     {
         var buy = new Core.SaveAuction()

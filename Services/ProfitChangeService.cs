@@ -376,6 +376,11 @@ public class ProfitChangeService
                 yield return await CostOf(ingredient.Key, $"Applied {ingredient.Key}");
                 continue;
             }
+            if (item.Key == "skin" && sell.Tag.StartsWith("PET_"))
+            {
+                yield return await CostOf($"PET_SKIN_" + ingredient.Key, $"Applied {ingredient.Key}");
+                continue;
+            }
             if (ingredient.count == 1)
                 yield return await CostOf(ingredient.Key, $"Used {ingredient.Key} to upgraded {item.Key} to {item.Value}", ingredient.count);
             else
