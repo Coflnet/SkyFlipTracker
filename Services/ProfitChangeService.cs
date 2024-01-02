@@ -371,6 +371,8 @@ public class ProfitChangeService
         {
             if (item.Value == "PET_ITEM_TIER_BOOST")
                 continue; // already handled
+            if (item.Value.StartsWith("RUNE_") && item.Value != ingredient.Key)
+                continue; // rune mapping returns both without and with level and here we only handle without
             if (item.Key == "ability_scroll")
             {
                 yield return await CostOf(ingredient.Key, $"Applied {ingredient.Key}");
