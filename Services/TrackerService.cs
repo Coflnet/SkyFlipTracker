@@ -448,6 +448,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     var sell = item.Where(i => i.FlatenedNBT.Any(f => f.Key == match.Key && f.Value == match.Value)).FirstOrDefault();
                     if (sell == null && buyResp.FlatenedNBT.Count > 0)
                         continue;
+                    sell = item.First();
                     var profit = (long)(sell.HighestBidAmount - buyResp.HighestBidAmount);
                     var tax = profitChangeService.GetAhTax(sell);
                     profit += tax.Amount;
