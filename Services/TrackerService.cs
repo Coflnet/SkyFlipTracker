@@ -442,10 +442,11 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 {
                     var buyResp = await GetAuction(purchase.AuctionId, token).ConfigureAwait(false);
                     var match = buyResp.FlatenedNBT.FirstOrDefault(n => item.Any(i => i.FlatenedNBT.Any(f => f.Key == n.Key && f.Value == n.Value)));
-                    if (match.Key == null)
+                    // some items don't have any nbt data
+                    if (match.Key == null && buyResp.FlatenedNBT.Count > 0)
                         continue;
                     var sell = item.Where(i => i.FlatenedNBT.Any(f => f.Key == match.Key && f.Value == match.Value)).FirstOrDefault();
-                    if (sell == null)
+                    if (sell == null && buyResp.FlatenedNBT.Count > 0)
                         continue;
                     var profit = (long)(sell.HighestBidAmount - buyResp.HighestBidAmount);
                     var tax = profitChangeService.GetAhTax(sell);
