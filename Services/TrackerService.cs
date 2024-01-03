@@ -436,12 +436,17 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                                 .GroupBy(s => new { s.AuctioneerId, s.Tag });
             await Parallel.ForEachAsync(noUidCheck, async (item, token) =>
             {
+                var logMore = item.First().Tag == "PINK_DONUT_PERSONALITY";
                 var query = new Dictionary<string, string>() { { "tag", item.Key.Tag } };
                 var purchases = await playerApi.ApiPlayerPlayerUuidBidsGetAsync(item.Key.AuctioneerId, 0, query);
+                if (logMore)
+                    logger.LogInformation($"Found {purchases.Count} purchases for {item.Key.AuctioneerId} {item.Key.Tag}");
                 foreach (var purchase in purchases.OrderByDescending(p => p.End).Where(p => p.End < item.First().End))
                 {
                     var buyResp = await GetAuction(purchase.AuctionId, token).ConfigureAwait(false);
                     var match = buyResp.FlatenedNBT.FirstOrDefault(n => item.Any(i => i.FlatenedNBT.Any(f => f.Key == n.Key && f.Value == n.Value)));
+                    if (logMore)
+                        logger.LogInformation($"Found match {match.Key} {match.Value}");
                     // some items don't have any nbt data
                     if (match.Key == null && buyResp.FlatenedNBT.Count > 0)
                         continue;
@@ -473,6 +478,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                         FinderType = LowPricedAuction.FinderType.UNKOWN,
                         ProfitChanges = new List<PastFlip.ProfitChange>() { tax }
                     };
+                    if(logMore)
+                        logger.LogInformation($"Found flip {flip.Profit} {flip.ItemName} {flip.SellTime} {flip.PurchaseTime} {flip.SellAuctionId} {flip.PurchaseAuctionId}");
                     await flipStorageService.SaveFlip(flip);
                     Console.WriteLine($"Found flip https://sky.coflnet.com/a/{buyResp.Uuid} -> https://sky.coflnet.com/a/{sell.Uuid}");
                     return;
