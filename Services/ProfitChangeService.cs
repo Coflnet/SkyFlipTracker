@@ -7,6 +7,7 @@ using Coflnet.Sky.Items.Client.Api;
 using System.Text.RegularExpressions;
 using Coflnet.Sky.Core;
 using System.Runtime.Serialization;
+using Coflnet.Sky.Core.Services;
 
 namespace Coflnet.Sky.SkyAuctionTracker.Services;
 /// <summary>

@@ -7,6 +7,7 @@ using Coflnet.Sky.Crafts.Client.Model;
 using NUnit.Framework;
 using Moq;
 using Newtonsoft.Json;
+using Coflnet.Sky.Core.Services;
 
 namespace Coflnet.Sky.SkyAuctionTracker.Services;
 
