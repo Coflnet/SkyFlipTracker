@@ -441,6 +441,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 var purchases = await playerApi.ApiPlayerPlayerUuidBidsGetAsync(item.Key.AuctioneerId, 0, query);
                 if (logMore)
                     logger.LogInformation($"Found {purchases.Count} purchases for {item.Key.AuctioneerId} {item.Key.Tag}");
+                Api.Client.Model.BidResult previousAuction = null;
                 foreach (var purchase in purchases.OrderByDescending(p => p.End).Where(p => p.End < item.First().End))
                 {
                     var buyResp = await GetAuction(purchase.AuctionId, token).ConfigureAwait(false);
@@ -454,9 +455,25 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     if (sell == null && buyResp.FlatenedNBT.Count > 0)
                         continue;
                     sell = item.First();
-                    var profit = (long)(sell.HighestBidAmount - buyResp.HighestBidAmount);
+                    var profit = sell.HighestBidAmount - buyResp.HighestBidAmount;
                     var tax = profitChangeService.GetAhTax(sell);
                     profit += tax.Amount;
+                    var changes = new List<PastFlip.ProfitChange>() { tax };
+                    if (previousAuction != null)
+                    {
+                        profit -= previousAuction.HighestBid;
+                        var purchaseCost = new PastFlip.ProfitChange($"Auction purchase", -previousAuction.HighestBid)
+                        {
+                            ContextItemId = AuctionService.Instance.GetId(previousAuction.AuctionId)
+                        };
+                        changes.Add(purchaseCost);
+                    }
+                    else if (sell.Count > buyResp.Count)
+                    {
+                        // has sold multiple purchases in one auction
+                        previousAuction = purchase;
+                        continue;
+                    }
                     if (sell.End - buyResp.End > TimeSpan.FromDays(14))
                         profit = 0; // no flip if it took more than 2 weeks
                     var flip = new PastFlip()
@@ -476,9 +493,9 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                         Version = 1,
                         TargetPrice = 0,
                         FinderType = LowPricedAuction.FinderType.UNKOWN,
-                        ProfitChanges = new List<PastFlip.ProfitChange>() { tax }
+                        ProfitChanges = changes
                     };
-                    if(logMore)
+                    if (logMore)
                         logger.LogInformation($"Found flip {flip.Profit} {flip.ItemName} {flip.SellTime} {flip.PurchaseTime} {flip.SellAuctionId} {flip.PurchaseAuctionId}");
                     await flipStorageService.SaveFlip(flip);
                     Console.WriteLine($"Found flip https://sky.coflnet.com/a/{buyResp.Uuid} -> https://sky.coflnet.com/a/{sell.Uuid}");
