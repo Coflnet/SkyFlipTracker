@@ -1096,6 +1096,25 @@ public class ProfitChangeTests
         Assert.AreEqual(-42001210, changes.Sum(c => c.Amount));
     }
 
+    [TestCase(null, "magic_find", "TALISMAN_ENRICHMENT_MAGIC_FIND")]
+    [TestCase("magic_find", "magic_find", null)]
+    [TestCase("magic_fin", "magic_find", "TALISMAN_ENRICHMENT_SWAPPER")]
+    public async Task EnrichmentAdded(string present, string property, string itemname)
+    {
+        var buy = CreateAuction("WITHER_RELIC");
+        if (present != null)
+            buy.FlatenedNBT["talisman_enrichment"] = present;
+        var sell = CreateAuction("WITHER_RELIC");
+        sell.FlatenedNBT["talisman_enrichment"] = property;
+        var pricesApi = new Mock<IPricesApi>();
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(itemname, null, 0, default)).ReturnsAsync(() => new() { Median = 1_000_000 });
+        service = new ProfitChangeService(pricesApi.Object, null, null, NullLogger<ProfitChangeService>.Instance, null, null, null);
+        var result = await service.GetChanges(buy, sell).ToListAsync();
+        Assert.AreEqual(itemname == null ? 1 : 2, result.Count);
+        if(itemname != null)
+            Assert.AreEqual(-1000000, result[1].Amount);
+    }
+
     [Test]
     public async Task MultiLevelCraftOriginal()
     {
