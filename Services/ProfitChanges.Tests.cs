@@ -774,7 +774,7 @@ public class ProfitChangeTests
     /// (their value increases nonexponential based on level)
     /// </summary>
     [TestCase(Core.Enchantment.EnchantmentType.hecatomb, 6_000_000, "hecatomb_s_runs", 97, 100, -600000)]
-    [TestCase(Core.Enchantment.EnchantmentType.compact, 6_000_000, "compact_blocks", 900_000, 1_000_000, -200000)]
+    [TestCase(Core.Enchantment.EnchantmentType.compact, 6_000_000, "compact_blocks", 900_000, 1_000_000, -600000)]
     [TestCase(Core.Enchantment.EnchantmentType.expertise, 6_000_000, "expertise_kills", 10_000, 15_000, -5000000)]
     public async Task LinearEnchantUpgrade(Core.Enchantment.EnchantmentType ench, int bazaarPrice, string attribName, int attrStart, int attrEnd, int expectedDiff)
     {

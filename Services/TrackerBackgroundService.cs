@@ -189,7 +189,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 consumeCounter.Inc(lps.Count());
                 try
                 {
-                    await StoreFlips(lps, scope, service);
+                    await Recheck(lps, scope, service);
                 }
                 catch (System.Exception e)
                 {
@@ -198,7 +198,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             }, stoppingToken, "sky-fliptracker", 50);
         }
 
-        private async Task StoreFlips(IEnumerable<LowPricedAuction> lps, IServiceScope scope, TrackerService service)
+        private async Task Recheck(IEnumerable<LowPricedAuction> lps, IServiceScope scope, TrackerService service)
         {
             var rerequestService = scope.ServiceProvider.GetRequiredService<IBaseApi>();
             var events = new List<FlipEvent>();
