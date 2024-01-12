@@ -1,4 +1,4 @@
-VERSION=0.9.3
+VERSION=0.10.0
 
 docker run --rm -v "${PWD}:/local" --network host -u $(id -u ${USER}):$(id -g ${USER})  openapitools/openapi-generator-cli generate \
 -i http://localhost:5017/swagger/v1/swagger.json \

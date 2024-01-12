@@ -165,6 +165,14 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
         {
             return await db.Flips.Where(flip => flip.AuctionId == auctionId).ToListAsync();
         }
+        [HttpPost]
+        [Route("flips/estimates/batch")]
+        public async Task<List<Flip>> GetFlipsOfAuctionBatch(List<long> auctionIds)
+        {
+            return await db.Flips.Where(flip => auctionIds.Contains(flip.AuctionId)).ToListAsync();
+        }
+
+
 
         /// <summary>
         /// Gets the flips for a given auctions
