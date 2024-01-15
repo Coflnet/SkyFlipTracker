@@ -343,7 +343,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     try
                     {
                         changes = await profitChangeService.GetChanges(buy, sell).ToListAsync().ConfigureAwait(false);
-                        await AddListingAttempts(sell, changes);
+                        if (buy.End > sell.End - TimeSpan.FromDays(14))
+                            await AddListingAttempts(sell, changes);
                     }
                     catch (System.Exception e)
                     {
