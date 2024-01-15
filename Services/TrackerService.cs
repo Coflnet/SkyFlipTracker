@@ -389,7 +389,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
         private async Task AddListingAttempts(SaveAuction sell, List<PastFlip.ProfitChange> changes)
         {
             var uid = sell.FlatenedNBT.Where(n => n.Key == "uid").FirstOrDefault().Value;
-            var listings = await playerApi.ApiPlayerPlayerUuidAuctionsGetAsync(sell.AuctioneerId, 0, new Dictionary<string, string>() { { "Uid", uid } });
+            var listings = await playerApi.ApiPlayerPlayerUuidAuctionsGetAsync(sell.AuctioneerId, 0, new Dictionary<string, string>() { { "UId", uid } });
             foreach (var listing in listings.Where(l => l.AuctionId != sell.Uuid))
             {
                 var change = profitChangeService.GetAhTax(listing.HighestBid, listing.StartingBid);
