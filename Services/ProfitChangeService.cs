@@ -203,6 +203,8 @@ public class ProfitChangeService
     public PastFlip.ProfitChange GetAhTax(long highestBid, long startingBid = 0)
     {
         var listCostFactor = 1f;
+        if(startingBid == 0)
+            startingBid = highestBid;
         if (highestBid > 10_000_000)
             listCostFactor = 2;
         if (highestBid > 100_000_000)
