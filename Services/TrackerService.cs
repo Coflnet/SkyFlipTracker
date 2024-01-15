@@ -343,6 +343,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     try
                     {
                         changes = await profitChangeService.GetChanges(buy, sell).ToListAsync().ConfigureAwait(false);
+                        await AddListingAttempts(sell, changes);
                     }
                     catch (System.Exception e)
                     {
@@ -383,6 +384,20 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 }
             });
             await noUidTask;
+        }
+
+        private async Task AddListingAttempts(SaveAuction sell, List<PastFlip.ProfitChange> changes)
+        {
+            var uid = sell.FlatenedNBT.Where(n => n.Key == "uid").FirstOrDefault().Value;
+            var listings = await playerApi.ApiPlayerPlayerUuidAuctionsGetAsync(sell.AuctioneerId, 0, new Dictionary<string, string>() { { "Uid", uid } });
+            foreach (var listing in listings.Where(l => l.AuctionId != sell.Uuid))
+            {
+                var change = profitChangeService.GetAhTax(listing.HighestBid, listing.StartingBid);
+                change.ContextItemId = AuctionService.Instance.GetId(listing.AuctionId);
+                change.Label = $"Listing attempt {listing.StartingBid}";
+                changes.Add(change);
+                Console.WriteLine($"Found listing attempt {listing.StartingBid} {listing.HighestBid} {listing.AuctionId} for {sell.Uuid}");
+            }
         }
 
         private async Task<FlipFlags> CheckTrade(ApiSaveAuction buy, SaveAuction sell)
@@ -456,7 +471,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                         continue;
                     sell = item.First();
                     var profit = sell.HighestBidAmount - buyResp.HighestBidAmount;
-                    var tax = profitChangeService.GetAhTax(sell);
+                    var tax = profitChangeService.GetAhTax(sell.HighestBidAmount, sell.StartingBid);
                     profit += tax.Amount;
                     var changes = new List<PastFlip.ProfitChange>() { tax };
                     if (previousAuction != null)
