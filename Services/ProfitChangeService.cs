@@ -210,7 +210,7 @@ public class ProfitChangeService
         var ahTax = new PastFlip.ProfitChange()
         {
             Amount = (long)-(
-                highestBid * listCostFactor / 100 // listing fee
+                startingBid * listCostFactor / 100 // listing fee
                 + (highestBid > 1_000_000 ? highestBid * 0.01 : 0) // claiming fee
                 + 1200 // time fee
                 ),
