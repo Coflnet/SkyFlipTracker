@@ -124,11 +124,10 @@ public class ProfitChangeService
                 }
                 if (sell.Tag == "PULSE_RING")
                 {
-                    var previusCharge = buy.FlatenedNBT.FirstOrDefault(f=> f.Key == "thunder_charge").Value ?? "0";
-                    var currentCharge = sell.FlatenedNBT.FirstOrDefault(f=> f.Key == "thunder_charge").Value ?? "0";
+                    var currentCharge = sell.FlatenedNBT.FirstOrDefault(f => f.Key == "thunder_charge").Value ?? "0";
                     if (wasRecombobulated)
                         targetTier--;
-                    var toibCount = (int.Parse(currentCharge) - int.Parse(previusCharge)) / 50_000;
+                    var toibCount = (int.Parse(currentCharge) - buy.GetNbtValue("thunder_charge")) / 50_000;
                     yield return await CostOf("THUNDER_IN_A_BOTTLE", $"{toibCount}x Thunder in a bottle", toibCount);
                     targetTier = buy.Tier; // handled conversion, don't log
                 }
@@ -202,7 +201,7 @@ public class ProfitChangeService
     public PastFlip.ProfitChange GetAhTax(long highestBid, long startingBid = 0)
     {
         var listCostFactor = 1f;
-        if(startingBid == 0)
+        if (startingBid == 0)
             startingBid = highestBid;
         if (startingBid > 10_000_000)
             listCostFactor = 2;
@@ -474,6 +473,15 @@ public class ProfitChangeService
     {
         if (item.Type == Core.Enchantment.EnchantmentType.telekinesis)
             return null; // not a book anymore
+        if (sell.Tag == "PROMISING_SPADE" && item.Type == Core.Enchantment.EnchantmentType.efficiency)
+        {
+            var difference = buy.GetNbtValue("blocksBroken") - Math.Min(sell.GetNbtValue("blocksBroken"), 20_000);
+            return new PastFlip.ProfitChange()
+            {
+                Label = $"Mined {difference} blocks",
+                Amount = difference
+            };
+        }
         PastFlip.ProfitChange found = null;
         try
         {
@@ -630,4 +638,12 @@ public class ApiSaveAuction : Core.SaveAuction
     /// </summary>
     [DataMember(Name = "flatNbt", EmitDefaultValue = true)]
     public override Dictionary<string, string> FlatenedNBT { get; set; }
+}
+
+public static class AuctionShortcuts
+{
+    public static int GetNbtValue(this Core.SaveAuction auction, string key)
+    {
+        return int.Parse(auction.FlatenedNBT.Where(f => f.Key == key).FirstOrDefault().Value ?? "0");
+    }
 }

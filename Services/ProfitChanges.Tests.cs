@@ -969,11 +969,7 @@ public class ProfitChangeTests
             Enchantments = new(),
             Tier = Core.Tier.LEGENDARY
         };
-        var pricesApi = new Mock<IPricesApi>();
-        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), null, 0, default)).ReturnsAsync(() => new() { Median = 10_000_000 });
-        service = new ProfitChangeService(pricesApi.Object, null, null,
-            NullLogger<ProfitChangeService>.Instance, null,
-            new HypixelItemService(new System.Net.Http.HttpClient(), NullLogger<HypixelItemService>.Instance), null);
+        Mock<IPricesApi> pricesApi = SetupItemPrice(10_000_000);
         var changes = await service.GetChanges(buy, sell).ToListAsync();
         Assert.AreEqual(10, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
         Assert.AreEqual(-32084266200, changes.Sum(c => c.Amount));
@@ -987,6 +983,30 @@ public class ProfitChangeTests
         Assert.AreEqual("WITHER essence x500 to add star", changes[2].Label);
         Assert.AreEqual("Used SECOND_MASTER_STAR to upgraded upgrade_level to 9", changes[7].Label);
 
+    }
+
+    private Mock<IPricesApi> SetupItemPrice(int price)
+    {
+        var pricesApi = new Mock<IPricesApi>();
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), null, 0, default)).ReturnsAsync(() => new() { Median = price });
+        service = new ProfitChangeService(pricesApi.Object, null, null,
+            NullLogger<ProfitChangeService>.Instance, null,
+            new HypixelItemService(new System.Net.Http.HttpClient(), NullLogger<HypixelItemService>.Instance), null);
+        return pricesApi;
+    }
+
+    [Test]
+    public async Task PromisingShovelSelfUpgradesEnchants()
+    {
+        var buy = CreateAuction("PROMISING_SPADE", "Promising Shovel", 10_000);
+        buy.FlatenedNBT["blocksBroken"] = "5";
+        var sell = CreateAuction("PROMISING_SPADE", "Promising Shovel", 100_000);
+        sell.FlatenedNBT["blocksBroken"] = "20001";
+        sell.Enchantments.Add(new() { Type = Core.Enchantment.EnchantmentType.efficiency, Level = 10 });
+        SetupItemPrice(500_000);
+        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        Assert.AreEqual(2, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
+        Assert.AreEqual(-19995, changes[1].Amount);
     }
 
     [Test]
