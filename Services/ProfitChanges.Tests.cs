@@ -361,7 +361,7 @@ public class ProfitChangeTests
         };
         var price = Random.Shared.Next(1, 5_000_000);
         var pricesApi = new Mock<IPricesApi>();
-        pricesApi.Setup(p=> p.ApiItemPriceItemTagGetAsync("RUNE_SOULTWIST", null, 0, default)).ReturnsAsync(() => new() { Median = price });
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("RUNE_SOULTWIST", null, 0, default)).ReturnsAsync(() => new() { Median = price });
         service = new ProfitChangeService(pricesApi.Object, null, null, NullLogger<ProfitChangeService>.Instance, null, null, null);
         var changes = await service.GetChanges(buy, sell).ToListAsync();
         Assert.AreEqual(2, changes.Count);
@@ -533,7 +533,7 @@ public class ProfitChangeTests
             Uuid = Guid.NewGuid().ToString("N"),
             Tag = "PULSE_RING",
             HighestBidAmount = 1000,
-            FlatenedNBT = new(),
+            FlatenedNBT = new(){{"thunder_charge", "1000000"}},
             Tier = Core.Tier.EPIC
         };
         var sell = new Core.SaveAuction()
@@ -541,7 +541,7 @@ public class ProfitChangeTests
             Uuid = Guid.NewGuid().ToString("N"),
             Tag = "PULSE_RING",
             HighestBidAmount = 10_000_000,
-            FlatenedNBT = new(),
+            FlatenedNBT = new(){{"thunder_charge", "5000000"}},
             Tier = Core.Tier.LEGENDARY
         };
         var pricesApi = new Mock<IPricesApi>();
@@ -551,6 +551,34 @@ public class ProfitChangeTests
         Assert.AreEqual(2, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
         Assert.AreEqual(-80201200, changes.Sum(c => c.Amount));
         Assert.AreEqual("80x Thunder in a bottle", changes[1].Label);
+    }
+
+    [Test]
+    public async Task PulseRingUpgradeRecombobulatedWithPresentCharge()
+    {
+        var buy = new Core.SaveAuction()
+        {
+            Uuid = Guid.NewGuid().ToString("N"),
+            Tag = "PULSE_RING",
+            HighestBidAmount = 1000,
+            FlatenedNBT = new() { { "rarity_upgrades", "1" }, { "thunder_charge", "550000" } },
+            Tier = Core.Tier.EPIC
+        };
+        var sell = new Core.SaveAuction()
+        {
+            Uuid = Guid.NewGuid().ToString("N"),
+            Tag = "PULSE_RING",
+            HighestBidAmount = 10_000_000,
+            FlatenedNBT = new() { { "rarity_upgrades", "1" }, { "thunder_charge", "1000000" } },
+            Tier = Core.Tier.LEGENDARY
+        };
+        var pricesApi = new Mock<IPricesApi>();
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), null, 0, default)).ReturnsAsync(() => new() { Median = 1_000_000 });
+        service = new ProfitChangeService(pricesApi.Object, null, null, NullLogger<ProfitChangeService>.Instance, null, null, null);
+        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        Assert.AreEqual(2, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
+        Assert.AreEqual(-9201200, changes.Sum(c => c.Amount));
+        Assert.AreEqual("9x Thunder in a bottle", changes[1].Label);
     }
     [Test]
     public async Task PulseRingUpgradeFull()
@@ -568,7 +596,7 @@ public class ProfitChangeTests
             Uuid = Guid.NewGuid().ToString("N"),
             Tag = "PULSE_RING",
             HighestBidAmount = 10_000_000,
-            FlatenedNBT = new(),
+            FlatenedNBT = new(){{"thunder_charge", "5000000"}},
             Tier = Core.Tier.MYTHIC
         };
         var pricesApi = new Mock<IPricesApi>();
@@ -692,7 +720,7 @@ public class ProfitChangeTests
         sell.Enchantments = new() { new() { Type = Core.Enchantment.EnchantmentType.ultimate_chimera, Level = 4 } };
         var pricesApi = new Mock<IPricesApi>();
         var bazaarApi = new Mock<Bazaar.Client.Api.IBazaarApi>();
-        bazaarApi.Setup(p => p.ApiBazaarPricesGetAsync(0, default)).ReturnsAsync(() => new() { 
+        bazaarApi.Setup(p => p.ApiBazaarPricesGetAsync(0, default)).ReturnsAsync(() => new() {
             new("ENCHANTMENT_ULTIMATE_CHIMERA_1", 105900000, 100_000_000),
             new("ENCHANTMENT_ULTIMATE_CHIMERA_4", 0, 33),
             });
@@ -1111,7 +1139,7 @@ public class ProfitChangeTests
         service = new ProfitChangeService(pricesApi.Object, null, null, NullLogger<ProfitChangeService>.Instance, null, null, null);
         var result = await service.GetChanges(buy, sell).ToListAsync();
         Assert.AreEqual(itemname == null ? 1 : 2, result.Count);
-        if(itemname != null)
+        if (itemname != null)
             Assert.AreEqual(-1000000, result[1].Amount);
     }
 

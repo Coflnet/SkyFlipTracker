@@ -115,23 +115,22 @@ public class ProfitChangeService
             }
             else
             {
-                if (sell.FlatenedNBT.Where(l => l.Key == "rarity_upgrades").Any() && !buy.FlatenedNBT.Where(l => l.Key == "rarity_upgrades").Any())
+                var isrecombobulated = sell.FlatenedNBT.Where(l => l.Key == "rarity_upgrades").Any();
+                var wasRecombobulated = buy.FlatenedNBT.Where(l => l.Key == "rarity_upgrades").Any();
+                if (isrecombobulated && !wasRecombobulated)
                 {
                     yield return await CostOf("RECOMBOBULATOR_3000", "Recombobulator");
                     targetTier--;
                 }
                 if (sell.Tag == "PULSE_RING")
                 {
-                    var toibCount = 0;
-                    if (targetTier >= Core.Tier.LEGENDARY)
-                        toibCount += 80;
-                    if (buy.Tier <= Core.Tier.UNCOMMON)
-                        toibCount += 3;
-                    if (buy.Tier < Core.Tier.EPIC && targetTier >= Core.Tier.EPIC)
-                        toibCount += 17;
-
+                    var previusCharge = buy.FlatenedNBT.FirstOrDefault(f=> f.Key == "thunder_charge").Value ?? "0";
+                    var currentCharge = sell.FlatenedNBT.FirstOrDefault(f=> f.Key == "thunder_charge").Value ?? "0";
+                    if (wasRecombobulated)
+                        targetTier--;
+                    var toibCount = (int.Parse(currentCharge) - int.Parse(previusCharge)) / 50_000;
                     yield return await CostOf("THUNDER_IN_A_BOTTLE", $"{toibCount}x Thunder in a bottle", toibCount);
-                    targetTier--;
+                    targetTier = buy.Tier; // handled conversion, don't log
                 }
                 if ((int)buy.Tier != (int)targetTier)
                     logger.LogWarning($"could not find rarity change source for {sell.Tag} {buy.Uuid} -> {sell.Uuid}");
