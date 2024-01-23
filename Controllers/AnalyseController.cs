@@ -227,7 +227,15 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
 
             var relevantFlips = await GetRelevantFlips(maxTime, minTime, numeric);
             if (relevantFlips.Count == 0)
-                return new SpeedCompResult() { Penalty = badIds.Any() ? 8 : -1, BadIds = badIds };
+            {
+                var receivedCount = await db.FlipEvents.Where(flipEvent =>
+                                    flipEvent.Type == FlipEventType.FLIP_RECEIVE
+                                    && numeric.Contains(flipEvent.PlayerId)
+                                    && flipEvent.Timestamp > minTime
+                                    && flipEvent.Timestamp <= maxTime)
+                            .CountAsync();
+                return new SpeedCompResult() { Penalty = badIds.Any() ? 8 : -1, BadIds = badIds, ReceivedCount = receivedCount };
+            }
             IEnumerable<(double TotalSeconds, TimeSpan age)> timeDif = (await GetTimings(maxTime, numeric, relevantFlips)).Where(t => t.TotalSeconds < 4);
 
             int escrowedUserCount = await GetEscrowedUserCount(maxAge, maxTime, numeric, relevantFlips);
@@ -416,6 +424,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
 
         public class SpeedCompResult
         {
+            public int ReceivedCount { get; set; }
+
             public Dictionary<long, List<DateTime>> Clicks { get; set; }
             public Dictionary<long, DateTime> Buys { get; set; }
             public double Penalty { get; set; }
