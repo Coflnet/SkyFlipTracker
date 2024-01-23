@@ -15,7 +15,7 @@ COPY --from=build /app .
 RUN mkdir -p ah/files
 ENV ASPNETCORE_URLS=http://+:8000
 
-RUN useradd --uid $(shuf -i 2000-65000 -n 1) app
-USER app
+RUN useradd --uid $(shuf -i 2000-65000 -n 1) app-user
+USER app-user
 
 ENTRYPOINT ["dotnet", "SkyFlipTracker.dll", "--hostBuilder:reloadConfigOnChange=false"]
