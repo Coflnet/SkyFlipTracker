@@ -25,6 +25,7 @@ using Coflnet.Sky.Core.Services;
 
 namespace Coflnet.Sky.SkyAuctionTracker
 {
+    #pragma warning disable CS1591
     public class Startup
     {
         public Startup(IConfiguration configuration)
