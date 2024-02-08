@@ -205,7 +205,7 @@ public class ProfitChangeService
             startingBid = highestBid;
         if (startingBid > 10_000_000)
             listCostFactor = 2;
-        if (startingBid > 100_000_000)
+        if (startingBid >= 100_000_000)
             listCostFactor = 2.5f;
         var ahTax = new PastFlip.ProfitChange()
         {
