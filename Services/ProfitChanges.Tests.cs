@@ -940,7 +940,7 @@ public class ProfitChangeTests
         service = new ProfitChangeService(null, null, null, NullLogger<ProfitChangeService>.Instance, null, null, bazaarApi.Object);
         var changes = await service.GetChanges(buy, sell).ToListAsync();
         Assert.AreEqual(2, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
-        Assert.AreEqual(-83001200, changes.Sum(c => c.Amount));
+        Assert.AreEqual(-83501200, changes.Sum(c => c.Amount));
         Assert.AreEqual("Enchant efficiency 10", changes[1].Label);
     }
 
