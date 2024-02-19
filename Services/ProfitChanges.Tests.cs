@@ -533,7 +533,7 @@ public class ProfitChangeTests
             Uuid = Guid.NewGuid().ToString("N"),
             Tag = "PULSE_RING",
             HighestBidAmount = 1000,
-            FlatenedNBT = new(){{"thunder_charge", "1000000"}},
+            FlatenedNBT = new() { { "thunder_charge", "1000000" } },
             Tier = Core.Tier.EPIC
         };
         var sell = new Core.SaveAuction()
@@ -541,7 +541,7 @@ public class ProfitChangeTests
             Uuid = Guid.NewGuid().ToString("N"),
             Tag = "PULSE_RING",
             HighestBidAmount = 10_000_000,
-            FlatenedNBT = new(){{"thunder_charge", "5000000"}},
+            FlatenedNBT = new() { { "thunder_charge", "5000000" } },
             Tier = Core.Tier.LEGENDARY
         };
         var pricesApi = new Mock<IPricesApi>();
@@ -596,7 +596,7 @@ public class ProfitChangeTests
             Uuid = Guid.NewGuid().ToString("N"),
             Tag = "PULSE_RING",
             HighestBidAmount = 10_000_000,
-            FlatenedNBT = new(){{"thunder_charge", "5000000"}},
+            FlatenedNBT = new() { { "thunder_charge", "5000000" } },
             Tier = Core.Tier.MYTHIC
         };
         var pricesApi = new Mock<IPricesApi>();
@@ -923,8 +923,41 @@ public class ProfitChangeTests
         service = new ProfitChangeService(pricesApi.Object, null, craftsApi.Object, NullLogger<ProfitChangeService>.Instance, itemsApi.Object, null, null);
         var changes = await service.GetChanges(buy, sell).ToListAsync();
         Assert.AreEqual(4, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
-        var upgradeCost = 3_000_000 + 10 * 100_000;
+        var upgradeCost = 2_000_000 + 11 * 100_000;
         Assert.AreEqual(craftCost + ahFees + upgradeCost, -changes.Sum(c => c.Amount));
+    }
+
+    [TestCase(true, 1)]
+    [TestCase(false, 2)]
+    public async Task StatsBookKeep(bool hadBook, int expectedChangecount)
+    {
+        var buy = new Core.SaveAuction()
+        {
+            Uuid = Guid.NewGuid().ToString("N"),
+            Tag = "ATOMSPLIT_KATANA",
+            HighestBidAmount = 5_000_000,
+            FlatenedNBT = new() { { "stats_book", "2000" } },
+            Enchantments = new(),
+            Tier = Core.Tier.LEGENDARY
+        };
+        if(!hadBook)
+            buy.FlatenedNBT.Remove("stats_book");
+        var sell = new Core.SaveAuction()
+        {
+            Uuid = Guid.NewGuid().ToString("N"),
+            Tag = "ATOMSPLIT_KATANA",
+            HighestBidAmount = 13_000_000,
+            FlatenedNBT = new() {
+                 { "stats_book", "2010" }
+            },
+            Enchantments = new(),
+            Tier = Core.Tier.LEGENDARY
+        };
+        var pricesApi = new Mock<IPricesApi>();
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("BOOK_OF_STATS", null, 0, default)).ReturnsAsync(() => new() { Median = 1_000_000 });
+        service = new ProfitChangeService(pricesApi.Object, null, null, NullLogger<ProfitChangeService>.Instance, null, null, null);
+        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        Assert.AreEqual(expectedChangecount, changes.Count, JsonConvert.SerializeObject(changes));
     }
 
     [Test]
