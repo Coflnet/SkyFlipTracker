@@ -960,21 +960,24 @@ public class ProfitChangeTests
         Assert.AreEqual(expectedChangecount, changes.Count, JsonConvert.SerializeObject(changes));
     }
 
-    [Test]
-    public async Task EfficiencyUpgradeSilex()
+    [TestCase(0, -83501200, "Enchant efficiency 10")]
+    [TestCase(7, -51501200, "Enchant efficiency from 7 to 10")]
+    public async Task EfficiencyUpgradeSilex(byte startingLevel, int cost, string message)
     {
         var buy = CreateAuction("DRILL", "drill", 1_000_000);
         var sell = CreateAuction("DRILL", "drill", 100_000_000);
         sell.Enchantments = new(){
                 new() { Type = Core.Enchantment.EnchantmentType.efficiency, Level = 10  }};
+        if(startingLevel > 0)
+            buy.Enchantments = new (){ new() { Type = Core.Enchantment.EnchantmentType.efficiency, Level = startingLevel } };
         var bazaarApi = new Mock<Bazaar.Client.Api.IBazaarApi>();
         bazaarApi.Setup(p => p.ApiBazaarPricesGetAsync(0, default))
             .ReturnsAsync(() => new() { new("SIL_EX", 17_000_000, 16_000_000) });
         service = new ProfitChangeService(null, null, null, NullLogger<ProfitChangeService>.Instance, null, null, bazaarApi.Object);
         var changes = await service.GetChanges(buy, sell).ToListAsync();
         Assert.AreEqual(2, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
-        Assert.AreEqual(-83501200, changes.Sum(c => c.Amount));
-        Assert.AreEqual("Enchant efficiency 10", changes[1].Label);
+        Assert.AreEqual(cost, changes.Sum(c => c.Amount));
+        Assert.AreEqual(message, changes[1].Label);
     }
 
     [Test]

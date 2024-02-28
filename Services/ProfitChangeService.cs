@@ -490,7 +490,7 @@ public class ProfitChangeService
             var sellValue = mapper.EnchantValue(item, sell.FlatenedNBT, itemValues);
             var buyValue = 0L;
             var enchantAtBuy = buy.Enchantments.Where(e => e.Type == item.Type).FirstOrDefault();
-            if (enchantAtBuy != default && (enchantAtBuy.Level != item.Level - 1 && item.Level < 7
+            if (enchantAtBuy != default && (enchantAtBuy.Level != item.Level - 1 //&& item.Level < 7
                 || Constants.EnchantToAttribute.ContainsKey(item.Type)))
             {
                 buyValue = mapper.EnchantValue(enchantAtBuy, buy.FlatenedNBT, itemValues);
