@@ -630,17 +630,23 @@ public class ProfitChangeTests
     public async Task CombineHighLevelAttribut()
     {
         var buy = CreateAuction("AURORA_CHESTPLATE");
+        buy.FlatenedNBT["magic_find"] = "4";
         buy.FlatenedNBT["mana_pool"] = "4";
         var sell = CreateAuction("AURORA_CHESTPLATE");
         sell.FlatenedNBT["mana_pool"] = "10";
+        sell.FlatenedNBT["magic_find"] = "7";
         var pricesApi = new Mock<IPricesApi>();
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("ATTRIBUTE_SHARD", new() { { "mana_pool", "2" } }, 0, default)).ReturnsAsync(() => new() { Median = 2_000_000 });
+        // there is no shard for magic find 2
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("ATTRIBUTE_SHARD", new() { { "magic_find", "2" } }, 0, default)).ReturnsAsync(() => new() { Median = 0 });
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("AURORA_CHESTPLATE", new() { { "magic_find", "2" } }, 0, default)).ReturnsAsync(() => new() { Median = 2_000_000 });
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("AURORA_CHESTPLATE", new() { { "mana_pool", "2" } }, 0, default)).ReturnsAsync(() => new() { Median = 5_000_000 });
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("AURORA_CHESTPLATE", new() { { "mana_pool", "5" } }, 0, default)).ReturnsAsync(() => new() { Median = 10_000_000 });
         service = new ProfitChangeService(pricesApi.Object, null, null, NullLogger<ProfitChangeService>.Instance, null, null, null);
         var result = await service.GetChanges(buy, sell).ToListAsync();
-        Assert.AreEqual(2, result.Count);
+        Assert.AreEqual(3, result.Count);
         Assert.AreEqual(-312000000, result[1].Amount);
+        Assert.AreEqual(-248000000, result[2].Amount);
     }
     [Test]
     public async Task WheelOfFateChangesAttributeType()
