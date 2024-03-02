@@ -8,6 +8,7 @@ using System.Text.RegularExpressions;
 using Coflnet.Sky.Core;
 using System.Runtime.Serialization;
 using Coflnet.Sky.Core.Services;
+using System.Security.Cryptography;
 
 namespace Coflnet.Sky.SkyAuctionTracker.Services;
 /// <summary>
@@ -147,7 +148,16 @@ public class ProfitChangeService
         foreach (var gem in gemsRemoved)
         {
             string type = GetCorrectKey(gem, buy.FlatenedNBT);
-            yield return await ValueOf($"{gem.Value}_{type}_GEM", $"{gem.Value} {type} gem removed");
+            var gemValue = await ValueOf($"{gem.Value}_{type}_GEM", $"{gem.Value} {type} gem removed");
+            gemValue.Amount -= gem.Value switch
+            {
+                "PERFECT" => 500_000,
+                "FLAWLESS" => 100_000,
+                "FINE" => 10_000,
+                "FLAWED" => 100,
+                _ => 0
+            };
+            yield return gemValue;
         }
 
         var itemsOnPurchase = buy.FlatenedNBT.Where(f => ItemKeys.Contains(f.Key)).ToList();

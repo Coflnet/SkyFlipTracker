@@ -298,6 +298,23 @@ public class ProfitChangeTests
     }
 
     [Test]
+    public async Task GemRemoved()
+    {
+        var buy = CreateAuction("DIVAN_CHESTPLATE");
+        buy.FlatenedNBT.Add("TOPAZ_0", "PERFECT");
+        var sell = CreateAuction("DIVAN_CHESTPLATE");
+        var pricesApi = new Mock<IPricesApi>();
+        var value = Random.Shared.Next(4_000_000, 5_000_000);
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("PERFECT_TOPAZ_GEM", null, 0, default))
+                .ReturnsAsync(() => new() { Median = value });
+
+        service = new ProfitChangeService(pricesApi.Object, null, null, NullLogger<ProfitChangeService>.Instance, null, null, null);
+        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        Assert.AreEqual("PERFECT TOPAZ gem removed", changes[1].Label);
+        Assert.AreEqual(value * 98 / 100 - 500_000, changes[1].Amount, "gem removal cost is 500k");
+    }
+
+    [Test]
     public async Task TierBoostKeep()
     {
         var buy = CreateAuction("PET_ENDER_DRAGON", "PET_ITEM_TIER_BOOST", 1000, Core.Tier.LEGENDARY);
@@ -946,7 +963,7 @@ public class ProfitChangeTests
             Enchantments = new(),
             Tier = Core.Tier.LEGENDARY
         };
-        if(!hadBook)
+        if (!hadBook)
             buy.FlatenedNBT.Remove("stats_book");
         var sell = new Core.SaveAuction()
         {
@@ -974,8 +991,8 @@ public class ProfitChangeTests
         var sell = CreateAuction("DRILL", "drill", 100_000_000);
         sell.Enchantments = new(){
                 new() { Type = Core.Enchantment.EnchantmentType.efficiency, Level = 10  }};
-        if(startingLevel > 0)
-            buy.Enchantments = new (){ new() { Type = Core.Enchantment.EnchantmentType.efficiency, Level = startingLevel } };
+        if (startingLevel > 0)
+            buy.Enchantments = new() { new() { Type = Core.Enchantment.EnchantmentType.efficiency, Level = startingLevel } };
         var bazaarApi = new Mock<Bazaar.Client.Api.IBazaarApi>();
         bazaarApi.Setup(p => p.ApiBazaarPricesGetAsync(0, default))
             .ReturnsAsync(() => new() { new("SIL_EX", 17_000_000, 16_000_000) });
