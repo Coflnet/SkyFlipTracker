@@ -297,7 +297,8 @@ public class ProfitChangeService
         }
         if (item.Key == "upgrade_level")
         {
-            var upgradeCost = await hypixelItemService.GetStarCost(sell.Tag, int.Parse(valueOnBuy.Value ?? "0"), int.Parse(item.Value));
+            var baseLevel = int.Parse(valueOnBuy.Value ?? buy.FlatenedNBT.GetValueOrDefault("dungeon_item_level") ?? "0");
+            var upgradeCost = await hypixelItemService.GetStarCost(sell.Tag, baseLevel, int.Parse(item.Value));
             foreach (var cost in upgradeCost)
             {
                 if (cost.Type == "ESSENCE")

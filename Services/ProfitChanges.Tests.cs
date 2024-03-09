@@ -1044,6 +1044,20 @@ public class ProfitChangeTests
 
     }
 
+    [Test]
+    public async Task OldStarStart()
+    {
+        var buy = CreateAuction("HYPERION", "Hyperion", 879_000_000);
+        buy.FlatenedNBT["dungeon_item_level"] = "4";
+        var sell = CreateAuction("HYPERION", "Hyperion", 979_000_000);
+        sell.FlatenedNBT["upgrade_level"] = "5";
+        sell.FlatenedNBT["dungeon_item_level"] = "4";
+        Mock<IPricesApi> pricesApi = SetupItemPrice(10_000_000);
+        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        Assert.AreEqual(2, changes.Count, "dungeon item level used as start");
+
+    }
+
     private Mock<IPricesApi> SetupItemPrice(int price)
     {
         var pricesApi = new Mock<IPricesApi>();
