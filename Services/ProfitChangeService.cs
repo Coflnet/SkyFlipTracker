@@ -318,14 +318,20 @@ public class ProfitChangeService
             }
             var level1Cost = await pricesApi.ApiItemPriceItemTagGetAsync(sell.Tag, new() { { "PetLevel", "1" }, { "Rarity", "LEGENDARY" } });
             var level100Cost = await pricesApi.ApiItemPriceItemTagGetAsync(sell.Tag, new() { { "PetLevel", endLevel }, { "Rarity", "LEGENDARY" } }) ?? new();
-            var expCost = (float)(level100Cost.Median - level1Cost.Median) / maxExpForPet;
+            var perExpCost = (float)(level100Cost.Median - level1Cost.Median) / maxExpForPet;
+            if (sell.Tag == "PET_SUBZERO_WISP")
+            {
+                // can get exp with hypergolic gabagool
+                var gabagoolCost = await pricesApi.ApiItemPriceItemTagGetAsync("HYPERGOLIC_GABAGOOL");
+                perExpCost = Math.Min(perExpCost, gabagoolCost.Median / 3276800);
+            }
             var currentExp = ParseFloat(item.Value);
             float addedExp = Math.Min(currentExp, maxExpForPet) - ParseFloat(valueOnBuy.Value ?? "0");
             if (addedExp > 0)
                 yield return new PastFlip.ProfitChange()
                 {
                     Label = $"Exp cost for {item.Value} exp",
-                    Amount = -(long)(expCost * addedExp)
+                    Amount = -(long)(perExpCost * addedExp)
                 };
         }
         if (Constants.AttributeKeys.Contains(item.Key))
@@ -365,7 +371,7 @@ public class ProfitChangeService
                 // check for higher level
                 var costOfLvl5 = await pricesApi.ApiItemPriceItemTagGetAsync(sell.Tag, new() { { item.Key, "5" } });
                 var needed = Math.Pow(2, sellLevel - 5);
-                sellValue = Math.Min(needed *(costOfLvl5?.Median ?? int.MaxValue), sellValue);
+                sellValue = Math.Min(needed * (costOfLvl5?.Median ?? int.MaxValue), sellValue);
             }
             var buyValue = Math.Pow(2, baseLevel - basedOnLvl2) * target;
 

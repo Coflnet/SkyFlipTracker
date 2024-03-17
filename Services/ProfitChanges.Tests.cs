@@ -1113,12 +1113,46 @@ public class ProfitChangeTests
         Assert.AreEqual(2, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
         Assert.AreEqual(-398413, changes.Sum(c => c.Amount));
     }
+    [Test]
+    public async Task SubzeroWispUpgradeWithHypergolicGabagool()
+    {
+        var buy = new Core.SaveAuction()
+        {
+            Uuid = Guid.NewGuid().ToString("N"),
+            Tag = "PET_SUBZERO_WISP",
+            HighestBidAmount = 5_000_000,
+            FlatenedNBT = new(){
+                {"exp", "0"}},
+            Enchantments = new(),
+            ItemName = "Subzero Wisp",
+            Tier = Core.Tier.LEGENDARY
+        };
+        var sell = new Core.SaveAuction()
+        {
+            Uuid = Guid.NewGuid().ToString("N"),
+            Tag = "PET_SUBZERO_WISP",
+            HighestBidAmount = 10_000_000,
+            FlatenedNBT = new() {
+                {"exp", "30088396.8"}
+            },
+            Enchantments = new(),
+            ItemName = "Subzero Wisp",
+            Tier = Core.Tier.LEGENDARY
+        };
+        SetupPetLevelService("PET_SUBZERO_WISP",
+            pricesApi => pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("HYPERGOLIC_GABAGOOL", null, 0, default)).ReturnsAsync(() => new() { Median = 8_000_000 })
+            , 800_000_000);
+        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        Assert.AreEqual(2, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
+        Assert.AreEqual(-50907660, changes.Sum(c => c.Amount));
+    }
 
-    private void SetupPetLevelService()
+    private void SetupPetLevelService(string petType = "PET_BAT", Action<Mock<IPricesApi>> setup = null, int lvl100Value = 20_000_000)
     {
         var pricesApi = new Mock<IPricesApi>();
-        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("PET_BAT", new() { { "PetLevel", "1" }, { "Rarity", "LEGENDARY" } }, 0, default)).ReturnsAsync(() => new() { Median = 10_000_000 });
-        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("PET_BAT", new() { { "PetLevel", "100" }, { "Rarity", "LEGENDARY" } }, 0, default)).ReturnsAsync(() => new() { Median = 20_000_000 });
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(petType, new() { { "PetLevel", "1" }, { "Rarity", "LEGENDARY" } }, 0, default)).ReturnsAsync(() => new() { Median = 10_000_000 });
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(petType, new() { { "PetLevel", "100" }, { "Rarity", "LEGENDARY" } }, 0, default)).ReturnsAsync(() => new() { Median = lvl100Value });
+        setup?.Invoke(pricesApi);
         service = new ProfitChangeService(pricesApi.Object, null, null,
             NullLogger<ProfitChangeService>.Instance, null,
             new HypixelItemService(new System.Net.Http.HttpClient(), NullLogger<HypixelItemService>.Instance), null);
