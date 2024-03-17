@@ -663,7 +663,7 @@ public class ProfitChangeTests
         var result = await service.GetChanges(buy, sell).ToListAsync();
         Assert.AreEqual(3, result.Count);
         Assert.AreEqual(-312000000, result[1].Amount);
-        Assert.AreEqual(-248000000, result[2].Amount);
+        Assert.AreEqual(-56000000, result[2].Amount);
     }
     [Test]
     public async Task WheelOfFateChangesAttributeType()

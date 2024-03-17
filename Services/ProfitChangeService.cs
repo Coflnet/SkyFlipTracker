@@ -349,24 +349,25 @@ public class ProfitChangeService
             }
             var sellLevel = ParseFloat(item.Value);
             var difference = sellLevel - baseLevel;
-            var attributeShardCost = await pricesApi.ApiItemPriceItemTagGetAsync("ATTRIBUTE_SHARD", new() { { item.Key, "2" } });
-            var costOfLvl2 = await pricesApi.ApiItemPriceItemTagGetAsync(sell.Tag, new() { { item.Key, "2" } });
+            var basedOnLvl2 = 2;
+            var attributeShardCost = await pricesApi.ApiItemPriceItemTagGetAsync("ATTRIBUTE_SHARD", new() { { item.Key, basedOnLvl2.ToString() } });
+            var costOfLvl2 = await pricesApi.ApiItemPriceItemTagGetAsync(sell.Tag, new() { { item.Key, basedOnLvl2.ToString() } });
             var target = Math.Min((attributeShardCost?.Median == 0) ? 2_000_000 : attributeShardCost.Median,
                                 costOfLvl2?.Median ?? attributeShardCost?.Median ?? 2_000_000);
             if (target == 0)
             {
-                logger.LogInformation($"could not find attribute cost for {item.Key} lvl 2 on {sell.Tag}");
+                logger.LogInformation($"could not find attribute cost for {item.Key} lvl {basedOnLvl2} on {sell.Tag}");
                 yield break;
             }
-            var sellValue = Math.Pow(2, sellLevel - 2) * target;
+            var sellValue = Math.Pow(2, sellLevel - basedOnLvl2) * target;
             if (sellLevel > 5)
             {
                 // check for higher level
                 var costOfLvl5 = await pricesApi.ApiItemPriceItemTagGetAsync(sell.Tag, new() { { item.Key, "5" } });
-                var above5Cost = Math.Min(costOfLvl5?.Median ?? int.MaxValue, Math.Pow(2, 5) * target);
-                sellValue = Math.Pow(2, sellLevel - 5) * above5Cost;
+                var needed = Math.Pow(2, sellLevel - 5);
+                sellValue = Math.Min(needed *(costOfLvl5?.Median ?? int.MaxValue), sellValue);
             }
-            var buyValue = Math.Pow(2, baseLevel - 2) * target;
+            var buyValue = Math.Pow(2, baseLevel - basedOnLvl2) * target;
 
             yield return new PastFlip.ProfitChange()
             {
