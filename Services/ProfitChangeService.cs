@@ -135,21 +135,21 @@ public class ProfitChangeService
                 if ((int)buy.Tier != (int)targetTier)
                     logger.LogWarning($"could not find rarity change source for {sell.Tag} {buy.Uuid} -> {sell.Uuid}");
             }
-        // determine gem differences 
-        var gemsOnPurchase = buy.FlatenedNBT.Where(f => f.Value == "PERFECT" || f.Value == "FLAWLESS").ToList();
-        var gemsOnSell = sell.FlatenedNBT.Where(f => f.Value == "PERFECT" || f.Value == "FLAWLESS").ToList();
+        var gemsOnPurchase = GetGems(buy);
+        var gemsOnSell = GetGems(sell);
         var gemsAdded = gemsOnSell.Except(gemsOnPurchase).ToList();
         var gemsRemoved = gemsOnPurchase.Except(gemsOnSell).ToList();
-        foreach (var gem in gemsAdded)
+        foreach (var itemKey in gemsAdded)
         {
-            string type = GetCorrectKey(gem, sell.FlatenedNBT);
-            yield return await CostOf($"{gem.Value}_{type}_GEM", $"{gem.Value} {type} gem added");
+            var parts = itemKey.Split('_');
+            yield return await CostOf(itemKey, $"{parts[0]} {parts[1]} gem added");
         }
-        foreach (var gem in gemsRemoved)
+        foreach (var itemKey in gemsRemoved)
         {
-            string type = GetCorrectKey(gem, buy.FlatenedNBT);
-            var gemValue = await ValueOf($"{gem.Value}_{type}_GEM", $"{gem.Value} {type} gem removed");
-            gemValue.Amount -= gem.Value switch
+            var parts = itemKey.Split('_');
+            var rarity = parts[0];
+            var gemValue = await ValueOf(itemKey, $"{rarity} {parts[1]} gem removed");
+            gemValue.Amount -= rarity switch
             {
                 "PERFECT" => 500_000,
                 "FLAWLESS" => 100_000,
@@ -206,6 +206,13 @@ public class ProfitChangeService
             }
         }
 
+         List<string> GetGems(Core.SaveAuction buy)
+        {
+            // determine gem differences 
+            return buy.FlatenedNBT.Where(f => f.Value == "PERFECT" || f.Value == "FLAWLESS").Select(f=>
+                this.mapper.GetItemKeyForGem(f, buy.FlatenedNBT)
+            ).ToList();
+        }
     }
 
     public PastFlip.ProfitChange GetAhTax(long highestBid, long startingBid = 0)
@@ -594,7 +601,7 @@ public class ProfitChangeService
 
     private string GetCorrectKey(KeyValuePair<string, string> gem, Dictionary<string, string> flat)
     {
-        return mapper.GetCorrectGemType(gem, flat);
+        return mapper.GetItemKeyForGem(gem, flat);
     }
 
     private static bool IsNotcaluclateable(Core.SaveAuction sell)

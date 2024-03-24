@@ -313,6 +313,30 @@ public class ProfitChangeTests
         Assert.AreEqual("PERFECT TOPAZ gem removed", changes[1].Label);
         Assert.AreEqual(value * 98 / 100 - 500_000, changes[1].Amount, "gem removal cost is 500k");
     }
+    [Test]
+    public async Task GemTypeSwitched()
+    {
+        var buy = CreateAuction("DIVAN_CHESTPLATE");
+        buy.FlatenedNBT.Add("COMBAT_0", "PERFECT");
+        buy.FlatenedNBT.Add("COMBAT_0_gem", "JASPER");
+        var sell = CreateAuction("DIVAN_CHESTPLATE");
+        sell.FlatenedNBT.Add("COMBAT_0", "PERFECT");
+        sell.FlatenedNBT.Add("COMBAT_0_gem", "RUBY");
+        var pricesApi = new Mock<IPricesApi>();
+        long value = Random.Shared.Next(34_000_000, 35_000_000);
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("PERFECT_JASPER_GEM", null, 0, default))
+                .ReturnsAsync(() => new() { Median = value });
+        var value2 = Random.Shared.Next(9_000_000, 12_000_000);
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("PERFECT_RUBY_GEM", null, 0, default))
+                .ReturnsAsync(() => new() { Median = value2 });
+
+        service = new ProfitChangeService(pricesApi.Object, null, null, NullLogger<ProfitChangeService>.Instance, null, null, null);
+        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        Assert.AreEqual("PERFECT JASPER gem removed", changes[2].Label);
+        Assert.AreEqual((value * 98 / 100) - 500_000, changes[2].Amount, "gem removal cost is 500k");
+        Assert.AreEqual("PERFECT RUBY gem added", changes[1].Label);
+        Assert.AreEqual(-value2 , changes[1].Amount);
+    }
 
     [Test]
     public async Task TierBoostKeep()
