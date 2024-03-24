@@ -137,8 +137,8 @@ public class ProfitChangeService
             }
         var gemsOnPurchase = GetGems(buy);
         var gemsOnSell = GetGems(sell);
-        var gemsAdded = gemsOnSell.Except(gemsOnPurchase).ToList();
-        var gemsRemoved = gemsOnPurchase.Except(gemsOnSell).ToList();
+        List<string> gemsAdded = GemsMissingFromFirstInSecond(gemsOnPurchase, gemsOnSell);
+        var gemsRemoved = GemsMissingFromFirstInSecond(gemsOnSell, gemsOnPurchase);
         foreach (var itemKey in gemsAdded)
         {
             var parts = itemKey.Split('_');
@@ -206,12 +206,23 @@ public class ProfitChangeService
             }
         }
 
-         List<string> GetGems(Core.SaveAuction buy)
+        List<string> GetGems(Core.SaveAuction buy)
         {
             // determine gem differences 
-            return buy.FlatenedNBT.Where(f => f.Value == "PERFECT" || f.Value == "FLAWLESS").Select(f=>
+            return buy.FlatenedNBT.Where(f => f.Value == "PERFECT" || f.Value == "FLAWLESS").Select(f =>
                 this.mapper.GetItemKeyForGem(f, buy.FlatenedNBT)
             ).ToList();
+        }
+
+        static List<string> GemsMissingFromFirstInSecond(List<string> gemsOnPurchase, List<string> gemsOnSell)
+        {
+            // remove each occurance only once from the list
+            var newList = new List<string>(gemsOnSell);
+            foreach (var gem in gemsOnPurchase)
+            {
+                newList.Remove(gem);
+            }
+            return newList;
         }
     }
 
