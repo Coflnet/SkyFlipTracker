@@ -584,7 +584,7 @@ public class ProfitChangeService
                 continue;
             if (subCraft.Ingredients.Where(i => i.ItemId == tagOnPurchase).Any())
             {
-                var toAdd = subCraft.Ingredients.Where(i => i.ItemId != tagOnPurchase && i.ItemId != subCraft.ItemId);
+                var toAdd = subCraft.Ingredients.Where(i => i.ItemId != subCraft.ItemId);
                 allIngredients.AddRange(toAdd);
                 RemoveItem(allIngredients, item);
                 return subCraft;

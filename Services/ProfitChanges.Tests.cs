@@ -481,6 +481,41 @@ public class ProfitChangeTests
         Assert.AreEqual(-600001210, changes.Sum(c => c.Amount));
         Assert.AreEqual("Applied IMPLOSION_SCROLL", changes[1].Label);
     }
+    [Test]
+    public async Task MultiLevelCombineSame()
+    {
+        var buy = new Core.SaveAuction()
+        {
+            Uuid = Guid.NewGuid().ToString("N"),
+            Tag = "MASTER_SKULL_TIER_4",
+            HighestBidAmount = 1000,
+            FlatenedNBT = new(),
+            Tier = Core.Tier.EPIC
+        };
+        var sell = new Core.SaveAuction()
+        {
+            Uuid = Guid.NewGuid().ToString("N"),
+            Tag = "MASTER_SKULL_TIER_6",
+            HighestBidAmount = 10_000_000,
+            FlatenedNBT = new(),
+            Tier = Core.Tier.EPIC
+        };
+        var pricesApi = new Mock<IPricesApi>();
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), null, 0, default))
+            .ReturnsAsync(() => new() { Median = 5_000_000 });
+        var craftsApi = new Mock<Crafts.Client.Api.ICraftsApi>();
+        craftsApi.Setup(p=>p.CraftsAllGetAsync(0, default)).ReturnsAsync(() => new() {
+            new() { ItemId = "MASTER_SKULL_TIER_6", Ingredients = new() { new() { ItemId = "MASTER_SKULL_TIER_5", Count = 4 } } },
+            new() { ItemId = "MASTER_SKULL_TIER_5", Ingredients = new() { new() { ItemId = "MASTER_SKULL_TIER_4", Count = 4 } } }
+        });
+        var itemsApi = new Mock<Items.Client.Api.IItemsApi>();
+        itemsApi.Setup(i => i.ItemItemTagGetAsync("MASTER_SKULL_TIER_6", It.IsAny<bool?>(), It.IsAny<int>(), default))
+            .ReturnsAsync(() => new() { Tag = "MASTER_SKULL_TIER_6", Tier = Items.Client.Model.Tier.EPIC });
+        service = new ProfitChangeService(pricesApi.Object, null, craftsApi.Object, NullLogger<ProfitChangeService>.Instance, itemsApi.Object, null, null);
+        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        Assert.AreEqual(3, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
+        Assert.That(changes.Any(c=>c.Label == "crafting material MASTER_SKULL_TIER_4 x3"), JsonConvert.SerializeObject(changes, Formatting.Indented));
+    }
 
     [Test]
     public async Task RarityUpgrade()
