@@ -478,7 +478,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     if (previousAuction != null)
                     {
                         profit -= previousAuction.HighestBid;
-                        var purchaseCost = new PastFlip.ProfitChange($"Auction purchase", -previousAuction.HighestBid)
+                        var purchaseCost = new PastFlip.ProfitChange($"Item purchase (combined stack)", -previousAuction.HighestBid)
                         {
                             ContextItemId = AuctionService.Instance.GetId(previousAuction.AuctionId)
                         };
