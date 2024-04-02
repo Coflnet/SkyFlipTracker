@@ -429,76 +429,80 @@ public class ProfitChangeService
 
     private async IAsyncEnumerable<PastFlip.ProfitChange> GetPetRarityUpgrades(Core.SaveAuction buy, Core.SaveAuction sell)
     {
+        var sellTier = sell.Tier;
         if (sell.FlatenedNBT.Where(l => l.Key == "heldItem" && l.Value == "PET_ITEM_TIER_BOOST").Any())
-            yield return await CostOf("PET_ITEM_TIER_BOOST", "tier Boost cost");
-        else
         {
-            Console.WriteLine($"buy tier {(int)buy.Tier} {buy.Tier} sell tier {(int)sell.Tier} {sell.Tier}");
-            for (int i = ((int)buy.Tier); i < (int)sell.Tier; i++)
-            {
-                var allCosts = await katApi.KatAllGetAsync(0, default);
-                if (allCosts == null)
-                    throw new Exception("could not get kat costs from crafts api");
-                var cost = allCosts.Where(c => ((int)c.TargetRarity) > i && c.CoreData.ItemTag == sell.Tag)
-                            .OrderBy(c => c.TargetRarity).FirstOrDefault();
-                var upgradeCost = cost?.UpgradeCost;
-                var tierName = (i >= (int)Core.Tier.LEGENDARY) ? sell.Tier.ToString() : ((Core.Tier)i + 1).ToString();
-                var materialTitle = $"Kat materials for {tierName}";
-                var level = 1;
-                try
-                {
-                    level = string.IsNullOrEmpty(buy.ItemName) ? 1 : int.Parse(Regex.Replace(buy.ItemName?.Split(' ')[1], @"[^\d]", ""));
-                }
-                catch (Exception)
-                {
-                    logger.LogWarning($"could not parse level from {buy.ItemName}");
-                }
-                var costAdded = false;
-                if (cost == null || cost.MaterialCost >= int.MaxValue || level > 2)
-                {
-                    // approximate cost with raw
-                    var rawCost = await katApi.KatRawGetAsync();
-                    var rarityInt = i;
-                    if (i > (int)Core.Tier.LEGENDARY)
-                        break;
-                    Console.WriteLine($"kat upgrade cost {(Core.Tier)rarityInt}({rarityInt}) {cost?.TargetRarity} {sell.Tier}");
-                    var raw = rawCost.Where(c => ((int)c.BaseRarity) == rarityInt && sell.Tag.EndsWith(c.Name.Replace(' ', '_').ToUpper())).FirstOrDefault();
-                    if (i == 5 && sell.Tag == "PET_JERRY")
-                    {
-                        yield return await CostOf("PET_ITEM_TOY_JERRY", "Jerry 3d glasses");
-                        break;
-                    }
-                    // special pet upgrades 
-                    if (sell.Tag.EndsWith("_WISP"))
-                    {
-                        var allCrafts = await craftsApi.CraftsAllGetAsync();
-                        var kind = sell.Tag.Split('_')[1];
-                        var craft = allCrafts.Where(c => c.ItemId == $"UPGRADE_STONE_{kind}").FirstOrDefault();
-                        if (craft == null)
-                            throw new Exception($"could not find craft for wisp UPGRADE_STONE_{kind}");
-                        yield return new PastFlip.ProfitChange()
-                        {
-                            Label = $"Wisp upgrade stone for {kind}",
-                            Amount = (long)-craft.CraftCost
-                        };
-                        break;
-                    }
-                    if (raw == null)
-                        throw new Exception($"could not find kat cost for tier {i}({(Core.Tier)rarityInt}) and tag {sell.Tag} {buy.Uuid} -> {sell.Uuid}");
-                    upgradeCost = raw.Cost * (1.0 - 0.003 * level);
-                    if (raw.Material != null)
-                    {
-                        costAdded = true;
-                        yield return await CostOf(raw.Material, materialTitle, raw.Amount);
-                    }
-                }
-                yield return new($"Kat cost for {tierName}", (long)-upgradeCost);
-                if (cost?.MaterialCost > 0 && !costAdded)
-                    yield return new(materialTitle, (long)-cost.MaterialCost);
-                if (i == (int)Core.Tier.LEGENDARY)
-                    break;
-            }
+            yield return await CostOf("PET_ITEM_TIER_BOOST", "tier Boost cost");
+            if (buy.Tier >= sell.Tier - 1 || buy.Tier == Core.Tier.LEGENDARY)
+                yield break;
+            sellTier--;
         }
+        Console.WriteLine($"buy tier {(int)buy.Tier} {buy.Tier} sell tier {(int)sellTier} {sellTier}");
+        for (int i = ((int)buy.Tier); i < (int)sellTier; i++)
+        {
+            var allCosts = await katApi.KatAllGetAsync(0, default);
+            if (allCosts == null)
+                throw new Exception("could not get kat costs from crafts api");
+            var cost = allCosts.Where(c => ((int)c.TargetRarity) > i && c.CoreData.ItemTag == sell.Tag)
+                        .OrderBy(c => c.TargetRarity).FirstOrDefault();
+            var upgradeCost = cost?.UpgradeCost;
+            var tierName = (i >= (int)Core.Tier.LEGENDARY) ? sell.Tier.ToString() : ((Core.Tier)i + 1).ToString();
+            var materialTitle = $"Kat materials for {tierName}";
+            var level = 1;
+            try
+            {
+                level = string.IsNullOrEmpty(buy.ItemName) ? 1 : int.Parse(Regex.Replace(buy.ItemName?.Split(' ')[1], @"[^\d]", ""));
+            }
+            catch (Exception)
+            {
+                logger.LogWarning($"could not parse level from {buy.ItemName}");
+            }
+            var costAdded = false;
+            if (cost == null || cost.MaterialCost >= int.MaxValue || level > 2)
+            {
+                // approximate cost with raw
+                var rawCost = await katApi.KatRawGetAsync();
+                var rarityInt = i;
+                if (i > (int)Core.Tier.LEGENDARY)
+                    break;
+                Console.WriteLine($"kat upgrade cost {(Core.Tier)rarityInt}({rarityInt}) {cost?.TargetRarity} {sell.Tier}");
+                var raw = rawCost.Where(c => ((int)c.BaseRarity) == rarityInt && sell.Tag.EndsWith(c.Name.Replace(' ', '_').ToUpper())).FirstOrDefault();
+                if (i == 5 && sell.Tag == "PET_JERRY")
+                {
+                    yield return await CostOf("PET_ITEM_TOY_JERRY", "Jerry 3d glasses");
+                    break;
+                }
+                // special pet upgrades 
+                if (sell.Tag.EndsWith("_WISP"))
+                {
+                    var allCrafts = await craftsApi.CraftsAllGetAsync();
+                    var kind = sell.Tag.Split('_')[1];
+                    var craft = allCrafts.Where(c => c.ItemId == $"UPGRADE_STONE_{kind}").FirstOrDefault();
+                    if (craft == null)
+                        throw new Exception($"could not find craft for wisp UPGRADE_STONE_{kind}");
+                    yield return new PastFlip.ProfitChange()
+                    {
+                        Label = $"Wisp upgrade stone for {kind}",
+                        Amount = (long)-craft.CraftCost
+                    };
+                    break;
+                }
+                if (raw == null)
+                    throw new Exception($"could not find kat cost for tier {i}({(Core.Tier)rarityInt}) and tag {sell.Tag} {buy.Uuid} -> {sell.Uuid}");
+                upgradeCost = raw.Cost * (1.0 - 0.003 * level);
+                if (raw.Material != null)
+                {
+                    costAdded = true;
+                    yield return await CostOf(raw.Material, materialTitle, raw.Amount);
+                }
+            }
+            yield return new($"Kat cost for {tierName}", (long)-upgradeCost);
+            if (cost?.MaterialCost > 0 && !costAdded)
+                yield return new(materialTitle, (long)-cost.MaterialCost);
+            if (i == (int)Core.Tier.LEGENDARY)
+                break;
+        }
+
     }
 
     private float ParseFloat(string value)

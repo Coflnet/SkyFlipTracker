@@ -265,8 +265,8 @@ public class ProfitChangeTests
     [Test]
     public async Task TierBoostAddition()
     {
-        var buy = CreateAuction("PET_ENDERMAN", "", 1000, Core.Tier.RARE);
-        var sell = CreateAuction("PET_ENDERMAN", "PET_ITEM_TIER_BOOST", 1000, Core.Tier.MYTHIC);
+        var buy = CreateAuction("PET_ENDERMAN", "", 1000, Core.Tier.LEGENDARY);
+        var sell = CreateAuction("PET_ENDERMAN", "Enderman", 1000, Core.Tier.MYTHIC);
         sell.FlatenedNBT.Add("heldItem", "PET_ITEM_TIER_BOOST");
         var pricesApi = new Mock<IPricesApi>();
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), null, 0, default))
@@ -275,6 +275,22 @@ public class ProfitChangeTests
         var changes = await service.GetChanges(buy, sell).ToListAsync();
         Assert.AreEqual(2, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
         Assert.AreEqual(-100001210, changes.Sum(c => c.Amount));
+    }
+
+    [Test]
+    public async Task TierBoostPlusKatUpgrade()
+    {
+        var buy = CreateAuction("PET_SCATHA", "", 1000, Core.Tier.RARE);
+        var sell = CreateAuction("PET_SCATHA", "Scatha", 10000, Core.Tier.LEGENDARY);
+        sell.FlatenedNBT.Add("heldItem", "PET_ITEM_TIER_BOOST");
+        var katApi = new Mock<Crafts.Client.Api.IKatApi>();
+        katApi.Setup(k => k.KatAllGetAsync(0, default)).ReturnsAsync(KatResponse("PET_SCATHA"));
+        var pricesApi = new Mock<IPricesApi>();
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), null, 0, default))
+                .ReturnsAsync(() => new() { Median = 100_000_000 });
+        service = new ProfitChangeService(pricesApi.Object, katApi.Object, null, NullLogger<ProfitChangeService>.Instance, null, null, null);
+        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        Assert.That(changes.Count, Is.EqualTo(4), JsonConvert.SerializeObject(changes, Formatting.Indented));
     }
 
 
