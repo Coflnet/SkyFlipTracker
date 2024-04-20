@@ -200,6 +200,8 @@ public class ProfitChangeService
         }
         foreach (var item in sell.FlatenedNBT.Where(s => !buy.FlatenedNBT.Any(b => b.Key == s.Key && b.Value == s.Value)))
         {
+            if(ItemKeys.Contains(item.Key))
+                continue; // already handled
             await foreach (var res in GetRemainingDifference(buy, sell, item))
             {
                 yield return res;

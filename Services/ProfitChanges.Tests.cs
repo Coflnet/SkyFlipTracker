@@ -356,7 +356,7 @@ public class ProfitChangeTests
         Assert.AreEqual("PERFECT JASPER gem removed", changes[3].Label);
         Assert.AreEqual((value * 98 / 100) - 500_000, changes[3].Amount, "gem removal cost is 500k");
         Assert.AreEqual("PERFECT RUBY gem added", changes[1].Label);
-        Assert.AreEqual(-value2 , changes[1].Amount);
+        Assert.AreEqual(-value2, changes[1].Amount);
         Assert.AreEqual(5, changes.Count);
     }
 
@@ -520,7 +520,7 @@ public class ProfitChangeTests
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), null, 0, default))
             .ReturnsAsync(() => new() { Median = 5_000_000 });
         var craftsApi = new Mock<Crafts.Client.Api.ICraftsApi>();
-        craftsApi.Setup(p=>p.CraftsAllGetAsync(0, default)).ReturnsAsync(() => new() {
+        craftsApi.Setup(p => p.CraftsAllGetAsync(0, default)).ReturnsAsync(() => new() {
             new() { ItemId = "MASTER_SKULL_TIER_6", Ingredients = new() { new() { ItemId = "MASTER_SKULL_TIER_5", Count = 4 } } },
             new() { ItemId = "MASTER_SKULL_TIER_5", Ingredients = new() { new() { ItemId = "MASTER_SKULL_TIER_4", Count = 4 } } }
         });
@@ -530,7 +530,7 @@ public class ProfitChangeTests
         service = new ProfitChangeService(pricesApi.Object, null, craftsApi.Object, NullLogger<ProfitChangeService>.Instance, itemsApi.Object, null, null);
         var changes = await service.GetChanges(buy, sell).ToListAsync();
         Assert.AreEqual(3, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
-        Assert.That(changes.Any(c=>c.Label == "crafting material MASTER_SKULL_TIER_4 x3"), JsonConvert.SerializeObject(changes, Formatting.Indented));
+        Assert.That(changes.Any(c => c.Label == "crafting material MASTER_SKULL_TIER_4 x3"), JsonConvert.SerializeObject(changes, Formatting.Indented));
     }
 
     [Test]
@@ -1082,6 +1082,18 @@ public class ProfitChangeTests
         Assert.AreEqual(2, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
         Assert.AreEqual(cost, changes.Sum(c => c.Amount));
         Assert.AreEqual(message, changes[1].Label);
+    }
+
+    [Test]
+    public async Task OnlyRemovingDrillPartsOnce()
+    {
+        var buy = CreateAuction("DRILL", "drill", 1_000_000);
+        var sell = CreateAuction("DRILL", "drill", 100_000_000);
+        sell.FlatenedNBT["drill_part_engine"] = "amber_polished_drill_engine";
+        SetupItemPrice(5_000_000);
+        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        Assert.AreEqual(2, changes.Count, JsonConvert.SerializeObject(changes, Formatting.Indented));
+        Assert.AreEqual(-5000000, changes[1].Amount);
     }
 
     [Test]
