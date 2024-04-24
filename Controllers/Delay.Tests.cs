@@ -17,7 +17,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
                 {
                     (1.422106, TimeSpan.FromMinutes(112))
                 }, 0, ref avg, 0, new List<string>());
-            Assert.AreEqual(0, penaltiy);
+            Assert.That(penaltiy, Is.EqualTo(0));
         }
     }
 }

@@ -50,6 +50,7 @@ public class PastFlip
     [JsonIgnore]
     [Newtonsoft.Json.JsonIgnore]
     public byte[] SerialisedProfitChanges { get; set; }
+    static MessagePackSerializerOptions options = MessagePackSerializerOptions.Standard.WithCompression(MessagePackCompression.Lz4Block);
     /// <summary>
     /// Things that affected the profit
     /// </summary>
@@ -61,12 +62,12 @@ public class PastFlip
         {
             if (SerialisedProfitChanges == null)
                 return null;
-            return MessagePack.LZ4MessagePackSerializer.Deserialize<IEnumerable<ProfitChange>>(SerialisedProfitChanges);
+            return MessagePackSerializer.Deserialize<IEnumerable<ProfitChange>>(SerialisedProfitChanges, options);
         }
         set
         {
             if (SerialisedProfitChanges == null && value != null)
-                SerialisedProfitChanges = MessagePack.LZ4MessagePackSerializer.Serialize<IEnumerable<ProfitChange>>(value);
+                SerialisedProfitChanges = MessagePackSerializer.Serialize<IEnumerable<ProfitChange>>(value, options);
         }
     }
     /// <summary>

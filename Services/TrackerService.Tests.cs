@@ -22,6 +22,6 @@ public class TrackerServiceTests
             Tag = "PET_BAT"
         };
         var name = TrackerService.GetDisplayName(buy, sell);
-        Assert.AreEqual(expected, name);
+        Assert.That(name, Is.EqualTo(expected));
     }
 }

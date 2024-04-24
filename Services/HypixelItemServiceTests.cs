@@ -14,10 +14,10 @@ public class HypixelItemServiceTests
         var hypixelItemService = new HypixelItemService(new HttpClient(), logger);
         var costs = hypixelItemService.GetSlotCost("DAEDALUS_AXE", new List<string>() { "COMBAT_0" }, new List<string>() { "COMBAT_0", "COMBAT_1" }).Result;
 
-        Assert.AreEqual(5, costs.Count());
-        Assert.AreEqual(100_000, costs.First().Coins);
-        Assert.AreEqual(40, costs.Last().Amount);
-        Assert.AreEqual("FINE_AMETHYST_GEM", costs.Last().ItemId);
+        Assert.That(costs.Count(), Is.EqualTo(5));
+        Assert.That(costs.First().Coins, Is.EqualTo(100_000));
+        Assert.That(costs.Last().Amount, Is.EqualTo(40));
+        Assert.That(costs.Last().ItemId, Is.EqualTo("FINE_AMETHYST_GEM"));
     }
 }
 #pragma warning restore CS1591 // Missing XML comment for publicly visible type or member
