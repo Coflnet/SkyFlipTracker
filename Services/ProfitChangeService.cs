@@ -642,6 +642,12 @@ public class ProfitChangeService
                 Label = title,
                 Amount = -1
             };
+        if(item == "SKYBLOCK_COIN")
+            return new PastFlip.ProfitChange()
+            {
+                Label = title,
+                Amount = -amount
+            };
         var itemPrice = await pricesApi.ApiItemPriceItemTagGetAsync(item)
                     ?? throw new Exception($"Failed to find price for {item}");
         var median = itemPrice.Median;
