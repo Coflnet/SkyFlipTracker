@@ -200,7 +200,7 @@ public class ProfitChangeService
         }
         foreach (var item in sell.FlatenedNBT.Where(s => !buy.FlatenedNBT.Any(b => b.Key == s.Key && b.Value == s.Value)))
         {
-            if(ItemKeys.Contains(item.Key))
+            if (ItemKeys.Contains(item.Key))
                 continue; // already handled
             await foreach (var res in GetRemainingDifference(buy, sell, item))
             {
@@ -337,7 +337,8 @@ public class ProfitChangeService
                 maxExpForPet = ExpMaxLevelGoldenDragon;
             }
             var level1Cost = await pricesApi.ApiItemPriceItemTagGetAsync(sell.Tag, new() { { "PetLevel", "1" }, { "Rarity", "LEGENDARY" } });
-            var level100Cost = await pricesApi.ApiItemPriceItemTagGetAsync(sell.Tag, new() { { "PetLevel", endLevel }, { "Rarity", "LEGENDARY" } }) ?? new();
+            var level100Cost = await pricesApi.ApiItemPriceItemTagGetAsync(sell.Tag, 
+                    new() { { "PetLevel", endLevel }, { "Rarity", "LEGENDARY" }, { "PetItem", "NOT_TIER_BOOST" } }) ?? new();
             var perExpCost = (float)(level100Cost.Median - level1Cost.Median) / maxExpForPet;
             if (sell.Tag == "PET_SUBZERO_WISP")
             {
@@ -642,7 +643,7 @@ public class ProfitChangeService
                 Label = title,
                 Amount = -1
             };
-        if(item == "SKYBLOCK_COIN")
+        if (item == "SKYBLOCK_COIN")
             return new PastFlip.ProfitChange()
             {
                 Label = title,

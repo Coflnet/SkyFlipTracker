@@ -1244,7 +1244,8 @@ public class ProfitChangeTests
     {
         var pricesApi = new Mock<IPricesApi>();
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(petType, new() { { "PetLevel", "1" }, { "Rarity", "LEGENDARY" } }, 0, default)).ReturnsAsync(() => new() { Median = 10_000_000 });
-        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(petType, new() { { "PetLevel", "100" }, { "Rarity", "LEGENDARY" } }, 0, default)).ReturnsAsync(() => new() { Median = lvl100Value });
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(petType, new() { { "PetLevel", "100" }, { "Rarity", "LEGENDARY" }, { "PetItem", "NOT_TIER_BOOST" } }, 0, default))
+                .ReturnsAsync(() => new() { Median = lvl100Value });
         setup?.Invoke(pricesApi);
         service = new ProfitChangeService(pricesApi.Object, null, null,
             NullLogger<ProfitChangeService>.Instance, null,
@@ -1285,12 +1286,12 @@ public class ProfitChangeTests
         sell.FlatenedNBT["exp"] = "29095472.42";
         var pricesApi = new Mock<IPricesApi>();
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("PET_GOLDEN_DRAGON", new() { { "PetLevel", "1" }, { "Rarity", "LEGENDARY" } }, 0, default)).ReturnsAsync(() => new() { Median = 600_000_000 });
-        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("PET_GOLDEN_DRAGON", new() { { "PetLevel", "200" }, { "Rarity", "LEGENDARY" } }, 0, default)).ReturnsAsync(() => new() { Median = 1200_000_000 });
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("PET_GOLDEN_DRAGON", new() { { "PetLevel", "200" }, { "Rarity", "LEGENDARY" }, { "PetItem", "NOT_TIER_BOOST"} }, 0, default)).ReturnsAsync(() => new() { Median = 1200_000_000 });
         service = new ProfitChangeService(pricesApi.Object, null, null,
             NullLogger<ProfitChangeService>.Instance, null,
             new HypixelItemService(new System.Net.Http.HttpClient(), NullLogger<HypixelItemService>.Instance), null);
         var changes = await service.GetChanges(buy, sell).ToListAsync();
-        pricesApi.Verify(p => p.ApiItemPriceItemTagGetAsync("PET_GOLDEN_DRAGON", new() { { "PetLevel", "200" }, { "Rarity", "LEGENDARY" } }, 0, default), Times.Once);
+        pricesApi.Verify(p => p.ApiItemPriceItemTagGetAsync("PET_GOLDEN_DRAGON", new() { { "PetLevel", "200" }, { "Rarity", "LEGENDARY" }, { "PetItem", "NOT_TIER_BOOST"} }, 0, default), Times.Once);
         Assert.That(changes.Count, Is.EqualTo(2), JsonConvert.SerializeObject(changes, Formatting.Indented));
         Assert.That(changes[1].Amount, Is.EqualTo(-10657764));
     }
