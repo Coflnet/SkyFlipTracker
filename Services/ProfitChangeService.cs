@@ -461,7 +461,7 @@ public class ProfitChangeService
                 logger.LogWarning($"could not parse level from {buy.ItemName}");
             }
             var costAdded = false;
-            if (cost == null || cost.MaterialCost >= int.MaxValue || level > 2)
+            if (cost == null || cost.MaterialCost >= 1_000_000 || level > 2)
             {
                 // approximate cost with raw
                 var rawCost = await katApi.KatRawGetAsync();
