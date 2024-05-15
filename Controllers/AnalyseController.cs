@@ -37,7 +37,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             "e709f7b92af9447ebc2c8ebc172a1b4f", "40d45b6f6bf9412580383269416e0cf2", "855fa79c6f9441b19fb507d088bb2dd9",  // connected
             "678712ab612b4a099ab261418e0da389", "c414a81db5104e1b9dc9e4b4fe5a7768", 
             "c57f8d117f414a4099cc3fccef5a34e7", "0f448f2df8a4401d9b2042d7435bbf30", "3a914807472944ce912ad1752866642f",
-            "d61b636f545243a4814e66f595524e96",
+            "d61b636f545243a4814e66f595524e96", "be375613d04a4360b91b6751ee4d6ca7", 
             "d472ab290c0f4cbbaccefdce90176d32" // See https://discord.com/channels/267680588666896385/1006897388641853470/1011757951087820911
         };
         private static readonly HashSet<string> CoolMacroers = new() { };
