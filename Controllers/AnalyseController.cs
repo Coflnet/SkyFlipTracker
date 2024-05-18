@@ -35,9 +35,9 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             "50e3c3fbd4d746f7868652ed37e0a153", "e7b5ad30f6f94b3993db1d2fb37661b5", "326263423660400393310fcc9d0d826f", // more bypass :/
             "9b6cbecab4654b08b70d9817b885be24", "059056b17ea1467880f59350ad635589",
             "e709f7b92af9447ebc2c8ebc172a1b4f", "40d45b6f6bf9412580383269416e0cf2", "855fa79c6f9441b19fb507d088bb2dd9",  // connected
-            "678712ab612b4a099ab261418e0da389", "c414a81db5104e1b9dc9e4b4fe5a7768", 
+            "678712ab612b4a099ab261418e0da389", "c414a81db5104e1b9dc9e4b4fe5a7768",
             "c57f8d117f414a4099cc3fccef5a34e7", "0f448f2df8a4401d9b2042d7435bbf30", "3a914807472944ce912ad1752866642f",
-            "d61b636f545243a4814e66f595524e96", "be375613d04a4360b91b6751ee4d6ca7", 
+            "d61b636f545243a4814e66f595524e96", "be375613d04a4360b91b6751ee4d6ca7",
             "d472ab290c0f4cbbaccefdce90176d32" // See https://discord.com/channels/267680588666896385/1006897388641853470/1011757951087820911
         };
         private static readonly HashSet<string> CoolMacroers = new() { };
@@ -232,16 +232,19 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
                     val = service.GetId(playerId);
                 return val;
             });
-
+            var receivedCount = 0;
             var relevantFlips = await GetRelevantFlips(maxTime, minTime, numeric);
+            if (relevantFlips.Count <= 10)
+            {
+                receivedCount = await db.FlipEvents.Where(flipEvent =>
+                                flipEvent.Type == FlipEventType.FLIP_RECEIVE
+                                && numeric.Contains(flipEvent.PlayerId)
+                                && flipEvent.Timestamp > minTime
+                                && flipEvent.Timestamp <= maxTime)
+                        .CountAsync();
+            }
             if (relevantFlips.Count == 0)
             {
-                var receivedCount = await db.FlipEvents.Where(flipEvent =>
-                                    flipEvent.Type == FlipEventType.FLIP_RECEIVE
-                                    && numeric.Contains(flipEvent.PlayerId)
-                                    && flipEvent.Timestamp > minTime
-                                    && flipEvent.Timestamp <= maxTime)
-                            .CountAsync();
                 return new SpeedCompResult() { Penalty = badIds.Any() ? 8 : -1, BadIds = badIds, ReceivedCount = receivedCount };
             }
             IEnumerable<(double TotalSeconds, TimeSpan age)> timeDif = (await GetTimings(maxTime, numeric, relevantFlips)).Where(t => t.TotalSeconds < 4);
@@ -267,6 +270,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
                 OutspeedUserCount = escrowedUserCount,
                 MacroedFlips = macroedTimeDif,
                 BoughtWorth = flipworth,
+                ReceivedCount = receivedCount,
                 TopBuySpeed = timeDif.Any() ? timeDif.Max(d => d.TotalSeconds) : 0
             };
         }
