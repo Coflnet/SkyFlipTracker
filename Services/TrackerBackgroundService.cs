@@ -50,12 +50,14 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             Task flipCons = ConsumeFlips(stoppingToken);
             Task flipEventCons = ConsumeEvents(stoppingToken);
             var sellCons = SoldAuction(stoppingToken);
+            var newAuctions = NewAuctions(stoppingToken);
 
             await Task.WhenAny(
                 Run(flipCons, "consuming flips"),
                 Run(flipEventCons, "flip events cons"),
                 Run(sellCons, "sells con"),
-                Run(LoadFlip(stoppingToken), "load flip"));
+                Run(LoadFlip(stoppingToken), "load flip"),
+                Run(newAuctions, "new auctions"));
             logger.LogError("consuming stopped :O");
             if (!stoppingToken.IsCancellationRequested)
                 throw new Exception("at least one consuming process stopped");
@@ -92,6 +94,26 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                         logger.LogError(e, "could not save event once");
                     }
             }, stoppingToken, "sky-fliptracker", 15);
+        }
+        private async Task NewAuctions(CancellationToken stoppingToken)
+        {
+            await KafkaConsumer.ConsumeBatch<SaveAuction>(config, config["TOPICS:NEW_AUCTION"], toUpdate =>
+            {
+                foreach (var item in toUpdate)
+                {
+                    if (!item.Coop.Any(c => AnalyseController.BadPlayersList.Contains(c)))
+                    {
+                        continue;
+                    }
+                    foreach (var uuid in item.Coop)
+                    {
+                        if (!AnalyseController.BadPlayersList.Contains(uuid))
+                            logger.LogWarning("found bad player in coop {uuid} from {auctioneer}", uuid, item.AuctioneerId);
+                        AnalyseController.BadPlayersList.Add(uuid);
+                    }
+                }
+                return Task.CompletedTask;
+            }, stoppingToken, "sky-fliptracker", 8);
         }
         private async Task SoldAuction(CancellationToken stoppingToken)
         {

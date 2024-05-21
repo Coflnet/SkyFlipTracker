@@ -42,7 +42,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             "40b42eeb7f084da09875de3dbdaf0b19", "6f897ee8aa56492a865d70f200da4634", "0f448f2df8a4401d9b2042d7435bbf30", // group in above
             "d472ab290c0f4cbbaccefdce90176d32" // See https://discord.com/channels/267680588666896385/1006897388641853470/1011757951087820911
         };
-        private static readonly HashSet<string> CoolMacroers = new() { };
+        public static HashSet<string> BadPlayersList => BadPlayers;
 
         private static readonly TimeSpan shadowTiming = TimeSpan.FromDays(2);
         private static readonly int longMacroMultiplier = 80;
@@ -310,7 +310,6 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             penaltiy += 0.02 * escrowedUserCount;
 
             penaltiy += (8 * badIds.Count());
-            penaltiy += (request.PlayerIds.Where(p => CoolMacroers.Contains(p)).Any() ? 0.312345 : 0);
             return penaltiy;
         }
         /// <summary>
