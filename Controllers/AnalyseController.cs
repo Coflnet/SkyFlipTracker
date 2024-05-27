@@ -43,7 +43,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             "dead7dac795242b59338b54900ea1430", "5746eb5b373545cca8c0f7b340010155", "f720fe62066e412982ea7a759a73b7b1", // this file is getting long
             "386e38574d9149afafd7ea8ccd1e015c", "4a616d12f0994a7691d5ca6f07499c2b", "1565ceccd53c4664aa55d424a25d1daf", // ximmer as well
             "407fcb6e116245c8b3284f733a931c5b", "f3f10d95a1b544e3b5df88fbfcae5fba", "ddb96c0938cd4e498ed57b2814b3d9b7",
-            
+            "c9bf10d8f394436283f3718d12c6950b", "cd1b67e5ce8c4dfcabcf74c6afe2478c", "c0b2620403b943309f6f98d164bb7249", //  https://discord.com/channels/267680588666896385/1244436738437550142/1244569273574101054
+            "95cc34fe0fd8438592a7a92c63961838", "3637befb840c4b138ab2f16fa7e5e3f1", "d29eaf93c0fb4657a03583825c11d62b", // _/
             "d472ab290c0f4cbbaccefdce90176d32" // See https://discord.com/channels/267680588666896385/1006897388641853470/1011757951087820911
         };
         public static HashSet<string> BadPlayersList => BadPlayers;
