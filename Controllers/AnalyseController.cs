@@ -36,8 +36,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             "9b6cbecab4654b08b70d9817b885be24", "059056b17ea1467880f59350ad635589",
             "e709f7b92af9447ebc2c8ebc172a1b4f", "40d45b6f6bf9412580383269416e0cf2", "855fa79c6f9441b19fb507d088bb2dd9",  // connected
             "678712ab612b4a099ab261418e0da389", "c414a81db5104e1b9dc9e4b4fe5a7768",
-            "c57f8d117f414a4099cc3fccef5a34e7", "3a914807472944ce912ad1752866642f",
-            "d61b636f545243a4814e66f595524e96", "be375613d04a4360b91b6751ee4d6ca7",
+            "c57f8d117f414a4099cc3fccef5a34e7",
+            "d61b636f545243a4814e66f595524e96",
             "b9e339dd54f0439482a2085af3964af4", "b0fd9dc352e54914bee815236debcba6", "a198dcc96fee4c18ae45beeb6e7a072b", // same as next line
             "40b42eeb7f084da09875de3dbdaf0b19", "6f897ee8aa56492a865d70f200da4634", "0f448f2df8a4401d9b2042d7435bbf30", // group in above
             "dead7dac795242b59338b54900ea1430", "5746eb5b373545cca8c0f7b340010155", "f720fe62066e412982ea7a759a73b7b1", // this file is getting long
