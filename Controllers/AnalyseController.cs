@@ -46,6 +46,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             "c9bf10d8f394436283f3718d12c6950b", "cd1b67e5ce8c4dfcabcf74c6afe2478c", "c0b2620403b943309f6f98d164bb7249", //  https://discord.com/channels/267680588666896385/1244436738437550142/1244569273574101054
             "95cc34fe0fd8438592a7a92c63961838", "3637befb840c4b138ab2f16fa7e5e3f1", "d29eaf93c0fb4657a03583825c11d62b", // _/
             "8bc5c2f2fcf94d2187c9b97061c549ad",
+            "cd6d17e1f82047e7b30c56bbfafa2627", "5cdc6982c88948dbbd2f453b5857e26c", "5c34d8bfe68f4cb2b2271bd046628c8e", "5fb31a20e6bf47f4bd887ebbe3e717df",
             "d223be875ed04d72b237789bd92b04d2", "877e47356af746a0ad638a4cdb0d4249",
             "ac42489d3a584975a9a339b7eb443c08", "e96f32ee1ce14f90ba33272a35c2c936", "5ca97128ac0c41269ba9a985b2c61e72",
             "d472ab290c0f4cbbaccefdce90176d32" // See https://discord.com/channels/267680588666896385/1006897388641853470/1011757951087820911
@@ -191,7 +192,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             var interestingList = await db.FlipEvents.Where(f => ids.Contains(f.AuctionId) && f.Type == FlipEventType.FLIP_RECEIVE)
                                 .ToListAsync();
 
-            var receiveMost = interestingList.Where(f => f.Timestamp - TimeSpan.FromSeconds(3.8) < buyTimes[f.AuctionId] && f.Timestamp + TimeSpan.FromSeconds(4) > buyTimes[f.AuctionId])
+            var receiveMost = interestingList.Where(f => f.Timestamp - TimeSpan.FromSeconds(3.8) < buyTimes[f.AuctionId] && f.Timestamp - TimeSpan.FromSeconds(0.5) > buyTimes[f.AuctionId])
                                 .GroupBy(f => f.PlayerId).OrderByDescending(f => f.Count()).FirstOrDefault();
             if (receiveMost == null)
                 return new AltResult();
