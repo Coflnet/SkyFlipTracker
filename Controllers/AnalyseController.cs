@@ -192,7 +192,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             var interestingList = await db.FlipEvents.Where(f => ids.Contains(f.AuctionId) && f.Type == FlipEventType.FLIP_RECEIVE)
                                 .ToListAsync();
 
-            var receiveMost = interestingList.Where(f => f.Timestamp - TimeSpan.FromSeconds(3.8) < buyTimes[f.AuctionId] && f.Timestamp - TimeSpan.FromSeconds(0.5) > buyTimes[f.AuctionId])
+            var receiveMost = interestingList.Where(f => f.Timestamp - TimeSpan.FromSeconds(3.8) < buyTimes[f.AuctionId] && f.Timestamp + TimeSpan.FromSeconds(3.9) > buyTimes[f.AuctionId])
                                 .GroupBy(f => f.PlayerId).OrderByDescending(f => f.Count()).FirstOrDefault();
             if (receiveMost == null)
                 return new AltResult();
