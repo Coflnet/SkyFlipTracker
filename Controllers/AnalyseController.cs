@@ -286,7 +286,10 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             double antiMacro = GetShortTermAntiMacroDelay(maxAge, timeDif, macroedFlips.Where(t => t.age < maxAge * shortMacroMultiplier).ToList());
 
             double penaltiy = CalculatePenalty(request, maxAge, timeDif, escrowedUserCount, ref avg, antiMacro, badIds);
-            int flipworth = await GetBoughtFlipsWorth(maxAge, maxTime, relevantFlips);
+            var flipVal = await GetBoughtFlipsWorth(maxAge, maxTime, relevantFlips);
+            var flipworth = flipVal.Sum(f => f.TargetPrice);
+            if (flipworth < 100_000_000)
+                penaltiy /= 1.5;
 
             return new SpeedCompResult()
             {
@@ -305,16 +308,24 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             };
         }
 
-        private async Task<int> GetBoughtFlipsWorth(TimeSpan maxAge, DateTime maxTime, List<FlipEvent> relevantFlips)
+        private async Task<AuctionEstimateTupple[]> GetBoughtFlipsWorth(TimeSpan maxAge, DateTime maxTime, List<FlipEvent> relevantFlips)
         {
             try
             {
-                return await db.Flips.Where(f => Auctionids(maxAge, maxTime, relevantFlips).Contains(f.AuctionId)).SumAsync(f => f.TargetPrice);
+                return await db.Flips.Where(f => Auctionids(maxAge, maxTime, relevantFlips).Contains(f.AuctionId))
+                    .Select(f => new AuctionEstimateTupple { AuctionId = f.AuctionId, TargetPrice = f.TargetPrice })
+                    .ToArrayAsync();
             }
-            catch (System.Exception)
+            catch (Exception)
             {
-                return 0;
+                return Array.Empty<AuctionEstimateTupple>();
             }
+        }
+
+        public class AuctionEstimateTupple
+        {
+            public long AuctionId { get; set; }
+            public long TargetPrice { get; set; }
         }
 
         public static double CalculatePenalty(SpeedCheckRequest request, TimeSpan baseMaxAge, IEnumerable<(double TotalSeconds, TimeSpan age)> timeDif, int escrowedUserCount, ref double avg, double antiMacro, IEnumerable<string> badIds)
@@ -329,7 +340,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
                     avg = GetAverageAdvantage(baseMaxAge, maxAge, relevant);
                 var recentTooFast = relevantTimings.Where(t => t.age < baseMaxAge).Where(d => d.TotalSeconds > 3.3);
                 var speedPenalty = GetSpeedPenalty(maxAge, recentTooFast);
-                penaltiy = avg * 0.9 + speedPenalty;
+                penaltiy = avg + speedPenalty;
             }
 
             penaltiy = Math.Max(penaltiy, 0) + antiMacro;
