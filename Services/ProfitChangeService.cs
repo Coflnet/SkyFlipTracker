@@ -544,7 +544,7 @@ public class ProfitChangeService
                     Amount = buyValue - sellValue
                 };
             }
-            else if (enchantAtBuy != default && enchantAtBuy.Level == item.Level - 1 && item.Level < 6)
+            else if (enchantAtBuy != default && enchantAtBuy.Level == item.Level - 1 && IsProbablyCombinable(item))
             {
                 // only requires another book of the same level
                 var enchantDummy = new Core.Enchantment()
@@ -575,6 +575,11 @@ public class ProfitChangeService
         }
 
         return found;
+
+        static bool IsProbablyCombinable(Core.Enchantment item)
+        {
+            return item.Level < 6 && (!Constants.VeryValuableEnchant.TryGetValue(item.Type, out var value) || value < item.Level);
+        }
     }
 
     private static Crafts.Client.Model.ProfitableCraft AddCraftPathIngredients(string tagOnPurchase, List<Crafts.Client.Model.ProfitableCraft> allCrafts, List<Crafts.Client.Model.Ingredient> allIngredients, int depth = 0)

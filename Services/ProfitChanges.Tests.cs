@@ -853,6 +853,23 @@ public class ProfitChangeTests
     }
 
     [Test]
+    public async Task EnchantUpgradeNonCobineDedication()
+    {
+        var buy = CreateAuction("HYPERION");
+        buy.Enchantments = new() { new() { Type = Core.Enchantment.EnchantmentType.dedication, Level = 3 } };
+        var sell = CreateAuction("HYPERION", highestBidAmount: 170_000_000);
+        sell.Enchantments = new() { new() { Type = Core.Enchantment.EnchantmentType.dedication, Level = 4 } };
+        var bazaarApi = new Mock<Bazaar.Client.Api.IBazaarApi>();
+        bazaarApi.Setup(p => p.ApiBazaarPricesGetAsync(0, default))
+            .ReturnsAsync(() => new() { new("ENCHANTMENT_DEDICATION_3", 3_900_000, 3_000_000), 
+                new("ENCHANTMENT_DEDICATION_4", 100_000_000, 100_000_000) });
+        service = new ProfitChangeService(null, null, null, NullLogger<ProfitChangeService>.Instance, null, null, bazaarApi.Object);
+        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        Assert.That(changes.Count, Is.EqualTo(2), JsonConvert.SerializeObject(changes, Formatting.Indented));
+        Assert.That(changes[1].Amount, Is.EqualTo(-100_000_000));
+    }
+
+    [Test]
     public async Task BazaarLimitEnchantUpgrade()
     {
         var buy = CreateAuction("HYPERION");
