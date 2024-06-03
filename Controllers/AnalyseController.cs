@@ -47,7 +47,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             "95cc34fe0fd8438592a7a92c63961838", "3637befb840c4b138ab2f16fa7e5e3f1", "d29eaf93c0fb4657a03583825c11d62b", // _/
             "8bc5c2f2fcf94d2187c9b97061c549ad", "3d6f741a528f439fafcd1458f91e3aec", "8b79c16342194a22b0476fd1d1390c1a",
             "cd6d17e1f82047e7b30c56bbfafa2627", "5cdc6982c88948dbbd2f453b5857e26c", "5c34d8bfe68f4cb2b2271bd046628c8e", "5fb31a20e6bf47f4bd887ebbe3e717df",
-            "d223be875ed04d72b237789bd92b04d2", "877e47356af746a0ad638a4cdb0d4249", 
+            "d223be875ed04d72b237789bd92b04d2", "877e47356af746a0ad638a4cdb0d4249",
             "ac42489d3a584975a9a339b7eb443c08", "e96f32ee1ce14f90ba33272a35c2c936", "5ca97128ac0c41269ba9a985b2c61e72",
             "d472ab290c0f4cbbaccefdce90176d32" // See https://discord.com/channels/267680588666896385/1006897388641853470/1011757951087820911
         };
@@ -195,10 +195,28 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             var receiveMost = interestingList.Where(f => f.Timestamp - TimeSpan.FromSeconds(3.8) < buyTimes[f.AuctionId] && f.Timestamp + TimeSpan.FromSeconds(3.9) > buyTimes[f.AuctionId])
                                 .GroupBy(f => f.PlayerId).OrderByDescending(f => f.Count()).FirstOrDefault();
             if (receiveMost == null)
-                return new AltResult();
+                return new AltResult() { PlayerId = "none" };
 
             var targetBought = await db.FlipEvents.Where(f => ids.Contains(f.AuctionId) && f.Type == FlipEventType.AUCTION_SOLD && f.PlayerId == receiveMost.Key)
                                 .CountAsync();
+
+            var timeDiff = new List<TimeDiff>();
+            var startTimes = await db.FlipEvents.Where(f => ids.Contains(f.AuctionId) && f.Type == FlipEventType.START)
+                                .ToListAsync();
+            var startLookup = startTimes.GroupBy(s => s.AuctionId).Select(g => g.First()).ToDictionary(f => f.AuctionId, f => f.Timestamp);
+            foreach (var item in relevantBuys)
+            {
+                var receive = interestingList.FirstOrDefault(f => f.AuctionId == item.AuctionId && f.PlayerId == receiveMost.Key);
+                startLookup.TryGetValue(item.AuctionId, out var start);
+                if (receive == null)
+                    continue;
+                timeDiff.Add(new TimeDiff()
+                {
+                    AuctionId = item.AuctionId.ToString(),
+                    TimeDiffrence = (float)(receive.Timestamp - item.Timestamp).TotalSeconds,
+                    WasBed = item.Timestamp - start < TimeSpan.FromSeconds(20)
+                });
+            }
 
             return new AltResult()
             {
@@ -207,7 +225,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
                 BoughtCount = relevantBuys.Count(),
                 SentOut = receiveMost,
                 TargetBought = relevantBuys,
-                SelfBought = targetBought
+                SelfBought = targetBought,
+                TimeDiffs = timeDiff
             };
         }
 
@@ -305,12 +324,12 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             var relevantTimings = timeDif.Where(t => t.age < maxAge).ToList();
             if (relevantTimings.Count() != 0)
             {
-                var relevant = relevantTimings.Where(d => d.TotalSeconds < 3.9 && d.TotalSeconds > 1);
+                var relevant = relevantTimings.Where(d => d.TotalSeconds < 3.95 && d.TotalSeconds > 1);
                 if (relevant.Count() > 0)
                     avg = GetAverageAdvantage(baseMaxAge, maxAge, relevant);
                 var recentTooFast = relevantTimings.Where(t => t.age < baseMaxAge).Where(d => d.TotalSeconds > 3.3);
                 var speedPenalty = GetSpeedPenalty(maxAge, recentTooFast);
-                penaltiy = avg + speedPenalty;
+                penaltiy = avg * 0.9 + speedPenalty;
             }
 
             penaltiy = Math.Max(penaltiy, 0) + antiMacro;
@@ -438,7 +457,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             return penaltiy;
         }
 
-        private static double GetSpeedPenalty(TimeSpan maxAge, IEnumerable<(double TotalSeconds, TimeSpan age)> tooFast, double v = 0.2)
+        private static double GetSpeedPenalty(TimeSpan maxAge, IEnumerable<(double TotalSeconds, TimeSpan age)> tooFast, double v = 0.1)
         {
             var shrink = 1;
             return tooFast.Where(f => f.age * shrink < maxAge).Select(f => (maxAge - f.age * shrink) / (maxAge) * v).Where(d => d > 0).Sum();

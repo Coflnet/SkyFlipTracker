@@ -32,5 +32,13 @@ namespace Coflnet.Sky.SkyAuctionTracker.Models
         /// 
         /// </summary>
         public IEnumerable<FlipEvent> TargetBought { get; set; }
+        public List<TimeDiff> TimeDiffs { get; internal set; }
+    }
+
+    public class TimeDiff
+    {
+        public string AuctionId { get; set; }
+        public float TimeDiffrence { get; set; }
+        public bool WasBed { get; set; }
     }
 }
