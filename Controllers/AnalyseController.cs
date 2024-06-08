@@ -286,10 +286,13 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             double antiMacro = GetShortTermAntiMacroDelay(maxAge, timeDif, macroedFlips.Where(t => t.age < maxAge * shortMacroMultiplier).ToList());
 
             double penaltiy = CalculatePenalty(request, maxAge, timeDif, escrowedUserCount, ref avg, antiMacro, badIds);
-            var flipVal = await GetBoughtFlipsWorth(maxAge, maxTime, relevantFlips);
+            var flipVal = await GetBoughtFlipsWorth(maxAge * 16, maxTime, relevantFlips);
             var flipworth = flipVal.Sum(f => f.TargetPrice);
             if (flipworth < 100_000_000)
                 penaltiy /= 1.5;
+            var recentFlipCount = timeDif.Where(t => t.age < TimeSpan.FromHours(10)).Count();
+            if (recentFlipCount < 5)
+                penaltiy /= (5 - recentFlipCount);
 
             return new SpeedCompResult()
             {
