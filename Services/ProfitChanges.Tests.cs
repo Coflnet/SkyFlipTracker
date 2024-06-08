@@ -1044,7 +1044,7 @@ public class ProfitChangeTests
         service = new ProfitChangeService(pricesApi.Object, null, craftsApi.Object, NullLogger<ProfitChangeService>.Instance, itemsApi.Object, null, null);
         var changes = await service.GetChanges(buy, sell).ToListAsync();
         Assert.That(changes.Count, Is.EqualTo(4), JsonConvert.SerializeObject(changes, Formatting.Indented));
-        var upgradeCost = 2_000_000 + 11 * 100_000;
+        var upgradeCost = 2_000_000 + 20 * 100_000;
         Assert.That(-changes.Sum(c => c.Amount), Is.EqualTo(craftCost + ahFees + upgradeCost));
     }
 
