@@ -1364,6 +1364,28 @@ public class ProfitChangeTests
         Assert.That(changes.Sum(c => c.Amount), Is.EqualTo(-42001210));
     }
 
+    [Test]
+    public async Task ChocolateUpgrade()
+    {
+        var buy = CreateAuction("GANACHE_CHOCOLATE_SLAB", "Slab", 20_000_000, Core.Tier.EPIC);
+        var sell = CreateAuction("PRESTIGE_CHOCOLATE_REALM", "Realm", 80000000, Core.Tier.LEGENDARY);
+        var craftsApi = new Mock<Crafts.Client.Api.ICraftsApi>();
+        craftsApi.Setup(c => c.CraftsAllGetAsync(0, default)).ReturnsAsync(() => new() {
+            new() { ItemId = "PRESTIGE_CHOCOLATE_REALM", Ingredients = new() {
+                new() { ItemId = "GANACHE_CHOCOLATE_SLAB", Count = 4 },
+                new() { ItemId = "SKYBLOCK_CHOCOLATE", Count = 4_500_000_000 }}} 
+            });
+        var pricesApi = new Mock<IPricesApi>();
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("NIBBLE_CHOCOLATE_STICK", null, 0, default)).ReturnsAsync(() => new() { Median = 220_000 });
+        var itemsApi = new Mock<Items.Client.Api.IItemsApi>();
+        itemsApi.Setup(i => i.ItemItemTagGetAsync("PRESTIGE_CHOCOLATE_REALM", It.IsAny<bool?>(), It.IsAny<int>(), default))
+            .ReturnsAsync(() => new() { Tag = "PRESTIGE_CHOCOLATE_REALM", Tier = Items.Client.Model.Tier.LEGENDARY });
+        var service = new ProfitChangeService(pricesApi.Object, null, craftsApi.Object, NullLogger<ProfitChangeService>.Instance, itemsApi.Object, null, null);
+        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        Assert.That(changes.Count, Is.EqualTo(2), JsonConvert.SerializeObject(changes, Formatting.Indented));
+        Assert.That(changes[1].Amount, Is.EqualTo(-3960_000));
+    }
+
     [TestCase(null, "magic_find", "TALISMAN_ENRICHMENT_MAGIC_FIND")]
     [TestCase("magic_find", "magic_find", null)]
     [TestCase("magic_fin", "magic_find", "TALISMAN_ENRICHMENT_SWAPPER")]

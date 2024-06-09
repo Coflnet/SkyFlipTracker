@@ -277,6 +277,12 @@ public class ProfitChangeService
                 count--;
             if (item.ItemId == "SKYBLOCK_COIN")
                 yield return new PastFlip.ProfitChange("Coins", -(long)item.Cost);
+            if (item.ItemId == "SKYBLOCK_CHOCOLATE")
+            {
+                var chocolateStickCost = await CostOf("NIBBLE_CHOCOLATE_STICK", "Chocolate stick");
+                yield return new PastFlip.ProfitChange($"{count} Chocolate", chocolateStickCost.Amount * count / 250_000_000);
+                continue;
+            }
             PastFlip.ProfitChange change = null;
             try
             {
@@ -650,7 +656,7 @@ public class ProfitChangeService
         return itemMetadata;
     }
 
-    private async Task<PastFlip.ProfitChange> CostOf(string item, string title, int amount = 1)
+    private async Task<PastFlip.ProfitChange> CostOf(string item, string title, long amount = 1)
     {
         if (item == "MOVE_JERRY")
             return new PastFlip.ProfitChange()
