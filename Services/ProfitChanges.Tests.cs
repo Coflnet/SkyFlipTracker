@@ -1079,6 +1079,8 @@ public class ProfitChangeTests
         service = new ProfitChangeService(pricesApi.Object, null, null, NullLogger<ProfitChangeService>.Instance, null, null, null);
         var changes = await service.GetChanges(buy, sell).ToListAsync();
         Assert.That(changes.Count, Is.EqualTo(expectedChangecount), JsonConvert.SerializeObject(changes));
+        if(changes.Count == 2)
+            Assert.That(changes[1].Amount, Is.EqualTo(-1_000_000));
     }
 
     [TestCase(0, -83501200, "Enchant efficiency 10")]
