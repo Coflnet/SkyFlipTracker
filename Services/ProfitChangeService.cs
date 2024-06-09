@@ -277,8 +277,18 @@ public class ProfitChangeService
                 count--;
             if (item.ItemId == "SKYBLOCK_COIN")
                 yield return new PastFlip.ProfitChange("Coins", -(long)item.Cost);
-            if (count > 0)
-                yield return await CostOf(item.ItemId, $"crafting material {item.ItemId}" + (count > 1 ? $" x{count}" : ""), count);
+            PastFlip.ProfitChange change = null;
+            try
+            {
+                if (count > 0)
+                    change = await CostOf(item.ItemId, $"crafting material {item.ItemId}" + (count > 1 ? $" x{count}" : ""), count);
+            }
+            catch (System.Exception e)
+            {
+                logger.LogError(e, $"could not find craft cost for {item.ItemId}");
+            }
+            if (change != null)
+                yield return change;
         }
         var itemMetadata = await GetItemMetadata(sell.Tag);
         if ((int)buy.Tier < (int)sell.Tier)
@@ -337,7 +347,7 @@ public class ProfitChangeService
                 maxExpForPet = ExpMaxLevelGoldenDragon;
             }
             var level1Cost = await pricesApi.ApiItemPriceItemTagGetAsync(sell.Tag, new() { { "PetLevel", "1" }, { "Rarity", "LEGENDARY" } });
-            var level100Cost = await pricesApi.ApiItemPriceItemTagGetAsync(sell.Tag, 
+            var level100Cost = await pricesApi.ApiItemPriceItemTagGetAsync(sell.Tag,
                     new() { { "PetLevel", endLevel }, { "Rarity", "LEGENDARY" }, { "PetItem", "NOT_TIER_BOOST" } }) ?? new();
             var perExpCost = (float)(level100Cost.Median - level1Cost.Median) / maxExpForPet;
             if (sell.Tag == "PET_SUBZERO_WISP")
