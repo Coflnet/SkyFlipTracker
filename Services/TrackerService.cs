@@ -401,13 +401,13 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             }
         }
 
-        private async Task<FlipFlags> CheckTrade(ApiSaveAuction buy, SaveAuction sell)
+        private async Task<(FlipFlags, PastFlip.ProfitChange)> CheckTrade(ApiSaveAuction buy, SaveAuction sell)
         {
             var flags = FlipFlags.None;
             var itemUuid = sell.FlatenedNBT.Where(n => n.Key == "uuid").FirstOrDefault().Value;
             if (buy.Bids.OrderByDescending(b => b.Amount).First().Bidder == sell.AuctioneerId || itemUuid == default)
             {
-                return flags;
+                return (flags, null);
             }
             flags |= FlipFlags.DifferentBuyer;
 
@@ -420,7 +420,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                         });
             if (items.Count <= 0)
             {
-                return flags;
+                return (flags, null);
             }
             // TODO: maybe make sure to use best match to sell modifiers
             var itemInfo = items.First();
@@ -432,17 +432,22 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 var coins = tradeitems.Where(t => t.ItemId == COIN_ID).Sum(t => t.Amount);
                 var itemCount = tradeitems.Where(t => t.ItemId != COIN_ID).Count();
                 // overwrite buy cost
-                buy.HighestBidAmount = coins / 10 / itemCount;
+                var tradeEstimate = coins / 10 / itemCount;
+                buy.HighestBidAmount = tradeEstimate;
                 foreach (var tradePosition in tradeitems)
                 {
                     Console.WriteLine($"trade: {tradePosition.PlayerUuid} {tradePosition.TimeStamp} {tradePosition.ItemId} {tradePosition.Amount}");
                 }
                 flags |= FlipFlags.ViaTrade;
                 if (itemCount > 1)
+                {
                     flags |= FlipFlags.MultiItemTrade;
+                    return (flags, new PastFlip.ProfitChange($"Item was traded with other items for about {tradeEstimate} coins", -1));
+                }
+                return (flags, new PastFlip.ProfitChange($"Item was bought by trade for {tradeEstimate} coins", -1));
             }
 
-            return flags;
+            return (flags, null);
         }
 
         private async Task CheckNoIdAuctions(IEnumerable<SaveAuction> sells, ParallelOptions parallelOptions)
