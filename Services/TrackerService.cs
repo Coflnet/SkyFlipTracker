@@ -336,7 +336,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 try
                 {
                     var sell = item.sell;
-                    FlipFlags flags = await CheckTrade(buy, sell);
+                    (FlipFlags flags, var change) = await CheckTrade(buy, sell);
                     var purchaseId = GetId(buy.Uuid);
                     var flipFound = finders.Where(f => f != null && f.AuctionId == purchaseId).OrderByDescending(f => f.Timestamp).FirstOrDefault();
                     List<PastFlip.ProfitChange> changes = new();
@@ -345,6 +345,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                         changes = await profitChangeService.GetChanges(buy, sell).ToListAsync().ConfigureAwait(false);
                         if (buy.End > sell.End - TimeSpan.FromDays(14))
                             await AddListingAttempts(sell, changes);
+                        if (change != null)
+                            changes.Insert(0, change);
                     }
                     catch (System.Exception e)
                     {
