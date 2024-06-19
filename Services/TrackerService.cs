@@ -93,7 +93,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
         public async Task AddFlips(IEnumerable<Flip> flipsToSave)
         {
             DateTime minTime = new DateTime(2020, 1, 1);
-            await db.Database.BeginTransactionAsync();
+            await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
             for (int i = 0; i < 10; i++)
             {
                 try
