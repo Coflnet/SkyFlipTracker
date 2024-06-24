@@ -291,6 +291,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             var flipworth = flipVal.Sum(f => f.TargetPrice);
             if (flipworth < 100_000_000)
                 penaltiy /= 1.5;
+            else if (flipworth > 2_000_000_000 && macroedTimeDif.Count() > 5)
+                penaltiy *= 1.5;
             var recentFlipCount = timeDif.Where(t => t.age < TimeSpan.FromHours(10)).Count();
             if (recentFlipCount < 5)
                 penaltiy /= (5 - recentFlipCount);
@@ -308,7 +310,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
                 MacroedFlips = macroedTimeDif,
                 BoughtWorth = flipworth,
                 ReceivedCount = receivedCount,
-                TopBuySpeed = timeDif.Any() ? timeDif.Max(d => d.TotalSeconds) : 0
+                TopBuySpeed = timeDif.Any() ? timeDif.Max(d => d.TotalSeconds) : 0,
+                AntiMacro = antiMacro
             };
         }
 
@@ -493,6 +496,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             public IEnumerable<MacroedFlip> MacroedFlips { get; set; }
             public long BoughtWorth { get; set; }
             public double TopBuySpeed { get; set; }
+            public double AntiMacro { get; internal set; }
         }
 
         public class Timing
