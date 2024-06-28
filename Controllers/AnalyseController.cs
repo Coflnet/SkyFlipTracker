@@ -321,6 +321,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             {
                 return await db.Flips.Where(f => Auctionids(maxAge, maxTime, relevantFlips).Contains(f.AuctionId))
                     .Select(f => new AuctionEstimateTupple { AuctionId = f.AuctionId, TargetPrice = f.TargetPrice })
+                    .GroupBy(f => f.AuctionId).Select(f => f.OrderBy(f => f.TargetPrice).First())
                     .ToArrayAsync();
             }
             catch (Exception)
