@@ -297,6 +297,9 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             if (recentFlipCount < 5)
                 penaltiy /= (5 - recentFlipCount);
 
+            if(timeDif.All(t=>t.age > TimeSpan.FromHours(1)) && flipworth < 50_000_000 && penaltiy < 0.05)
+                penaltiy = 0;
+
             return new SpeedCompResult()
             {
                 // Clicks = clicks,
