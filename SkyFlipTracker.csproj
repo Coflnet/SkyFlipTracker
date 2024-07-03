@@ -15,20 +15,20 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="AutoMapper" Version="12.0.1" />
-    <PackageReference Include="CassandraCSharpDriver" Version="3.19.3" />
-    <PackageReference Include="Coflnet.Leaderboard.Client" Version="0.2.1" />
-    <PackageReference Include="Coflnet.Sky.Bazaar.Client" Version="0.3.1" />
+    <PackageReference Include="AutoMapper" Version="13.0.1" />
+    <PackageReference Include="CassandraCSharpDriver" Version="3.20.1" />
+    <PackageReference Include="Coflnet.Leaderboard.Client" Version="0.3.0" />
+    <PackageReference Include="Coflnet.Sky.Bazaar.Client" Version="0.4.1" />
     <PackageReference Include="Coflnet.Sky.Crafts.Client" Version="0.3.0" />
-    <PackageReference Include="Coflnet.Sky.PlayerState.Client" Version="0.1.1" />
-    <PackageReference Include="Coflnet.Sky.Proxy.Client" Version="0.1.1" />
-    <PackageReference Include="Coflnet.Sky.Settings.Client" Version="0.2.1" />
-    <PackageReference Include="Microsoft.AspNetCore.Mvc.NewtonsoftJson" Version="8.0.4" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="6.0.24">
+    <PackageReference Include="Coflnet.Sky.PlayerState.Client" Version="0.2.1" />
+    <PackageReference Include="Coflnet.Sky.Proxy.Client" Version="0.1.2" />
+    <PackageReference Include="Coflnet.Sky.Settings.Client" Version="0.2.2" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.NewtonsoftJson" Version="8.0.6" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.6">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
-    <PackageReference Include="Coflnet.Sky.Api.Client" Version="0.5.0" />
+    <PackageReference Include="Coflnet.Sky.Api.Client" Version="0.6.1" />
     <PackageReference Include="System.Linq.Async" Version="6.0.1" />
   </ItemGroup>
 
@@ -36,9 +36,9 @@
     <Compile Remove="**\*.Tests.cs" />
   </ItemGroup>
   <ItemGroup Condition="'$(Configuration)' != 'Release'">
-    <PackageReference Include="Moq" Version="4.20.69" />
+    <PackageReference Include="Moq" Version="4.20.70" />
     <PackageReference Include="NUnit3TestAdapter" Version="4.5.0" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.11.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.10.0" />
   </ItemGroup>
 
 </Project>
