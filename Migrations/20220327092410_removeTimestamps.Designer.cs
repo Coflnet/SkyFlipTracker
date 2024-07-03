@@ -14,7 +14,9 @@ namespace SkyFlipTracker.Migrations
     [Migration("20220327092410_removeTimestamps")]
     partial class removeTimestamps
     {
+#pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
+#pragma warning restore CS1591 // Missing XML comment for publicly visible type or member
         {
 #pragma warning disable 612, 618
             modelBuilder
