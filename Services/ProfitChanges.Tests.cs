@@ -861,7 +861,7 @@ public class ProfitChangeTests
         sell.Enchantments = new() { new() { Type = Core.Enchantment.EnchantmentType.dedication, Level = 4 } };
         var bazaarApi = new Mock<Bazaar.Client.Api.IBazaarApi>();
         bazaarApi.Setup(p => p.ApiBazaarPricesGetAsync(0, default))
-            .ReturnsAsync(() => new() { new("ENCHANTMENT_DEDICATION_3", 3_900_000, 3_000_000), 
+            .ReturnsAsync(() => new() { new("ENCHANTMENT_DEDICATION_3", 3_900_000, 3_000_000),
                 new("ENCHANTMENT_DEDICATION_4", 100_000_000, 100_000_000) });
         service = new ProfitChangeService(null, null, null, NullLogger<ProfitChangeService>.Instance, null, null, bazaarApi.Object);
         var changes = await service.GetChanges(buy, sell).ToListAsync();
@@ -1079,7 +1079,7 @@ public class ProfitChangeTests
         service = new ProfitChangeService(pricesApi.Object, null, null, NullLogger<ProfitChangeService>.Instance, null, null, null);
         var changes = await service.GetChanges(buy, sell).ToListAsync();
         Assert.That(changes.Count, Is.EqualTo(expectedChangecount), JsonConvert.SerializeObject(changes));
-        if(changes.Count == 2)
+        if (changes.Count == 2)
             Assert.That(changes[1].Amount, Is.EqualTo(-1_000_000));
     }
 
@@ -1101,6 +1101,23 @@ public class ProfitChangeTests
         Assert.That(changes.Count, Is.EqualTo(2), JsonConvert.SerializeObject(changes, Formatting.Indented));
         Assert.That(changes.Sum(c => c.Amount), Is.EqualTo(cost));
         Assert.That(changes[1].Label, Is.EqualTo(message));
+    }
+    [Test]
+    public async Task GoldenBountyScavengerUpgrade()
+    {
+        var buy = CreateAuction("DRILL", "drill", 1_000_000);
+        var sell = CreateAuction("DRILL", "drill", 100_000_000);
+        sell.Enchantments = new(){
+                new() { Type = Core.Enchantment.EnchantmentType.scavenger, Level = 6  }};
+        buy.Enchantments = new() { new() { Type = Core.Enchantment.EnchantmentType.scavenger, Level = 5 } };
+        var bazaarApi = new Mock<Bazaar.Client.Api.IBazaarApi>();
+        bazaarApi.Setup(p => p.ApiBazaarPricesGetAsync(0, default))
+            .ReturnsAsync(() => new() { new("GOLDEN_BOUNTY", 27_000_000, 26_000_000) });
+        service = new ProfitChangeService(null, null, null, NullLogger<ProfitChangeService>.Instance, null, null, bazaarApi.Object);
+        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        Assert.That(changes.Count, Is.EqualTo(2), JsonConvert.SerializeObject(changes, Formatting.Indented));
+        Assert.That(changes.Sum(c => c.Amount), Is.EqualTo(-29501200));
+        Assert.That(changes[1].Label, Is.EqualTo("Enchant scavenger from 5 to 6"));
     }
 
     [Test]
@@ -1305,12 +1322,12 @@ public class ProfitChangeTests
         sell.FlatenedNBT["exp"] = "29095472.42";
         var pricesApi = new Mock<IPricesApi>();
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("PET_GOLDEN_DRAGON", new() { { "PetLevel", "1" }, { "Rarity", "LEGENDARY" } }, 0, default)).ReturnsAsync(() => new() { Median = 600_000_000 });
-        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("PET_GOLDEN_DRAGON", new() { { "PetLevel", "200" }, { "Rarity", "LEGENDARY" }, { "PetItem", "NOT_TIER_BOOST"} }, 0, default)).ReturnsAsync(() => new() { Median = 1200_000_000 });
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("PET_GOLDEN_DRAGON", new() { { "PetLevel", "200" }, { "Rarity", "LEGENDARY" }, { "PetItem", "NOT_TIER_BOOST" } }, 0, default)).ReturnsAsync(() => new() { Median = 1200_000_000 });
         service = new ProfitChangeService(pricesApi.Object, null, null,
             NullLogger<ProfitChangeService>.Instance, null,
             new HypixelItemService(new System.Net.Http.HttpClient(), NullLogger<HypixelItemService>.Instance), null);
         var changes = await service.GetChanges(buy, sell).ToListAsync();
-        pricesApi.Verify(p => p.ApiItemPriceItemTagGetAsync("PET_GOLDEN_DRAGON", new() { { "PetLevel", "200" }, { "Rarity", "LEGENDARY" }, { "PetItem", "NOT_TIER_BOOST"} }, 0, default), Times.Once);
+        pricesApi.Verify(p => p.ApiItemPriceItemTagGetAsync("PET_GOLDEN_DRAGON", new() { { "PetLevel", "200" }, { "Rarity", "LEGENDARY" }, { "PetItem", "NOT_TIER_BOOST" } }, 0, default), Times.Once);
         Assert.That(changes.Count, Is.EqualTo(2), JsonConvert.SerializeObject(changes, Formatting.Indented));
         Assert.That(changes[1].Amount, Is.EqualTo(-10657764));
     }
@@ -1373,7 +1390,7 @@ public class ProfitChangeTests
         craftsApi.Setup(c => c.CraftsAllGetAsync(0, default)).ReturnsAsync(() => new() {
             new() { ItemId = "PRESTIGE_CHOCOLATE_REALM", Ingredients = new() {
                 new() { ItemId = "GANACHE_CHOCOLATE_SLAB", Count = 4 },
-                new() { ItemId = "SKYBLOCK_CHOCOLATE", Count = 4_500_000_000 }}} 
+                new() { ItemId = "SKYBLOCK_CHOCOLATE", Count = 4_500_000_000 }}}
             });
         var pricesApi = new Mock<IPricesApi>();
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("NIBBLE_CHOCOLATE_STICK", null, 0, default)).ReturnsAsync(() => new() { Median = 220_000 });
