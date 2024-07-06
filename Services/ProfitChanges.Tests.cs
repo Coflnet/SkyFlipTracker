@@ -1117,7 +1117,7 @@ public class ProfitChangeTests
         var changes = await service.GetChanges(buy, sell).ToListAsync();
         Assert.That(changes.Count, Is.EqualTo(2), JsonConvert.SerializeObject(changes, Formatting.Indented));
         Assert.That(changes.Sum(c => c.Amount), Is.EqualTo(-29501200));
-        Assert.That(changes[1].Label, Is.EqualTo("Enchant scavenger from 5 to 6"));
+        Assert.That(changes[1].Label, Is.EqualTo("Enchant scavenger 6"));
     }
 
     [Test]
