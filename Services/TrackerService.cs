@@ -288,11 +288,14 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             var sellLookup = sells.Where(s => s.FlatenedNBT.Where(n => n.Key == "uid").Any() && s.HighestBidAmount > 0)
                                 .GroupBy(s => new { uid = s.FlatenedNBT.Where(n => n.Key == "uid").First(), s.End }).Select(g => g.First())
                                 .ToDictionary(s => s.FlatenedNBT.Where(n => n.Key == "uid").Select(n => n.Value).FirstOrDefault());
-
+            var tradeLookupTask = transactionApi.TransactionUuidItemIdPostAsync(GetItemUuids(sells));
             var buyLookup = await auctionsApi.ApiAuctionsUidsSoldPostWithHttpInfoAsync(new Api.Client.Model.InventoryBatchLookup() { Uuids = sellLookup.Keys.ToList() });
+            var tradeUuidLookup = await tradeLookupTask;
             if (buyLookup.StatusCode != System.Net.HttpStatusCode.OK)
                 throw new Exception("Could not reach api to load purchases " + buyLookup.StatusCode);
             var exists = buyLookup.Data;
+            if(tradeUuidLookup.Count > 0)
+                logger.LogInformation($"Found {tradeUuidLookup.Count} trade items");
             if (exists.Count == 0)
             {
                 logger.LogInformation($"no purchases found {sells.Count()}");
@@ -387,6 +390,12 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 }
             });
             await noUidTask;
+        }
+
+        private static List<Guid> GetItemUuids(IEnumerable<SaveAuction> sells)
+        {
+            return sells.Select(s => s.FlatenedNBT.Where(n => n.Key == "uuid").FirstOrDefault().Value)
+                .Where(v => v != default).Select(Guid.Parse).ToHashSet().ToList();
         }
 
         private async Task AddListingAttempts(SaveAuction sell, List<PastFlip.ProfitChange> changes)
