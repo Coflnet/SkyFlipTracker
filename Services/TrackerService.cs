@@ -16,6 +16,7 @@ using Prometheus;
 using System.Globalization;
 using Coflnet.Leaderboard.Client.Api;
 using Coflnet.Sky.Settings.Client.Api;
+using Coflnet.Sky.PlayerState.Client.Model;
 
 namespace Coflnet.Sky.SkyAuctionTracker.Services
 {
@@ -294,7 +295,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             if (buyLookup.StatusCode != System.Net.HttpStatusCode.OK)
                 throw new Exception("Could not reach api to load purchases " + buyLookup.StatusCode);
             var exists = buyLookup.Data;
-            if(tradeUuidLookup.Count > 0)
+            if (tradeUuidLookup.Count > 0)
                 logger.LogInformation($"Found {tradeUuidLookup.Count} trade items");
             if (exists.Count == 0)
             {
@@ -309,6 +310,14 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                                         || v.Timestamp > DateTime.UtcNow))
                                     .OrderByDescending(u => u.Timestamp).FirstOrDefault()
             }).Where(item => item.buy != null).ToList();
+            foreach (var tradeSource in tradeUuidLookup)
+            {
+                soldAuctions.Add(new
+                {
+                    sell = sellLookup.GetValueOrDefault(tradeSource.Key),
+                    buy = new Api.Client.Model.ItemSell() { Buyer = null, Uuid = tradeSource.Value.OrderByDescending(t => t).First().ToString() }
+                });
+            }
             var purchaseUid = soldAuctions.Select(u => GetId(u.buy.Uuid)).ToHashSet();
 
             List<Flip> finders = new();
@@ -326,7 +335,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             // Console.WriteLine(Newtonsoft.Json.JsonConvert.SerializeObject(soldAuctions, Newtonsoft.Json.Formatting.Indented));
             await Parallel.ForEachAsync(soldAuctions, parallelOptions, async (item, token) =>
             {
-                var buy = await GetAuction(item.buy.Uuid, token).ConfigureAwait(false);
+                var buy = await GetAuction(item.buy.Uuid, item.sell, token).ConfigureAwait(false);
 
                 flipSumaryEventProducer.Produce(new FlipSumaryEvent()
                 {
@@ -438,18 +447,9 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             var itemTrade = await transactionApi.TransactionItemItemIdGetAsync(itemInfo.Id ?? throw new Exception("no item id"), 0);
             if (itemTrade.Count > 0)
             {
-                var time = itemTrade.First().TimeStamp;
-                var tradeitems = await transactionApi.TransactionPlayerPlayerUuidGetAsync(itemTrade.First().PlayerUuid, 1, time);
-                var coins = tradeitems.Where(t => t.ItemId == COIN_ID).Sum(t => t.Amount);
-                var itemCount = tradeitems.Where(t => t.ItemId != COIN_ID).Count();
-                // overwrite buy cost
-                var tradeEstimate = coins / 10 / itemCount;
-                buy.HighestBidAmount = tradeEstimate;
-                foreach (var tradePosition in tradeitems)
-                {
-                    Console.WriteLine($"trade: {tradePosition.PlayerUuid} {tradePosition.TimeStamp} {tradePosition.ItemId} {tradePosition.Amount}");
-                }
+                (int itemCount, long tradeEstimate, _) = await GetTradeValue(itemTrade);
                 flags |= FlipFlags.ViaTrade;
+                buy.HighestBidAmount = tradeEstimate;
                 if (itemCount > 1)
                 {
                     flags |= FlipFlags.MultiItemTrade;
@@ -459,6 +459,21 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             }
 
             return (flags, null);
+        }
+
+        private async Task<(int itemCount, long tradeEstimate, List<Transaction> items)> GetTradeValue(List<Transaction> itemTrade)
+        {
+            var time = itemTrade.First().TimeStamp;
+            var tradeitems = await transactionApi.TransactionPlayerPlayerUuidGetAsync(itemTrade.First().PlayerUuid, 1, time);
+            var coins = tradeitems.Where(t => t.ItemId == COIN_ID).Sum(t => t.Amount);
+            var itemCount = tradeitems.Where(t => t.ItemId != COIN_ID).Count();
+            // overwrite buy cost
+            var tradeEstimate = coins / 10 / itemCount;
+            foreach (var tradePosition in tradeitems)
+            {
+                Console.WriteLine($"trade: {tradePosition.PlayerUuid} {tradePosition.TimeStamp} {tradePosition.ItemId} {tradePosition.Amount}");
+            }
+            return (itemCount, tradeEstimate, tradeitems);
         }
 
         private async Task CheckNoIdAuctions(IEnumerable<SaveAuction> sells, ParallelOptions parallelOptions)
@@ -476,7 +491,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 Api.Client.Model.BidResult previousAuction = null;
                 foreach (var purchase in purchases.OrderByDescending(p => p.End).Where(p => p.End < item.First().End))
                 {
-                    var buyResp = await GetAuction(purchase.AuctionId, token).ConfigureAwait(false);
+                    var buyResp = await GetAuction(purchase.AuctionId, null, token).ConfigureAwait(false);
                     var match = buyResp.FlatenedNBT.FirstOrDefault(n => item.Any(i => i.FlatenedNBT.Any(f => f.Key == n.Key && f.Value == n.Value)));
                     if (logMore)
                         logger.LogInformation($"Found match {match.Key} {match.Value}");
@@ -536,13 +551,56 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             });
         }
 
-        private async Task<ApiSaveAuction> GetAuction(string uuid, CancellationToken token)
+        private async Task<ApiSaveAuction> GetAuction(string uuid, SaveAuction sell, CancellationToken token)
         {
-            var buyResp = await auctionsApi.ApiAuctionAuctionUuidGetWithHttpInfoAsync(uuid, 0, token).ConfigureAwait(false);
-            var buy = JsonConvert.DeserializeObject<ApiSaveAuction>(buyResp.RawContent);
-            if (buy == null)
-                throw new Exception($"could not load buy {uuid} {buyResp.StatusCode} Content: {buyResp.RawContent}");
-            return buy;
+            if (Guid.TryParse(uuid, out _) || sell == null)
+            {
+                var buyResp = await auctionsApi.ApiAuctionAuctionUuidGetWithHttpInfoAsync(uuid, 0, token).ConfigureAwait(false);
+                var buy = JsonConvert.DeserializeObject<ApiSaveAuction>(buyResp.RawContent);
+                if (buy == null)
+                    throw new Exception($"could not load buy {uuid} {buyResp.StatusCode} Content: {buyResp.RawContent}");
+                return buy;
+            }
+            // this is a trade mock
+            var itemTrade = await transactionApi.TransactionItemItemIdGetAsync(long.Parse(uuid), 0);
+            if (itemTrade.Count <= 0)
+                throw new Exception($"could not load trade {uuid}");
+            (int itemCount, long tradeEstimate, var items) = await GetTradeValue(itemTrade);
+            var potentialItems = items.Where(i => i.ItemId > COIN_ID + 100).ToList();
+            if (potentialItems.Count == 0)
+                throw new Exception($"No item in trade for {uuid}");
+            while (potentialItems.Count > 1)
+            {
+                var item = potentialItems.First();
+                var itemInfo = await itemsApi.ApiItemsIdGetAsync(item.ItemId, 0);
+                if (itemInfo.ExtraAttributes.TryGetValue("uuid", out var itemUuidObj) && itemUuidObj.ToString() == sell.FlatenedNBT.GetValueOrDefault("uuid"))
+                {
+                    Console.WriteLine($"Creating virtual purchase auction for {sell.Uuid}");
+                    return FromitemRepresent(itemInfo);
+                }
+                potentialItems.RemoveAt(0);
+            }
+            throw new Exception($"could not find trade item for {uuid} in any trade {sell.Tag}");
+
+        }
+
+        public ApiSaveAuction FromitemRepresent(Coflnet.Sky.PlayerState.Client.Model.Item i)
+        {
+            var auction = new ApiSaveAuction()
+            {
+                Count = i.Count ?? 0,
+                Tag = i.Tag,
+                ItemName = i.ItemName,
+            };
+            auction.Enchantments = i.Enchantments?.Select(e => new Enchantment()
+            {
+                Type = Enum.TryParse<Enchantment.EnchantmentType>(e.Key, out var type) ? type : Enchantment.EnchantmentType.unknown,
+                Level = (byte)(e.Value ?? 0)
+            }).ToList() ?? new();
+            auction.Tier = Enum.TryParse<Tier>(i.ExtraAttributes.FirstOrDefault(a => a.Key == "tier").Value?.ToString() ?? "", out var tier) ? tier : Tier.UNKNOWN;
+            auction.Reforge = Enum.TryParse<ItemReferences.Reforge>(i.ExtraAttributes.FirstOrDefault(a => a.Key == "modifier").Value?.ToString() ?? "", out var reforge) ? reforge : ItemReferences.Reforge.Unknown;
+            auction.SetFlattenedNbt(NBT.FlattenNbtData(i.ExtraAttributes));
+            return auction;
         }
 
         public static string GetDisplayName(ApiSaveAuction buy, SaveAuction sell)
