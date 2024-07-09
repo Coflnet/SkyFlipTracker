@@ -338,21 +338,20 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             await Parallel.ForEachAsync(soldAuctions, parallelOptions, async (item, token) =>
             {
                 var buy = await GetAuction(item.buy.Uuid, item.sell, token).ConfigureAwait(false);
-
-                flipSumaryEventProducer.Produce(new FlipSumaryEvent()
-                {
-                    Flipper = item.sell.AuctioneerId,
-                    Buy = buy,
-                    Sell = item.sell,
-                    Finder = finders.Where(f => f.AuctionId == GetId(item.buy.Uuid)).OrderBy(f => f.Timestamp).FirstOrDefault(),
-                    Profit = (int)(item.sell.HighestBidAmount - buy?.HighestBidAmount ?? 0),
-                });
                 try
                 {
                     var sell = item.sell;
-                    (FlipFlags flags, var change) = await CheckTrade(buy, sell);
+                    (FlipFlags flags, var change) = await CheckTrade(buy, sell); 
                     var purchaseId = GetId(buy.Uuid);
                     var flipFound = finders.Where(f => f != null && f.AuctionId == purchaseId).OrderByDescending(f => f.Timestamp).FirstOrDefault();
+                    flipSumaryEventProducer.Produce(new FlipSumaryEvent()
+                    {
+                        Flipper = item.sell.AuctioneerId,
+                        Buy = buy,
+                        Sell = item.sell,
+                        Finder = flipFound,
+                        Profit = (int)(item.sell.HighestBidAmount - buy?.HighestBidAmount ?? 0),
+                    });
                     List<PastFlip.ProfitChange> changes = new();
                     try
                     {
@@ -589,6 +588,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             var auction = FromitemRepresent(itemInfo);
             auction.HighestBidAmount = tradeEstimate;
             auction.End = itemTrade.First().TimeStamp;
+            auction.Uuid = Guid.NewGuid().ToString();
             logger.LogInformation("Created virtual trade item {auction} from {item}", JsonConvert.SerializeObject(auction), JsonConvert.SerializeObject(itemInfo));
             return auction;
 
@@ -648,6 +648,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
 
         internal long GetId(string uuid)
         {
+            if (uuid == null)
+                return -1;
             if (uuid.Length < 16)
                 return long.Parse(uuid);
             if (uuid.Length > 17)
