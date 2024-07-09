@@ -341,6 +341,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 try
                 {
                     var sell = item.sell;
+                    if (buy.AuctioneerId == null)
+                        logger.LogInformation($"trade check {item.buy.ItemTag}");
                     (FlipFlags flags, var change) = await CheckTrade(buy, sell);
                     var purchaseId = GetId(buy.Uuid);
                     var flipFound = finders.Where(f => f != null && f.AuctionId == purchaseId).OrderByDescending(f => f.Timestamp).FirstOrDefault();
@@ -352,10 +354,14 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                         Finder = flipFound,
                         Profit = (int)(item.sell.HighestBidAmount - buy?.HighestBidAmount ?? 0),
                     });
+                    if (buy.AuctioneerId == null)
+                        logger.LogInformation($"trade produced  {item.buy.ItemTag}");
                     List<PastFlip.ProfitChange> changes = new();
                     try
                     {
                         changes = await profitChangeService.GetChanges(buy, sell).ToListAsync().ConfigureAwait(false);
+                        if (buy.AuctioneerId == null)
+                            logger.LogInformation($"trade changes retrieved  {item.buy.ItemTag}");
                         if (buy.End > sell.End - TimeSpan.FromDays(14))
                             await AddListingAttempts(sell, changes);
                         if (change != null)
@@ -370,6 +376,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     if (sell.End - buy.End > TimeSpan.FromDays(14))
                         profit = 0; // no flip if it took more than 2 weeks
                     var name = GetDisplayName(buy, sell);
+                    if (buy.AuctioneerId == null)
+                        logger.LogInformation($"trade name determined {item.buy.ItemTag}");
                     var flip = new PastFlip()
                     {
                         Flipper = Guid.Parse(sell.AuctioneerId),
@@ -391,6 +399,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                         Flags = flags
                     };
                     await flipStorageService.SaveFlip(flip);
+                    if (buy.AuctioneerId == null)
+                        logger.LogInformation($"trade saved {item.buy.ItemTag}");
                     userFlipCounter.Inc();
                 }
                 catch (System.Exception e)
@@ -558,7 +568,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
 
         private async Task<ApiSaveAuction> GetAuction(string uuid, SaveAuction sell, CancellationToken token)
         {
-            if (uuid.Length >= 32 && (Guid.TryParse(uuid, out _) || sell == null))
+            if (uuid.Length >= 32 && Guid.TryParse(uuid, out _) || sell == null)
             {
                 try
                 {
