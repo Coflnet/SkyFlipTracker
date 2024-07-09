@@ -584,7 +584,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             var itemInfo = await itemsApi.ApiItemsIdGetAsync(long.Parse(uuid), 0);
             var auction = FromitemRepresent(itemInfo);
             auction.HighestBidAmount = tradeEstimate;
-            logger.LogInformation("Created virtual trade item {auction}", JsonConvert.SerializeObject(auction));
+            logger.LogInformation("Created virtual trade item {auction} from {item}", JsonConvert.SerializeObject(auction), JsonConvert.SerializeObject(itemInfo));
             return auction;
 
         }
