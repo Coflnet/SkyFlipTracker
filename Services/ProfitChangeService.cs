@@ -419,6 +419,15 @@ public class ProfitChangeService
             };
 
         }
+        if (item.Key == "additional_coins")
+        {
+            var coins = ParseFloat(item.Value);
+            yield return new PastFlip.ProfitChange()
+            {
+                Label = "Additional coins",
+                Amount = -(long)coins
+            };
+        }
         // missing nbt
         if (!mapper.TryGetIngredients(item.Key, item.Value, valueOnBuy.Value, out var items))
             yield break;

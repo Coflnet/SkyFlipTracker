@@ -1121,6 +1121,20 @@ public class ProfitChangeTests
     }
 
     [Test]
+    public async Task AdditionalMiddasCoins()
+    {
+        var buy = CreateAuction("STARRED_MIDAS_STAFF", "staff", 100_000_000);
+        var sell = CreateAuction("STARRED_MIDAS_STAFF", "staff", 500_000_000);
+        sell.FlatenedNBT["additional_coins"] = "206660000";
+        var bazaarApi = new Mock<Bazaar.Client.Api.IBazaarApi>();
+        service = new ProfitChangeService(null, null, null, NullLogger<ProfitChangeService>.Instance, null, null, bazaarApi.Object);
+        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        Assert.That(changes.Count, Is.EqualTo(2), JsonConvert.SerializeObject(changes, Formatting.Indented));
+        Assert.That(changes.Sum(c => c.Amount), Is.EqualTo(-224161200));
+        Assert.That(changes[1].Label, Is.EqualTo("Additional coins"));
+    }
+
+    [Test]
     public async Task OnlyRemovingDrillPartsOnce()
     {
         var buy = CreateAuction("DRILL", "drill", 1_000_000);
