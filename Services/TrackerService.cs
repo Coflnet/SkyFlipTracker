@@ -584,6 +584,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             var itemInfo = await itemsApi.ApiItemsIdGetAsync(long.Parse(uuid), 0);
             var auction = FromitemRepresent(itemInfo);
             auction.HighestBidAmount = tradeEstimate;
+            auction.End = itemTrade.First().TimeStamp;
             logger.LogInformation("Created virtual trade item {auction} from {item}", JsonConvert.SerializeObject(auction), JsonConvert.SerializeObject(itemInfo));
             return auction;
 
@@ -591,7 +592,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
 
         public ApiSaveAuction FromitemRepresent(Coflnet.Sky.PlayerState.Client.Model.Item i)
         {
-            var auction = new ApiSaveAuction()
+            var auction = new SaveAuction()
             {
                 Count = i.Count ?? 0,
                 Tag = i.Tag,
@@ -605,7 +606,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             auction.Tier = Enum.TryParse<Tier>(i.ExtraAttributes.FirstOrDefault(a => a.Key == "tier").Value?.ToString() ?? "", out var tier) ? tier : Tier.UNKNOWN;
             auction.Reforge = Enum.TryParse<ItemReferences.Reforge>(i.ExtraAttributes.FirstOrDefault(a => a.Key == "modifier").Value?.ToString() ?? "", out var reforge) ? reforge : ItemReferences.Reforge.Unknown;
             auction.SetFlattenedNbt(NBT.FlattenNbtData(i.ExtraAttributes));
-            return auction;
+            return JsonConvert.DeserializeObject<ApiSaveAuction>(JsonConvert.SerializeObject(auction));
         }
 
         public static string GetDisplayName(ApiSaveAuction buy, SaveAuction sell)
