@@ -310,6 +310,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                                         || v.Timestamp > DateTime.UtcNow))
                                     .OrderByDescending(u => u.Timestamp).FirstOrDefault()
             }).Where(item => item.buy != null).ToList();
+            var purchaseUid = soldAuctions.Select(u => GetId(u.buy.Uuid)).ToHashSet();
             foreach (var tradeSource in tradeUuidLookup)
             {
                 soldAuctions.Add(new
@@ -318,7 +319,6 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     buy = new Api.Client.Model.ItemSell() { Buyer = null, Uuid = tradeSource.Value.OrderByDescending(t => t).First().ToString() }
                 });
             }
-            var purchaseUid = soldAuctions.Select(u => GetId(u.buy.Uuid)).ToHashSet();
 
             List<Flip> finders = new();
             using (var scope = scopeFactory.CreateScope())
