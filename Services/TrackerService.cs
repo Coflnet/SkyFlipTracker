@@ -341,7 +341,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 try
                 {
                     var sell = item.sell;
-                    (FlipFlags flags, var change) = await CheckTrade(buy, sell); 
+                    (FlipFlags flags, var change) = await CheckTrade(buy, sell);
                     var purchaseId = GetId(buy.Uuid);
                     var flipFound = finders.Where(f => f != null && f.AuctionId == purchaseId).OrderByDescending(f => f.Timestamp).FirstOrDefault();
                     flipSumaryEventProducer.Produce(new FlipSumaryEvent()
@@ -589,7 +589,10 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             auction.HighestBidAmount = tradeEstimate;
             auction.End = itemTrade.First().TimeStamp;
             auction.Uuid = Guid.Empty.ToString("N");
-            logger.LogInformation("Created virtual trade item {auction} from {item}", JsonConvert.SerializeObject(auction), JsonConvert.SerializeObject(itemInfo));
+            logger.LogInformation("Created virtual trade item for {playerId} {auction} from {item}",
+                itemTrade.First().PlayerUuid,
+                JsonConvert.SerializeObject(auction),
+                JsonConvert.SerializeObject(itemInfo));
             return auction;
 
         }
