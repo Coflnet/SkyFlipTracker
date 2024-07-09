@@ -422,10 +422,11 @@ public class ProfitChangeService
         if (item.Key == "additional_coins")
         {
             var coins = ParseFloat(item.Value);
+            var previous = ParseFloat(valueOnBuy.Value ?? "0");
             yield return new PastFlip.ProfitChange()
             {
                 Label = "Additional coins",
-                Amount = -(long)coins
+                Amount = -(long)(coins - previous)
             };
         }
         // missing nbt
