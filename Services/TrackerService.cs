@@ -581,19 +581,11 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             var potentialItems = items.Where(i => i.ItemId > COIN_ID + 100).ToList();
             if (potentialItems.Count == 0)
                 throw new Exception($"No item in trade for {uuid}");
-            while (potentialItems.Count > 1)
-            {
-                var item = potentialItems.First();
-                var itemInfo = await itemsApi.ApiItemsIdGetAsync(item.ItemId, 0);
-                if (itemInfo.ExtraAttributes.TryGetValue("uuid", out var itemUuidObj) && itemUuidObj.ToString() == sell.FlatenedNBT.GetValueOrDefault("uuid"))
-                {
-                    Console.WriteLine($"Creating virtual purchase auction for {sell.Uuid}");
-                    return FromitemRepresent(itemInfo);
-                }
-                logger.LogInformation($"Item {itemUuidObj.ToString()} {itemInfo.Tag}  does not match {sell.FlatenedNBT.GetValueOrDefault("uuid")} {sell.FlatenedNBT.GetValueOrDefault("uid")} auctionId {sell.Uuid}");
-                potentialItems.RemoveAt(0);
-            }
-            throw new Exception($"could not find trade item for {uuid} in any trade {sell.Tag}");
+            var itemInfo = await itemsApi.ApiItemsIdGetAsync(long.Parse(uuid), 0);
+            var auction = FromitemRepresent(itemInfo);
+            auction.HighestBidAmount = tradeEstimate;
+            logger.LogInformation("Created virtual trade item {auction}", JsonConvert.SerializeObject(auction));
+            return auction;
 
         }
 
