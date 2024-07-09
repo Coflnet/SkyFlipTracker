@@ -553,14 +553,24 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
 
         private async Task<ApiSaveAuction> GetAuction(string uuid, SaveAuction sell, CancellationToken token)
         {
-            if (uuid.Length >= 32 && Guid.TryParse(uuid, out _) || sell == null)
+            if (uuid.Length >= 32 && (Guid.TryParse(uuid, out _) || sell == null))
             {
-                var buyResp = await auctionsApi.ApiAuctionAuctionUuidGetWithHttpInfoAsync(uuid, 0, token).ConfigureAwait(false);
-                var buy = JsonConvert.DeserializeObject<ApiSaveAuction>(buyResp.RawContent);
-                if (buy == null)
-                    throw new Exception($"could not load buy {uuid} {buyResp.StatusCode} Content: {buyResp.RawContent}");
-                return buy;
+                try
+                {
+
+                    var buyResp = await auctionsApi.ApiAuctionAuctionUuidGetWithHttpInfoAsync(uuid, 0, token).ConfigureAwait(false);
+                    var buy = JsonConvert.DeserializeObject<ApiSaveAuction>(buyResp.RawContent);
+                    if (buy == null)
+                        throw new Exception($"could not load buy {uuid} {buyResp.StatusCode} Content: {buyResp.RawContent}");
+                    return buy;
+                }
+                catch (Exception)
+                {
+                    logger.LogError($"Could not load auction {uuid} {sell?.Tag} {sell?.UId} {sell?.Uuid}");
+                    throw;
+                }
             }
+            logger.LogInformation($"Loading trade item for {uuid}");
             // this is a trade mock
             var itemTrade = await transactionApi.TransactionItemItemIdGetAsync(long.Parse(uuid), 0);
             if (itemTrade.Count <= 0)
