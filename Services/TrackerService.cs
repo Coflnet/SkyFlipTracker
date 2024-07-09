@@ -313,7 +313,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             var purchaseUid = soldAuctions.Select(u => GetId(u.buy.Uuid)).ToHashSet();
             foreach (var tradeSource in tradeUuidLookup)
             {
-                var uid = AuctionService.Instance.GetUuid(AuctionService.Instance.GetId(tradeSource.Key));
+                var uid = tradeSource.Key.Split("'").Last();
                 var sell = sellLookup.GetValueOrDefault(uid) ?? throw new Exception($"Could not find sell for trade item {uid} {tradeSource.Key}");
                 soldAuctions.Add(new
                 {
