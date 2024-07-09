@@ -1127,11 +1127,16 @@ public class ProfitChangeTests
         var sell = CreateAuction("STARRED_MIDAS_STAFF", "staff", 500_000_000);
         sell.FlatenedNBT["additional_coins"] = "206660000";
         var bazaarApi = new Mock<Bazaar.Client.Api.IBazaarApi>();
-        service = new ProfitChangeService(null, null, null, NullLogger<ProfitChangeService>.Instance, null, null, bazaarApi.Object);
+        bazaarApi.Setup(p => p.ApiBazaarPricesGetAsync(0, default))
+            .ReturnsAsync(() => new() { new("STOCK_OF_STONKS", 3_000_000, 3_000_000) });
+        var pricesApi = new Mock<IPricesApi>();
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("STOCK_OF_STONKS", null, 0, default)).ReturnsAsync(() => new() { Median = 3_000_000 });
+        service = new ProfitChangeService(pricesApi.Object, null, null, NullLogger<ProfitChangeService>.Instance, null, null, bazaarApi.Object);
         var changes = await service.GetChanges(buy, sell).ToListAsync();
-        Assert.That(changes.Count, Is.EqualTo(2), JsonConvert.SerializeObject(changes, Formatting.Indented));
-        Assert.That(changes.Sum(c => c.Amount), Is.EqualTo(-224161200));
+        Assert.That(changes.Count, Is.EqualTo(3), JsonConvert.SerializeObject(changes, Formatting.Indented));
+        Assert.That(changes.Sum(c => c.Amount), Is.EqualTo(-233161200));
         Assert.That(changes[1].Label, Is.EqualTo("Additional coins"));
+        Assert.That(changes[2].Label, Is.EqualTo("Stock of Stonks"));
     }
 
     [Test]

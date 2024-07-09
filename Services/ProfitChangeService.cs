@@ -425,11 +425,14 @@ public class ProfitChangeService
             var previous = ParseFloat(valueOnBuy.Value ?? "0");
             var sum = -(long)(coins - previous);
             if (sum != 0)
+            {
                 yield return new PastFlip.ProfitChange()
                 {
                     Label = "Additional coins",
                     Amount = sum
                 };
+                yield return await CostOf("STOCK_OF_STONKS", "Stock of Stonks", 3);
+            }
         }
         // missing nbt
         if (!mapper.TryGetIngredients(item.Key, item.Value, valueOnBuy.Value, out var items))
