@@ -590,6 +590,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     Console.WriteLine($"Creating virtual purchase auction for {sell.Uuid}");
                     return FromitemRepresent(itemInfo);
                 }
+                logger.LogInformation($"Item {itemUuidObj.ToString()} {itemInfo.Tag}  does not match {sell.FlatenedNBT.GetValueOrDefault("uuid")} {sell.FlatenedNBT.GetValueOrDefault("uid")} auctionId {sell.Uuid}");
                 potentialItems.RemoveAt(0);
             }
             throw new Exception($"could not find trade item for {uuid} in any trade {sell.Tag}");
