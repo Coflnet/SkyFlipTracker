@@ -553,7 +553,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
 
         private async Task<ApiSaveAuction> GetAuction(string uuid, SaveAuction sell, CancellationToken token)
         {
-            if (Guid.TryParse(uuid, out _) || sell == null)
+            if (uuid.Length >= 32 && Guid.TryParse(uuid, out _) || sell == null)
             {
                 var buyResp = await auctionsApi.ApiAuctionAuctionUuidGetWithHttpInfoAsync(uuid, 0, token).ConfigureAwait(false);
                 var buy = JsonConvert.DeserializeObject<ApiSaveAuction>(buyResp.RawContent);
