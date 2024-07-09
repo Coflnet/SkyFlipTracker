@@ -427,6 +427,10 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
         {
             var flags = FlipFlags.None;
             var itemUuid = sell.FlatenedNBT.Where(n => n.Key == "uuid").FirstOrDefault().Value;
+            if (buy.Bids == null)
+            {
+                return (FlipFlags.ViaTrade, new PastFlip.ProfitChange($"Item was bought via trade for {buy.HighestBidAmount} coins", -1));
+            }
             if (buy.Bids.OrderByDescending(b => b.Amount).First().Bidder == sell.AuctioneerId || itemUuid == default)
             {
                 return (flags, null);
