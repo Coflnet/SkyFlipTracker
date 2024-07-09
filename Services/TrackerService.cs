@@ -644,6 +644,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
 
         internal long GetId(string uuid)
         {
+            if (uuid.Length < 16)
+                return long.Parse(uuid);
             if (uuid.Length > 17)
                 uuid = uuid.Substring(0, 17);
             var builder = new System.Text.StringBuilder(uuid);
