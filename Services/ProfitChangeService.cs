@@ -11,6 +11,8 @@ using Coflnet.Sky.Core.Services;
 using System.Security.Cryptography;
 
 namespace Coflnet.Sky.SkyAuctionTracker.Services;
+
+
 /// <summary>
 /// Organizses any and every profit changes
 /// </summary>
@@ -26,6 +28,7 @@ public class ProfitChangeService
     private Core.PropertyMapper mapper = new();
     private Bazaar.Client.Api.IBazaarApi bazaarApi;
     private HypixelItemService hypixelItemService;
+    private IPriceProviderFactory priceProviderFactory;
     /// <summary>
     /// Keys containing itemTags that can be removed
     /// </summary>
@@ -46,6 +49,7 @@ public class ProfitChangeService
     /// <param name="itemApi"></param>
     /// <param name="hypixelItemService"></param>
     /// <param name="bazaarApi"></param>
+    /// <param name="priceProviderFactory"></param>
     public ProfitChangeService(
         Coflnet.Sky.Api.Client.Api.IPricesApi pricesApi,
         Crafts.Client.Api.IKatApi katApi,
@@ -53,7 +57,8 @@ public class ProfitChangeService
         ILogger<ProfitChangeService> logger,
         IItemsApi itemApi,
         HypixelItemService hypixelItemService,
-        Bazaar.Client.Api.IBazaarApi bazaarApi)
+        Bazaar.Client.Api.IBazaarApi bazaarApi,
+        IPriceProviderFactory priceProviderFactory)
     {
         this.pricesApi = pricesApi;
         this.katApi = katApi;
@@ -62,6 +67,7 @@ public class ProfitChangeService
         this.itemApi = itemApi;
         this.hypixelItemService = hypixelItemService;
         this.bazaarApi = bazaarApi;
+        this.priceProviderFactory = priceProviderFactory;
     }
 
     /// <summary>
@@ -73,6 +79,7 @@ public class ProfitChangeService
     public async IAsyncEnumerable<PastFlip.ProfitChange> GetChanges(Coflnet.Sky.Core.SaveAuction buy, Coflnet.Sky.Core.SaveAuction sell)
     {
         yield return GetAhTax(sell.HighestBidAmount, sell.StartingBid);
+        var priceProvider = priceProviderFactory.Create(sell);
         if (IsNotcaluclateable(sell))
             yield break;
         if (buy.Tier == Core.Tier.UNKNOWN)
@@ -88,7 +95,7 @@ public class ProfitChangeService
         var tagOnPurchase = buy.Tag;
         if (tagOnPurchase != sell.Tag)
         {
-            await foreach (var item in GetCraftCosts(buy, sell))
+            await foreach (var item in GetCraftCosts(buy, sell, priceProvider))
             {
                 yield return item;
             }
@@ -109,7 +116,7 @@ public class ProfitChangeService
         if ((int)buy.Tier < (int)sell.Tier)
             if (sell.Tag.StartsWith("PET_"))
             {
-                await foreach (var item in GetPetRarityUpgrades(buy, sell))
+                await foreach (var item in GetPetRarityUpgrades(buy, sell, priceProvider))
                 {
                     yield return item;
                 }
@@ -120,7 +127,7 @@ public class ProfitChangeService
                 var wasRecombobulated = buy.FlatenedNBT.Where(l => l.Key == "rarity_upgrades").Any();
                 if (isrecombobulated && !wasRecombobulated)
                 {
-                    yield return await CostOf("RECOMBOBULATOR_3000", "Recombobulator");
+                    yield return await priceProvider.CostOf("RECOMBOBULATOR_3000", "Recombobulator");
                     targetTier--;
                 }
                 if (sell.Tag == "PULSE_RING")
@@ -129,7 +136,7 @@ public class ProfitChangeService
                     if (wasRecombobulated)
                         targetTier--;
                     var toibCount = (int.Parse(currentCharge) - buy.GetNbtValue("thunder_charge")) / 50_000;
-                    yield return await CostOf("THUNDER_IN_A_BOTTLE", $"{toibCount}x Thunder in a bottle", toibCount);
+                    yield return await priceProvider.CostOf("THUNDER_IN_A_BOTTLE", $"{toibCount}x Thunder in a bottle", toibCount);
                     targetTier = buy.Tier; // handled conversion, don't log
                 }
                 if ((int)buy.Tier != (int)targetTier)
@@ -142,7 +149,7 @@ public class ProfitChangeService
         foreach (var itemKey in gemsAdded)
         {
             var parts = itemKey.Split('_');
-            yield return await CostOf(itemKey, $"{parts[0]} {parts[1]} gem added");
+            yield return await priceProvider.CostOf(itemKey, $"{parts[0]} {parts[1]} gem added");
         }
         foreach (var itemKey in gemsRemoved)
         {
@@ -166,7 +173,7 @@ public class ProfitChangeService
         var itemsRemoved = itemsOnPurchase.Except(itemsOnSell).ToList();
         foreach (var item in itemsAdded)
         {
-            yield return await CostOf(item.Value, $"{item.Value} {item.Key} added");
+            yield return await priceProvider.CostOf(item.Value, $"{item.Value} {item.Key} added");
         }
         foreach (var item in itemsRemoved)
         {
@@ -193,7 +200,7 @@ public class ProfitChangeService
             var reforgeItem = mapper.GetReforgeCost(sell.Reforge, sell.Tier);
             if (reforgeItem.Item1 != string.Empty)
             {
-                var itemCost = await CostOf(reforgeItem.Item1, $"Reforge {sell.Reforge} added");
+                var itemCost = await priceProvider.CostOf(reforgeItem.Item1, $"Reforge {sell.Reforge} added");
                 itemCost.Amount -= reforgeItem.Item2;
                 yield return itemCost;
             }
@@ -202,7 +209,7 @@ public class ProfitChangeService
         {
             if (ItemKeys.Contains(item.Key))
                 continue; // already handled
-            await foreach (var res in GetRemainingDifference(buy, sell, item))
+            await foreach (var res in GetRemainingDifference(buy, sell, item, priceProvider))
             {
                 yield return res;
             }
@@ -249,7 +256,7 @@ public class ProfitChangeService
         return ahTax;
     }
 
-    private async IAsyncEnumerable<PastFlip.ProfitChange> GetCraftCosts(Core.SaveAuction buy, Core.SaveAuction sell)
+    private async IAsyncEnumerable<PastFlip.ProfitChange> GetCraftCosts(Core.SaveAuction buy, Core.SaveAuction sell, IPriceProvider priceProvider)
     {
         var tagOnPurchase = buy.Tag;
         if (tagOnPurchase.Contains("_WITHER_"))
@@ -279,7 +286,7 @@ public class ProfitChangeService
                 yield return new PastFlip.ProfitChange("Coins", -(long)item.Cost);
             if (item.ItemId == "SKYBLOCK_CHOCOLATE")
             {
-                var chocolateStickCost = await CostOf("NIBBLE_CHOCOLATE_STICK", "Chocolate stick");
+                var chocolateStickCost = await priceProvider.CostOf("NIBBLE_CHOCOLATE_STICK", "Chocolate stick");
                 yield return new PastFlip.ProfitChange($"{count} Chocolate", chocolateStickCost.Amount * count / 250_000_000);
                 continue;
             }
@@ -287,7 +294,7 @@ public class ProfitChangeService
             try
             {
                 if (count > 0)
-                    change = await CostOf(item.ItemId, $"crafting material {item.ItemId}" + (count > 1 ? $" x{count}" : ""), count);
+                    change = await priceProvider.CostOf(item.ItemId, $"crafting material {item.ItemId}" + (count > 1 ? $" x{count}" : ""), count);
             }
             catch (System.Exception e)
             {
@@ -308,7 +315,7 @@ public class ProfitChangeService
         }
     }
 
-    private async IAsyncEnumerable<PastFlip.ProfitChange> GetRemainingDifference(Core.SaveAuction buy, Core.SaveAuction sell, KeyValuePair<string, string> item)
+    private async IAsyncEnumerable<PastFlip.ProfitChange> GetRemainingDifference(Core.SaveAuction buy, Core.SaveAuction sell, KeyValuePair<string, string> item, IPriceProvider priceProvider)
     {
         if (item.Key == "rarity_upgrades")
             yield break;
@@ -328,7 +335,7 @@ public class ProfitChangeService
                         Amount = -cost.Coins
                     };
                 else if (cost.Type == "ITEM")
-                    yield return await CostOf(cost.ItemId, $"Slot unlock item {cost.ItemId}x{cost.Amount}", cost.Amount ?? 1);
+                    yield return await priceProvider.CostOf(cost.ItemId, $"Slot unlock item {cost.ItemId}x{cost.Amount}", cost.Amount ?? 1);
             }
         }
         if (item.Key == "upgrade_level")
@@ -338,9 +345,9 @@ public class ProfitChangeService
             foreach (var cost in upgradeCost)
             {
                 if (cost.Type == "ESSENCE")
-                    yield return await CostOf($"ESSENCE_{cost.EssenceType}", $"{cost.EssenceType} essence x{cost.Amount} to add star", cost.Amount);
+                    yield return await priceProvider.CostOf($"ESSENCE_{cost.EssenceType}", $"{cost.EssenceType} essence x{cost.Amount} to add star", cost.Amount);
                 else if (cost.Type == "ITEM")
-                    yield return await CostOf(cost.ItemId, $"{cost.ItemId}x{cost.Amount} for star", cost.Amount);
+                    yield return await priceProvider.CostOf(cost.ItemId, $"{cost.ItemId}x{cost.Amount} for star", cost.Amount);
             }
         }
         if (item.Key == "exp")
@@ -381,7 +388,7 @@ public class ProfitChangeService
                 if (currentAttri.First().Key == item.Key)
                 {
                     // add only for first attribute
-                    yield return await CostOf("WHEEL_OF_FATE", "Wheel of fate cost");
+                    yield return await priceProvider.CostOf("WHEEL_OF_FATE", "Wheel of fate cost");
                 }
                 var val = previousAttributes.Select(f => (f, ParseFloat(f.Value), diff: Math.Abs(ParseFloat(f.Value) - ParseFloat(item.Value))))
                         .OrderBy(f => f.diff).First();
@@ -431,7 +438,7 @@ public class ProfitChangeService
                     Label = "Additional coins",
                     Amount = sum
                 };
-                yield return await CostOf("STOCK_OF_STONKS", "Stock of Stonks", 3);
+                yield return await priceProvider.CostOf("STOCK_OF_STONKS", "Stock of Stonks", 3);
             }
         }
         // missing nbt
@@ -446,27 +453,27 @@ public class ProfitChangeService
                 continue; // rune mapping returns both without and with level and here we only handle without
             if (item.Key == "ability_scroll")
             {
-                yield return await CostOf(ingredient.Key, $"Applied {ingredient.Key}");
+                yield return await priceProvider.CostOf(ingredient.Key, $"Applied {ingredient.Key}");
                 continue;
             }
             if (item.Key == "skin" && sell.Tag.StartsWith("PET_"))
             {
-                yield return await CostOf($"PET_SKIN_" + ingredient.Key, $"Applied {ingredient.Key}");
+                yield return await priceProvider.CostOf($"PET_SKIN_" + ingredient.Key, $"Applied {ingredient.Key}");
                 continue;
             }
             if (ingredient.count == 1)
-                yield return await CostOf(ingredient.Key, $"Used {ingredient.Key} to upgraded {item.Key} to {item.Value}", ingredient.count);
+                yield return await priceProvider.CostOf(ingredient.Key, $"Used {ingredient.Key} to upgraded {item.Key} to {item.Value}", ingredient.count);
             else
-                yield return await CostOf(ingredient.Key, $"Used {ingredient.count}x {ingredient.Key} to upgraded {item.Key} to {item.Value}", ingredient.count);
+                yield return await priceProvider.CostOf(ingredient.Key, $"Used {ingredient.count}x {ingredient.Key} to upgraded {item.Key} to {item.Value}", ingredient.count);
         }
     }
 
-    private async IAsyncEnumerable<PastFlip.ProfitChange> GetPetRarityUpgrades(Core.SaveAuction buy, Core.SaveAuction sell)
+    private async IAsyncEnumerable<PastFlip.ProfitChange> GetPetRarityUpgrades(Core.SaveAuction buy, Core.SaveAuction sell, IPriceProvider priceProvider)
     {
         var sellTier = sell.Tier;
         if (sell.FlatenedNBT.Where(l => l.Key == "heldItem" && l.Value == "PET_ITEM_TIER_BOOST").Any())
         {
-            yield return await CostOf("PET_ITEM_TIER_BOOST", "tier Boost cost");
+            yield return await priceProvider.CostOf("PET_ITEM_TIER_BOOST", "tier Boost cost");
             if (buy.Tier >= sell.Tier - 1 || buy.Tier == Core.Tier.LEGENDARY)
                 yield break;
             sellTier--;
@@ -503,7 +510,7 @@ public class ProfitChangeService
                 var raw = rawCost.Where(c => ((int)c.BaseRarity) == rarityInt && sell.Tag.EndsWith(c.Name.Replace(' ', '_').ToUpper())).FirstOrDefault();
                 if (i == 5 && sell.Tag == "PET_JERRY")
                 {
-                    yield return await CostOf("PET_ITEM_TOY_JERRY", "Jerry 3d glasses");
+                    yield return await priceProvider.CostOf("PET_ITEM_TOY_JERRY", "Jerry 3d glasses");
                     break;
                 }
                 // special pet upgrades 
@@ -527,7 +534,7 @@ public class ProfitChangeService
                 if (raw.Material != null)
                 {
                     costAdded = true;
-                    yield return await CostOf(raw.Material, materialTitle, raw.Amount);
+                    yield return await priceProvider.CostOf(raw.Material, materialTitle, raw.Amount);
                 }
             }
             yield return new($"Kat cost for {tierName}", (long)-upgradeCost);
@@ -685,6 +692,7 @@ public class ProfitChangeService
                 Label = title,
                 Amount = -amount
             };
+
         var itemPrice = await pricesApi.ApiItemPriceItemTagGetAsync(item)
                     ?? throw new Exception($"Failed to find price for {item}");
         var median = itemPrice.Median;
