@@ -80,6 +80,7 @@ namespace Coflnet.Sky.SkyAuctionTracker
 
             services.AddSingleton<ProfitChangeService>();
             services.AddSingleton<FlipStorageService>();
+            services.AddSingleton<IPriceProviderFactory, PriceProviderFactory>();
             services.AddJaeger(Configuration);
             services.AddTransient<TrackerService>();
             services.AddSingleton<Kafka.KafkaCreator>();
