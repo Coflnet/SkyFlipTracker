@@ -314,6 +314,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             foreach (var tradeSource in tradeUuidLookup)
             {
                 var uid = tradeSource.Key.Split("-").Last();
+                if(exists.TryGetValue(uid, out var existing))
+                    continue; // know buy properties
                 var sell = sellLookup.GetValueOrDefault(uid) ?? throw new Exception($"Could not find sell for trade item {uid} {tradeSource.Key}");
                 soldAuctions.Add(new
                 {
