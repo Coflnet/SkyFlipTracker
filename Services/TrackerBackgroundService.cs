@@ -224,7 +224,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
         {
             var rerequestService = scope.ServiceProvider.GetRequiredService<IBaseApi>();
             var events = new List<FlipEvent>();
-            foreach (var item in lps.Where(lp => lp.TargetPrice - lp.Auction.StartingBid > 550_000))
+            foreach (var item in lps.Where(lp => lp.TargetPrice - lp.Auction.StartingBid > 550_000)
+                .GroupBy(lp => lp.Auction.UId).Select(g => g.First()))
             {
                 if (item.Auction.Start > DateTime.UtcNow - TimeSpan.FromMinutes(1))
                 {
