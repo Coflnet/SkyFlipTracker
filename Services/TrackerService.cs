@@ -336,7 +336,6 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 CancellationToken = new CancellationTokenSource(20000).Token
             };
             var noUidTask = CheckNoIdAuctions(sells, parallelOptions);
-            // Console.WriteLine(Newtonsoft.Json.JsonConvert.SerializeObject(soldAuctions, Newtonsoft.Json.Formatting.Indented));
             await Parallel.ForEachAsync(soldAuctions, parallelOptions, async (item, token) =>
             {
                 var buy = await GetAuction(item.buy.Uuid, item.sell, token).ConfigureAwait(false);
@@ -401,13 +400,16 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                         Flags = flags
                     };
                     await flipStorageService.SaveFlip(flip);
-                    if (buy.AuctioneerId == null)
-                        logger.LogInformation($"trade saved {item.buy.ItemTag}");
                     userFlipCounter.Inc();
+
+                    if(flipFound == default && changes.Count <= 2 && profit > 5_000_000 && buy.End > DateTime.UtcNow - TimeSpan.FromDays(1))
+                    {
+                        logger.LogInformation($"Flip {flip.PurchaseAuctionId} not found for {flip.Profit}");
+                    }
                 }
                 catch (System.Exception e)
                 {
-                    logger.LogError(e, $"Failed to save flip {item.buy.Uuid} -> {item.sell.Uuid} {Newtonsoft.Json.JsonConvert.SerializeObject(item.sell)}\n{Newtonsoft.Json.JsonConvert.SerializeObject(buy)}");
+                    logger.LogError(e, $"Failed to save flip {item.buy.Uuid} -> {item.sell.Uuid} {JsonConvert.SerializeObject(item.sell)}\n{JsonConvert.SerializeObject(buy)}");
                     throw;
                 }
             });
