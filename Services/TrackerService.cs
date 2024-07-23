@@ -314,7 +314,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             foreach (var tradeSource in tradeUuidLookup)
             {
                 var uid = tradeSource.Key.Split("-").Last();
-                if(exists.TryGetValue(uid, out var existing))
+                if (exists.TryGetValue(uid, out var existing))
                     continue; // know buy properties
                 var sell = sellLookup.GetValueOrDefault(uid) ?? throw new Exception($"Could not find sell for trade item {uid} {tradeSource.Key}");
                 soldAuctions.Add(new
@@ -402,12 +402,29 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     await flipStorageService.SaveFlip(flip);
                     userFlipCounter.Inc();
 
-                    if(flipFound == default && changes.Count <= 2 && profit > 5_000_000 && buy.End > DateTime.UtcNow - TimeSpan.FromDays(1))
+                    if (flipFound == default && changes.Count <= 1 && profit > 3_000_000 && buy.End > DateTime.UtcNow - TimeSpan.FromDays(1))
                     {
-                        logger.LogInformation($"Flip {flip.PurchaseAuctionId} not found for {flip.Profit}");
+                        logger.LogInformation($"Flip {flip.PurchaseAuctionId:n} not found for {flip.Profit}");
+                    }
+                    if (flipFound != default && changes.Count <= 1 && profit > 3_000_000 && buy.End > DateTime.UtcNow - TimeSpan.FromDays(1))
+                    {
+                        using (var scope = scopeFactory.CreateScope())
+                        using (var dbScoped = scope.ServiceProvider.GetRequiredService<TrackerDbContext>())
+                        {
+                            var playerId = GetId(buy.AuctioneerId);
+                            var sendEvents = await dbScoped.FlipEvents.Where(f => buy.UId == f.AuctionId).ToListAsync();
+                            if (sendEvents.Count > 1)
+                            {
+                                var sentToPurchaser = sendEvents.Where(e => e.Type == FlipEventType.FLIP_RECEIVE && e.PlayerId == playerId).Any();
+                                var boughtAt = sendEvents.Where(e => e.Type == FlipEventType.AUCTION_SOLD).FirstOrDefault();
+                                var firstSend = sendEvents.Where(e => e.Type == FlipEventType.FLIP_RECEIVE).OrderBy(e => e.Timestamp).FirstOrDefault();
+                                var diff = boughtAt?.Timestamp - firstSend?.Timestamp;
+                                logger.LogInformation($"Flip {flip.PurchaseAuctionId:n} found for {flip.Profit} by us {sentToPurchaser} bought {boughtAt} {sendEvents.Count} diff{diff}");
+                            }
+                        }
                     }
                 }
-                catch (System.Exception e)
+                catch (Exception e)
                 {
                     logger.LogError(e, $"Failed to save flip {item.buy.Uuid} -> {item.sell.Uuid} {JsonConvert.SerializeObject(item.sell)}\n{JsonConvert.SerializeObject(buy)}");
                     throw;
