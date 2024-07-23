@@ -421,6 +421,11 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                                 var diff = boughtAt?.Timestamp - firstSend?.Timestamp;
                                 logger.LogInformation($"Flip {flip.PurchaseAuctionId:n} found for {flip.Profit} by us {sentToPurchaser} bought {boughtAt} {sendEvents.Count} diff{diff}");
                             }
+                            else
+                            {
+                                logger.LogInformation($"Flip {flip.PurchaseAuctionId:n} found for {flip.Profit} not sent to anybody");
+
+                            }
                         }
                     }
                 }
