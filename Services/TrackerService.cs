@@ -412,7 +412,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                         using (var dbScoped = scope.ServiceProvider.GetRequiredService<TrackerDbContext>())
                         {
                             var playerId = GetId(buy.AuctioneerId);
-                            var sendEvents = await dbScoped.FlipEvents.Where(f => buy.UId == f.AuctionId).ToListAsync();
+                            var purchaseUid = GetId(buy.Uuid);
+                            var sendEvents = await dbScoped.FlipEvents.Where(f => purchaseUid == f.AuctionId).ToListAsync();
                             if (sendEvents.Count > 1)
                             {
                                 var sentToPurchaser = sendEvents.Where(e => e.Type == FlipEventType.FLIP_RECEIVE && e.PlayerId == playerId).Any();
@@ -423,7 +424,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                             }
                             else
                             {
-                                logger.LogInformation($"Flip {flip.PurchaseAuctionId:n} found for {flip.Profit} not sent to anybody");
+                                logger.LogInformation($"Flip {flip.PurchaseAuctionId:n} ({buy.UId}) found for {flip.Profit} not sent to anybody");
 
                             }
                         }
