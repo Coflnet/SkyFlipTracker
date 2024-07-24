@@ -411,7 +411,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                         using (var scope = scopeFactory.CreateScope())
                         using (var dbScoped = scope.ServiceProvider.GetRequiredService<TrackerDbContext>())
                         {
-                            var playerId = GetId(buy.AuctioneerId);
+                            var playerId = GetId(buy.Bids.OrderByDescending(b => b.Amount).First().Bidder);
                             var purchaseUid = GetId(buy.Uuid);
                             var sendEvents = await dbScoped.FlipEvents.Where(f => purchaseUid == f.AuctionId).ToListAsync();
                             if (sendEvents.Count > 1)
@@ -420,7 +420,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                                 var boughtAt = sendEvents.Where(e => e.Type == FlipEventType.AUCTION_SOLD).FirstOrDefault();
                                 var firstSend = sendEvents.Where(e => e.Type == FlipEventType.FLIP_RECEIVE).OrderBy(e => e.Timestamp).FirstOrDefault();
                                 var diff = boughtAt?.Timestamp - firstSend?.Timestamp;
-                                logger.LogInformation($"Flip {flip.PurchaseAuctionId:n} found for {flip.Profit} by us {sentToPurchaser} bought {boughtAt} {sendEvents.Count} diff{diff}");
+                                logger.LogInformation($"Flip {flip.PurchaseAuctionId:n} found for {flip.Profit} by us {sentToPurchaser} bought {boughtAt.Timestamp} {sendEvents.Count} diff {diff}");
                             }
                             else
                             {
