@@ -415,6 +415,35 @@ public class ProfitChangeTests
         Assert.That(changes.Count, Is.EqualTo(2));
         Assert.That(changes.Last().Amount, Is.EqualTo(-price));
     }
+    [TestCase("RUNE_PRIMAL_FEAR", 80_000_000)]
+    [TestCase("RUNE_SOULTWIST", 960000000)]
+    public async Task HigherLevelUniqueRuneAddedStaysAtlvl3(string runeTag, int targetChange)
+    {
+        var buy = new Core.SaveAuction()
+        {
+            Uuid = Guid.NewGuid().ToString("N"),
+            Tag = "LIVID_DAGGER",
+            HighestBidAmount = 1000,
+            FlatenedNBT = new(),
+            Tier = Core.Tier.RARE
+        };
+        var sell = new Core.SaveAuction()
+        {
+            Uuid = Guid.NewGuid().ToString("N"),
+            Tag = "LIVID_DAGGER",
+            HighestBidAmount = 10_000_000,
+            FlatenedNBT = new()
+                {
+                    { runeTag, "3" }
+                },
+            Tier = Core.Tier.MYTHIC
+        };
+        var price = 80_000_000;
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(runeTag, null, 0, default)).ReturnsAsync(() => new() { Median = price });
+        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        Assert.That(changes.Count, Is.EqualTo(2));
+        Assert.That(changes.Last().Amount, Is.EqualTo(-targetChange));
+    }
     [Test]
     public async Task AoteReforgeNaming()
     {
