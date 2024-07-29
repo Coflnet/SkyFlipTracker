@@ -387,6 +387,37 @@ public class ProfitChangeTests
         Assert.That(changes.Sum(c => c.Amount), Is.EqualTo(-(5_000_000 + 600_000 + 201200)));
     }
     [Test]
+    public async Task AddFullHotFumingPotatoBooks()
+    {
+        var buy = new Core.SaveAuction()
+        {
+            Uuid = Guid.NewGuid().ToString("N"),
+            Tag = "LIVID_DAGGER",
+            HighestBidAmount = 1000,
+            FlatenedNBT = new(),
+            Tier = Core.Tier.MYTHIC
+        };
+        var sell = new Core.SaveAuction()
+        {
+            Uuid = Guid.NewGuid().ToString("N"),
+            Tag = "LIVID_DAGGER",
+            HighestBidAmount = 10_000_000,
+            FlatenedNBT = new()
+                {
+                    { "hpc", "15" }
+                },
+            Tier = Core.Tier.MYTHIC
+        };
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("HOT_POTATO_BOOK", null, 0, default))
+                .ReturnsAsync(() => new() { Median = 80_000 });
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("FUMING_POTATO_BOOK", null, 0, default))
+                .ReturnsAsync(() => new() { Median = 1_180_000 });
+        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        Assert.That(changes.Count, Is.EqualTo(3));
+        Assert.That(changes[2].Amount, Is.EqualTo(-80_000*10));
+        Assert.That(changes[1].Amount, Is.EqualTo(-1_180_000*5));
+    }
+    [Test]
     public async Task RuneAdded()
     {
         // {"uuid":"2a4dc80a8b264ff7a322979bf2431151","count":1,"startingBid":0,"tag":"LIVID_DAGGER","itemName":"§6Fabled Livid Dagger §6✪§6✪§6✪","start":"0001-01-01T00:00:00Z","end":"2024-01-05T17:07:52.479Z","auctioneerId":"2b751a1a45f04fa4bd10fcdd8afb79bc","profileId":null,"Coop":null,"CoopMembers":null,"highestBidAmount":10394641,"bids":[{"bidder":"e386a859fedb494681d52370152a0ccb","profileId":"unknown","amount":10394641,"timestamp":"2024-01-05T17:07:52.479Z"}],"anvilUses":0,"enchantments":[{"type":"impaling","level":3},{"type":"luck","level":5},{"type":"critical","level":6},{"type":"ultimate_combo","level":5},{"type":"looting","level":3},{"type":"syphon","level":3},{"type":"ender_slayer","level":5},{"type":"telekinesis","level":1},{"type":"scavenger","level":3},{"type":"fire_aspect","level":2},{"type":"vampirism","level":5},{"type":"giant_killer","level":5},{"type":"venomous","level":5},{"type":"first_strike","level":4},{"type":"thunderlord","level":5},{"type":"sharpness","level":5},{"type":"cubism","level":5},{"type":"lethality","level":5},{"type":"prosecute","level":5}],"nbtData":{"Data":{"hpc":10,"runes":{"SOULTWIST":1},"upgrade_level":3,"uid":"51a63082b961","uuid":"3894dafe-22eb-4379-b062-51a63082b961"}},"itemCreatedAt":"2022-04-21T12:10:00Z","reforge":"Fabled","category":"UNKNOWN","tier":"LEGENDARY","bin":false,"flatNbt":{"hpc":"10","upgrade_level":"3","uid":"51a63082b961","uuid":"3894dafe-22eb-4379-b062-51a63082b961","RUNE_SOULTWIST":"1"}}
