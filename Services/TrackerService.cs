@@ -338,6 +338,12 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             var noUidTask = CheckNoIdAuctions(sells, parallelOptions);
             await Parallel.ForEachAsync(soldAuctions, parallelOptions, async (item, token) =>
             {
+                var isStoredAlready = await CacheService.Instance.GetFromRedis<bool>("fliptracked" + item.buy.Uuid);
+                if (isStoredAlready)
+                {
+                    logger.LogInformation($"Already stored {item.buy.Uuid}");
+                    return;
+                }
                 var buy = await GetAuction(item.buy.Uuid, item.sell, token).ConfigureAwait(false);
                 try
                 {
@@ -429,6 +435,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                             }
                         }
                     }
+                    await CacheService.Instance.SaveInRedis("fliptracked" + item.buy.Uuid, true, TimeSpan.FromMinutes(2));
                 }
                 catch (Exception e)
                 {
