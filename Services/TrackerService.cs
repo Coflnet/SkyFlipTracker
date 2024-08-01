@@ -420,7 +420,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                                 var boughtAt = sendEvents.Where(e => e.Type == FlipEventType.AUCTION_SOLD).FirstOrDefault();
                                 var firstSend = sendEvents.Where(e => e.Type == FlipEventType.FLIP_RECEIVE).OrderBy(e => e.Timestamp).FirstOrDefault();
                                 var diff = boughtAt?.Timestamp - firstSend?.Timestamp;
-                                logger.LogInformation($"Flip {flip.PurchaseAuctionId:n} found for {flip.Profit} by us {sentToPurchaser} bought {boughtAt.Timestamp} {sendEvents.Count} diff {diff}");
+                                logger.LogInformation($"Flip {flip.PurchaseAuctionId:n} found for {flip.Profit} by us {sentToPurchaser} bought {boughtAt?.Timestamp} {sendEvents.Count} diff {diff}");
                             }
                             else
                             {
