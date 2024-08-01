@@ -17,6 +17,7 @@ using System.Globalization;
 using Coflnet.Leaderboard.Client.Api;
 using Coflnet.Sky.Settings.Client.Api;
 using Coflnet.Sky.PlayerState.Client.Model;
+using System.Collections.Concurrent;
 
 namespace Coflnet.Sky.SkyAuctionTracker.Services
 {
@@ -40,6 +41,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
         readonly Counter flipFoundCounter = Metrics.CreateCounter("sky_fliptracker_saved_finding", "How many found flips were saved");
         readonly Counter userFlipCounter = Metrics.CreateCounter("sky_fliptracker_user_flip", "How many flips were done by a user");
 
+        private ConcurrentQueue<long> flipIds = new();
 
         public TrackerService(
             TrackerDbContext db,
@@ -338,10 +340,9 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             var noUidTask = CheckNoIdAuctions(sells, parallelOptions);
             await Parallel.ForEachAsync(soldAuctions, parallelOptions, async (item, token) =>
             {
-                var isStoredAlready = await CacheService.Instance.GetFromRedis<bool>("fliptracked" + item.buy.Uuid);
-                if (isStoredAlready)
+                if (flipIds.Contains(item.sell.UId))
                 {
-                    logger.LogInformation($"Already stored {item.buy.Uuid}");
+                    logger.LogInformation($"Already stored {item.sell.Uuid}");
                     return;
                 }
                 var buy = await GetAuction(item.buy.Uuid, item.sell, token).ConfigureAwait(false);
@@ -435,7 +436,9 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                             }
                         }
                     }
-                    await CacheService.Instance.SaveInRedis("fliptracked" + item.buy.Uuid, true, TimeSpan.FromMinutes(2));
+                    flipIds.Enqueue(sell.UId);
+                    if (flipIds.Count > 100)
+                        flipIds.TryDequeue(out _);
                 }
                 catch (Exception e)
                 {
