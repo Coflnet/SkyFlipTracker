@@ -568,7 +568,7 @@ public class ProfitChangeService
         try
         {
             var allBazaar = await bazaarApi.ApiBazaarPricesGetAsync();
-            var itemValues = allBazaar.ToDictionary(b => b.ProductId, b => b.SellPrice);
+            var itemValues = allBazaar.GroupBy(a => a.ProductId).ToDictionary(b => b.Key, b => b.Max(x => x.SellPrice));
             var sellValue = mapper.EnchantValue(item, sell.FlatenedNBT, itemValues);
             var buyValue = 0L;
             var enchantAtBuy = buy.Enchantments.Where(e => e.Type == item.Type).FirstOrDefault();
