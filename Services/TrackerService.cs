@@ -275,6 +275,11 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 }
                 if (sells.Count() < 4)
                     dev.Logger.Instance.Error(error, $"cassandra index failed batch size {sells.Count()}");
+                if (sells.All(s => s.End < new DateTime(2024, 8, 8, 0, 9, 0, DateTimeKind.Utc)))
+                {
+                    logger.LogInformation($"skipping {sells.Count()} sells before 2024-08-08 00:08:34");
+                    return;
+                }
                 await Task.Delay(200);
                 if (sells.Count() > 1)
                 {
