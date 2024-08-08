@@ -487,7 +487,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             var items = await itemsApi.ApiItemsFindUuidPostAsync(new(){
                             new (){
                                 Tag = sell.Tag,
-                                Uuid = Guid.Parse(sell.FlatenedNBT.Where(n => n.Key == "uuid").First().Value)
+                                Uuid = Guid.Parse(sell.FlatenedNBT.Where(n => n.Key == "uuid").FirstOrDefault().Value ?? Guid.Empty.ToString("N"))
                             }
                         });
             if (items.Count <= 0)
