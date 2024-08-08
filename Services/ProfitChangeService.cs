@@ -384,6 +384,8 @@ public class ProfitChangeService
             if (baseLevel == 0) // wheel of fate applied
             {
                 var previousAttributes = buy.FlatenedNBT.Where(f => Constants.AttributeKeys.Contains(f.Key)).ToList();
+                if(previousAttributes.Count == 0)
+                    yield break;
                 var currentAttri = sell.FlatenedNBT.Where(f => Constants.AttributeKeys.Contains(f.Key)).ToList();
                 if (currentAttri.First().Key == item.Key)
                 {
