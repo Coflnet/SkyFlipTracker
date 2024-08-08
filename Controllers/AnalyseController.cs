@@ -53,10 +53,10 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
         };
         public static HashSet<string> BadPlayersList => BadPlayers;
 
-        private static readonly TimeSpan shadowTiming = TimeSpan.FromDays(2);
-        private static readonly int longMacroMultiplier = 80;
+        private static readonly TimeSpan shadowTiming = TimeSpan.FromDays(1);
+        private static readonly int longMacroMultiplier = 20;
         // extended time that supposed macroers will be delayed over.
-        private static readonly int shortMacroMultiplier = 6;
+        private static readonly int shortMacroMultiplier = 4;
 
         /// <summary>
         /// Creates a new instance of <see cref="TrackerController"/>
