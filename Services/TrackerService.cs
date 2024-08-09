@@ -275,7 +275,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 }
                 if (sells.Count() < 4)
                     dev.Logger.Instance.Error(error, $"cassandra index failed batch size {sells.Count()}");
-                
+
                 await Task.Delay(200);
                 if (sells.Count() > 1)
                 {
@@ -355,6 +355,9 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 try
                 {
                     var sell = item.sell;
+                    var first = sells.First();
+                    if (!sells.All(s => s.AuctioneerId == first.AuctioneerId) && (await flipStorageService.GetFlips(Guid.Parse(sell.AuctioneerId), sell.End, sell.End)).Any())
+                        return; // no refresh request and already stored, skip calculation
                     if (buy.AuctioneerId == null)
                         logger.LogInformation($"trade check {item.buy.ItemTag}");
                     (FlipFlags flags, var change) = await CheckTrade(buy, sell);
@@ -676,7 +679,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             {
                 return name;
             }
-            if (sell.Tag.StartsWith("PET_") && sell.FlatenedNBT.Any(f => f.Key == "exp")&& buy.FlatenedNBT.Any(f => f.Key == "exp") && sell.ItemName != buy.ItemName
+            if (sell.Tag.StartsWith("PET_") && sell.FlatenedNBT.Any(f => f.Key == "exp") && buy.FlatenedNBT.Any(f => f.Key == "exp") && sell.ItemName != buy.ItemName
                                     && ParseFloat(sell.FlatenedNBT.First(f => f.Key == "exp").Value) - ParseFloat(buy.FlatenedNBT.First(f => f.Key == "exp").Value) > 100_000)
             {
                 // level changed 
