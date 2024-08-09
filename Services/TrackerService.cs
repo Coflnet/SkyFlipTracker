@@ -676,7 +676,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             {
                 return name;
             }
-            if (sell.Tag.StartsWith("PET_") && sell.FlatenedNBT.Any(f => f.Key == "exp") && sell.ItemName != buy.ItemName
+            if (sell.Tag.StartsWith("PET_") && sell.FlatenedNBT.Any(f => f.Key == "exp")&& buy.FlatenedNBT.Any(f => f.Key == "exp") && sell.ItemName != buy.ItemName
                                     && ParseFloat(sell.FlatenedNBT.First(f => f.Key == "exp").Value) - ParseFloat(buy.FlatenedNBT.First(f => f.Key == "exp").Value) > 100_000)
             {
                 // level changed 
