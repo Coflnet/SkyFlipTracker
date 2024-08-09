@@ -541,6 +541,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
         {
 
             var noUidCheck = sells.Where(s => !s.FlatenedNBT.Where(n => n.Key == "uid").Any() && s.HighestBidAmount > 0)
+                                .Where(s=>s.End > DateTime.UtcNow - TimeSpan.FromDays(1)) // old not important
                                 .GroupBy(s => new { s.AuctioneerId, s.Tag });
             await Parallel.ForEachAsync(noUidCheck, async (item, token) =>
             {
