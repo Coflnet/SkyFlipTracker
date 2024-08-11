@@ -150,15 +150,5 @@ public class FlipStorageService
         var session = await GetSession();
         var table = GetFlipsTable(session);
         await table.CreateIfNotExistsAsync();
-        try
-        {
-            session.Execute("ALTER TABLE flips ADD flags int;");
-            await SaveFlip(new PastFlip() { Flipper = Guid.Empty, SellTime = DateTime.UtcNow, Uid = 0, Flags = 0 });
-            logger.LogInformation("inserted flags column");
-        }
-        catch (Exception e)
-        {
-            logger.LogInformation(e, "flags exists already");
-        }
     }
 }
