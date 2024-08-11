@@ -346,11 +346,6 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     logger.LogInformation($"Already stored {item.sell.Uuid}");
                     return;
                 }
-                if (item.buy.Timestamp < new DateTime(2024, 8, 8, 0, 8, 34) && item.buy.Timestamp > new DateTime(2024, 8, 7, 0, 8, 33))
-                {
-                    logger.LogInformation($"skipping buy before 2024-08-08 00:08:34");
-                    return;
-                }
                 var buy = await GetAuction(item.buy.Uuid, item.sell, token).ConfigureAwait(false);
                 try
                 {
@@ -424,26 +419,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     }
                     if (flipFound != default && changes.Count <= 1 && profit > 3_000_000 && buy.End > DateTime.UtcNow - TimeSpan.FromDays(1))
                     {
-                        using (var scope = scopeFactory.CreateScope())
-                        using (var dbScoped = scope.ServiceProvider.GetRequiredService<TrackerDbContext>())
-                        {
-                            var playerId = GetId(buy.Bids.OrderByDescending(b => b.Amount).First().Bidder);
-                            var purchaseUid = GetId(buy.Uuid);
-                            var sendEvents = await dbScoped.FlipEvents.Where(f => purchaseUid == f.AuctionId).ToListAsync();
-                            if (sendEvents.Count > 1)
-                            {
-                                var sentToPurchaser = sendEvents.Where(e => e.Type == FlipEventType.FLIP_RECEIVE && e.PlayerId == playerId).Any();
-                                var boughtAt = sendEvents.Where(e => e.Type == FlipEventType.AUCTION_SOLD).FirstOrDefault();
-                                var firstSend = sendEvents.Where(e => e.Type == FlipEventType.FLIP_RECEIVE).OrderBy(e => e.Timestamp).FirstOrDefault();
-                                var diff = boughtAt?.Timestamp - firstSend?.Timestamp;
-                                logger.LogInformation($"Flip {flip.PurchaseAuctionId:n} found for {flip.Profit} by us {sentToPurchaser} bought {boughtAt?.Timestamp} {sendEvents.Count} diff {diff}");
-                            }
-                            else
-                            {
-                                logger.LogInformation($"Flip {flip.PurchaseAuctionId:n} ({buy.UId}) found for {flip.Profit} not sent to anybody");
-
-                            }
-                        }
+                        await LogFoundFlips(buy, flip);
                     }
                     flipIds.Enqueue(sell.UId);
                     if (flipIds.Count > 100)
@@ -456,6 +432,31 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 }
             });
             await noUidTask;
+        }
+
+        private async Task LogFoundFlips(ApiSaveAuction buy, PastFlip flip)
+        {
+            using var scope = scopeFactory.CreateScope();
+            using var dbScoped = scope.ServiceProvider.GetRequiredService<TrackerDbContext>();
+            var playerId = GetId(buy.Bids.OrderByDescending(b => b.Amount).First().Bidder);
+            var purchaseUid = GetId(buy.Uuid);
+            var sendEvents = await dbScoped.FlipEvents.Where(f => purchaseUid == f.AuctionId).ToListAsync();
+            if (sendEvents.Count <= 1)
+            {
+                logger.LogInformation($"Flip {flip.PurchaseAuctionId:n} ({buy.UId}) found for {flip.Profit} not sent to anybody");
+                return;
+            }
+            var sentToPurchaser = sendEvents.Where(e => e.Type == FlipEventType.FLIP_RECEIVE && e.PlayerId == playerId).Any();
+            var boughtAt = sendEvents.Where(e => e.Type == FlipEventType.AUCTION_SOLD).FirstOrDefault();
+            var firstSend = sendEvents.Where(e => e.Type == FlipEventType.FLIP_RECEIVE).OrderBy(e => e.Timestamp).FirstOrDefault();
+            var diff = boughtAt?.Timestamp - firstSend?.Timestamp;
+            logger.LogInformation($"Flip {flip.PurchaseAuctionId:n} found for {flip.Profit} by us {sentToPurchaser} bought {boughtAt?.Timestamp} {sendEvents.Count} diff {diff}");
+            if (!sentToPurchaser && diff > TimeSpan.FromSeconds(-4) && diff < TimeSpan.FromSeconds(-3.5))
+            {
+                // todo store
+            }
+
+
         }
 
         private static List<Guid> GetItemUuids(IEnumerable<SaveAuction> sells)
@@ -541,7 +542,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
         {
 
             var noUidCheck = sells.Where(s => !s.FlatenedNBT.Where(n => n.Key == "uid").Any() && s.HighestBidAmount > 0)
-                                .Where(s=>s.End > DateTime.UtcNow - TimeSpan.FromDays(1)) // old not important
+                                .Where(s => s.End > DateTime.UtcNow - TimeSpan.FromDays(1)) // old not important
                                 .GroupBy(s => new { s.AuctioneerId, s.Tag });
             await Parallel.ForEachAsync(noUidCheck, async (item, token) =>
             {
