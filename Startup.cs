@@ -68,7 +68,10 @@ namespace Coflnet.Sky.SkyAuctionTracker
                     .EnableDetailedErrors()       // <-- with debugging (remove for production).
             );
             if (Configuration["OLD_CASSANDRA:HOSTS"] != null)
+            {
                 services.AddHostedService<MigrationService>();
+                services.AddSingleton(ConnectionMultiplexer.Connect(Configuration["REDIS_HOST"]));
+            }
             else
                 services.AddHostedService<TrackerBackgroundService>();
             services.AddSingleton<IAuctionsApi>(conf => new AuctionsApi(Configuration["API_BASE_URL"]));
@@ -93,7 +96,6 @@ namespace Coflnet.Sky.SkyAuctionTracker
             services.AddCoflnetCore();
             services.AddSingleton<FlipSumaryEventProducer>();
             services.AddSingleton<HypixelItemService>();
-            services.AddSingleton(ConnectionMultiplexer.Connect(Configuration["REDIS_HOST"]));
             services.AddHttpClient();
             services.AddResponseCaching();
             services.AddMemoryCache();
