@@ -1,7 +1,5 @@
 global using System;
 
-namespace Coflnet.Sky.SkyAuctionTracker.Services;
-
 using Coflnet.Sky.SkyAuctionTracker.Models;
 using Cassandra;
 using Cassandra.Mapping;
@@ -15,6 +13,7 @@ using System.Linq;
 using Cassandra.Mapping.TypeConversion;
 using Cassandra.Mapping.Utils;
 
+namespace Coflnet.Sky.SkyAuctionTracker.Services;
 /// <summary>
 /// Stores pastflips in cassandra
 /// </summary>
@@ -24,6 +23,7 @@ public class FlipStorageService
     private SemaphoreSlim sessionOpenLock = new SemaphoreSlim(1);
     private ILogger<FlipStorageService> logger;
     private IConfiguration config;
+    private Table<OutspedFlip> outspedTable;
     public FlipStorageService(ILogger<FlipStorageService> logger, IConfiguration config)
     {
         this.logger = logger;
@@ -75,7 +75,7 @@ public class FlipStorageService
         {
             await table.Insert(flip).ExecuteAsync();
         }
-        catch (Cassandra.InvalidQueryException e)
+        catch (InvalidQueryException e)
         {
             if (e.Message.Contains("No keyspace has been specified"))
             {
@@ -130,7 +130,7 @@ public class FlipStorageService
     {
         return new Table<PastFlip>(session, new MappingConfiguration().Define(new Map<PastFlip>()
             .PartitionKey(c => c.Flipper)
-            .ClusteringKey(c => c.SellTime)
+            .ClusteringKey(c => c.SellTime, SortOrder.Descending)
             .ClusteringKey(c => c.Uid)
             .Column(c => c.FinderType, cm => cm.WithDbType<int>())
             .Column(c => c.ItemTier, cm => cm.WithDbType<int>())
@@ -138,6 +138,8 @@ public class FlipStorageService
             .Column(o => o.Flags, c => c.WithName("flags").WithDbType<int>())
             ), "flips");
     }
+
+    public Table<PastFlip> GetTable(ISession session) => GetFlipsTable(session);
 
     /// <summary>
     /// Brings the db into the current state

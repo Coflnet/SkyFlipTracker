@@ -4,6 +4,7 @@ using System.Text.Json.Serialization;
 using Coflnet.Sky.Core;
 using MessagePack;
 using System.Collections.Generic;
+using Cassandra.Mapping.Attributes;
 namespace Coflnet.Sky.SkyAuctionTracker.Models;
 
 public class PastFlip
@@ -11,7 +12,7 @@ public class PastFlip
     /// <summary>
     /// The uuid of the player that sold the item
     /// </summary>
-    [Cassandra.Mapping.Attributes.PartitionKey]
+    [PartitionKey]
     public Guid Flipper { get; set; }
     /// <summary>
     /// The name of the sold item
@@ -32,12 +33,12 @@ public class PastFlip
     public LowPricedAuction.FinderType FinderType { get; set; }
     public Guid SellAuctionId { get; set; }
     public long SellPrice { get; set; }
-    [Cassandra.Mapping.Attributes.ClusteringKey(0)]
+    [ClusteringKey(0)]
     public DateTime SellTime { get; set; }
     /// <summary>
     /// The uid of the sold item
     /// </summary>
-    [Cassandra.Mapping.Attributes.ClusteringKey(1)]
+    [ClusteringKey(1)]
     public long Uid { get; set; }
     /// <summary>
     /// The total profit of the flip
@@ -54,7 +55,7 @@ public class PastFlip
     /// <summary>
     /// Things that affected the profit
     /// </summary>
-    [Cassandra.Mapping.Attributes.Ignore]
+    [Ignore]
     [IgnoreMember]
     public IEnumerable<ProfitChange> ProfitChanges
     {
@@ -133,4 +134,18 @@ public class PastFlip
         {
         }
     }
+}
+
+public class OutspedFlip
+{
+    public string Tag { get; set; }
+    public string Key { get; set; }
+}
+
+public class FinderContext
+{
+    public Guid AuctionId { get; set; }
+    public LowPricedAuction.FinderType Finder { get; set; }
+    public Dictionary<string, string> Context { get; set; }
+    public Dictionary<string, string> AuctionContext { get; set; }
 }

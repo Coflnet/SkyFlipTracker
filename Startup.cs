@@ -22,10 +22,12 @@ using Coflnet.Sky.Proxy.Client.Api;
 using Coflnet.Sky.Settings.Client.Api;
 using Coflnet.Leaderboard.Client.Api;
 using Coflnet.Sky.Core.Services;
+using Coflnet.Core;
+using Coflnet.Sky.Kafka;
 
 namespace Coflnet.Sky.SkyAuctionTracker
 {
-    #pragma warning disable CS1591
+#pragma warning disable CS1591
     public class Startup
     {
         public Startup(IConfiguration configuration)
@@ -64,7 +66,10 @@ namespace Coflnet.Sky.SkyAuctionTracker
                     .EnableSensitiveDataLogging() // <-- These two calls are optional but help
                     .EnableDetailedErrors()       // <-- with debugging (remove for production).
             );
-            services.AddHostedService<TrackerBackgroundService>();
+            if (Configuration["MIGRATOR"] == "true")
+                services.AddHostedService<MigrationService>();
+            else
+                services.AddHostedService<TrackerBackgroundService>();
             services.AddSingleton<IAuctionsApi>(conf => new AuctionsApi(Configuration["API_BASE_URL"]));
             services.AddSingleton<IPricesApi>(conf => new PricesApi(Configuration["API_BASE_URL"]));
             services.AddSingleton<IPlayerApi>(conf => new PlayerApi(Configuration["API_BASE_URL"]));
@@ -83,7 +88,8 @@ namespace Coflnet.Sky.SkyAuctionTracker
             services.AddSingleton<IPriceProviderFactory, PriceProviderFactory>();
             services.AddJaeger(Configuration);
             services.AddTransient<TrackerService>();
-            services.AddSingleton<Kafka.KafkaCreator>();
+            services.AddSingleton<KafkaCreator>();
+            services.AddCoflnetCore();
             services.AddSingleton<FlipSumaryEventProducer>();
             services.AddSingleton<HypixelItemService>();
             services.AddHttpClient();

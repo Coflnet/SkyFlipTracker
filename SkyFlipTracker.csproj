@@ -17,6 +17,7 @@
   <ItemGroup>
     <PackageReference Include="AutoMapper" Version="13.0.1" />
     <PackageReference Include="CassandraCSharpDriver" Version="3.20.1" />
+    <PackageReference Include="Coflnet.Core" Version="0.2.0" />
     <PackageReference Include="Coflnet.Leaderboard.Client" Version="0.3.0" />
     <PackageReference Include="Coflnet.Sky.Bazaar.Client" Version="0.4.1" />
     <PackageReference Include="Coflnet.Sky.Crafts.Client" Version="0.3.0" />

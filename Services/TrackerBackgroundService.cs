@@ -11,8 +11,8 @@ using Microsoft.Extensions.Logging;
 using Coflnet.Sky.SkyAuctionTracker.Controllers;
 using System.Linq;
 using Coflnet.Sky.Core;
-using Coflnet.Kafka;
 using Coflnet.Sky.Proxy.Client.Api;
+using Coflnet.Sky.Kafka;
 
 namespace Coflnet.Sky.SkyAuctionTracker.Services
 {
@@ -78,7 +78,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
 
         private async Task ConsumeEvents(CancellationToken stoppingToken)
         {
-            await Coflnet.Kafka.KafkaConsumer.ConsumeBatch<FlipEvent>(config, config["TOPICS:FLIP_EVENT"], async flipEvents =>
+            await KafkaConsumer.ConsumeBatch<FlipEvent>(config, config["TOPICS:FLIP_EVENT"], async flipEvents =>
             {
                 for (int i = 0; i < 3; i++)
                     try
