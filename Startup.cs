@@ -24,6 +24,7 @@ using Coflnet.Leaderboard.Client.Api;
 using Coflnet.Sky.Core.Services;
 using Coflnet.Core;
 using Coflnet.Sky.Kafka;
+using StackExchange.Redis;
 
 namespace Coflnet.Sky.SkyAuctionTracker
 {
@@ -92,6 +93,7 @@ namespace Coflnet.Sky.SkyAuctionTracker
             services.AddCoflnetCore();
             services.AddSingleton<FlipSumaryEventProducer>();
             services.AddSingleton<HypixelItemService>();
+            services.AddSingleton(ConnectionMultiplexer.Connect(Configuration["REDIS_HOST"]));
             services.AddHttpClient();
             services.AddResponseCaching();
             services.AddMemoryCache();
