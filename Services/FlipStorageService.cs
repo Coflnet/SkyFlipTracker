@@ -19,52 +19,21 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services;
 /// </summary>
 public class FlipStorageService
 {
-    ISession _session;
     private SemaphoreSlim sessionOpenLock = new SemaphoreSlim(1);
     private ILogger<FlipStorageService> logger;
     private IConfiguration config;
     private Table<OutspedFlip> outspedTable;
-    public FlipStorageService(ILogger<FlipStorageService> logger, IConfiguration config)
+    private ISession session;
+    public FlipStorageService(ILogger<FlipStorageService> logger, IConfiguration config, ISession session)
     {
         this.logger = logger;
         this.config = config;
+        this.session = session;
     }
 
     public async Task<ISession> GetSession(string keyspace = null)
     {
-        if (_session != null)
-            return _session;
-        await sessionOpenLock.WaitAsync();
-        if (_session != null)
-            return _session;
-        if (keyspace == null)
-            keyspace = config["CASSANDRA:KEYSPACE"];
-        try
-        {
-            var cluster = Cluster.Builder()
-                                .WithCredentials(config["CASSANDRA:USER"], config["CASSANDRA:PASSWORD"])
-                                .AddContactPoints(config["CASSANDRA:HOSTS"].Split(","))
-                                .Build();
-
-            _session = await cluster.ConnectAsync();
-            if (keyspace != null)
-            {
-                _session.CreateKeyspaceIfNotExists(keyspace);
-                _session.ChangeKeyspace(keyspace);
-                var table = GetFlipsTable(_session);
-                await table.CreateIfNotExistsAsync();
-            }
-            return _session;
-        }
-        catch (Exception e)
-        {
-            logger.LogError(e, "failed to connect to cassandra");
-            throw e;
-        }
-        finally
-        {
-            sessionOpenLock.Release();
-        }
+        return session;
     }
 
     public async Task SaveFlip(PastFlip flip)
