@@ -66,7 +66,7 @@ namespace Coflnet.Sky.SkyAuctionTracker
                     .EnableSensitiveDataLogging() // <-- These two calls are optional but help
                     .EnableDetailedErrors()       // <-- with debugging (remove for production).
             );
-            if (Configuration["MIGRATOR"] == "true")
+            if (Configuration["OLD_CASSANDRA:HOSTS"] != null)
                 services.AddHostedService<MigrationService>();
             else
                 services.AddHostedService<TrackerBackgroundService>();
