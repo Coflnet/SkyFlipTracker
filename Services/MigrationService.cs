@@ -36,6 +36,7 @@ public class MigrationService : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        await flipStorageService.Migrate();
         var handlerLogger = serviceProvider.GetRequiredService<ILogger<MigrationHandler<PastFlip>>>();
         var migrationHandler = new MigrationHandler<PastFlip>(
                 () => flipStorageService.GetTable(oldSession),
