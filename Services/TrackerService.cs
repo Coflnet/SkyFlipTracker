@@ -260,7 +260,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             using var activity = activitySource.StartActivity("IndexCassandra", ActivityKind.Server);
             try
             {
-                await CalculateAndIndex(sells);
+                await CalculateAndIndex(sells, extraLog);
                 return;
             }
             catch (System.Exception error)
@@ -269,7 +269,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 {
                     foreach (var item in sells)
                     {
-                        await CalculateAndIndex(new SaveAuction[] { item }, extraLog);
+                        await CalculateAndIndex([item], extraLog);
                     }
                     logger.LogInformation($"saved sells {sells.Count()} one by one because dupplicate");
                     return;
