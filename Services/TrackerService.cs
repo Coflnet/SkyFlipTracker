@@ -398,6 +398,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     var name = GetDisplayName(buy, sell);
                     if (buy.AuctioneerId == null)
                         logger.LogInformation($"trade name determined {item.buy.ItemTag}");
+                    if(item.sell.UId == 0)
+                        item.sell.UId = AuctionService.Instance.GetId(item.sell.Uuid);
                     var flip = new PastFlip()
                     {
                         Flipper = Guid.Parse(sell.AuctioneerId),
