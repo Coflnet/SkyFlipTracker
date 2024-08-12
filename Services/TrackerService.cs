@@ -308,7 +308,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             }
             if (extraLog)
             {
-                logger.LogInformation($"Buy lookup {JsonConvert.SerializeObject(buyLookup)}");
+                logger.LogInformation($"Buy lookup {JsonConvert.SerializeObject(exists)}");
                 logger.LogInformation($"Sell lookup {JsonConvert.SerializeObject(sellLookup)}");
             }
             var soldAuctions = exists.Select(item => new
@@ -420,6 +420,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     };
                     await flipStorageService.SaveFlip(flip);
                     userFlipCounter.Inc();
+                    if(extraLog)
+                        logger.LogInformation($"Saved flip {flip.Uid} {JsonConvert.SerializeObject(flip)}");
 
                     if (flipFound == default && changes.Count <= 1 && profit > 3_000_000 && buy.End > DateTime.UtcNow - TimeSpan.FromDays(1))
                     {
