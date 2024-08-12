@@ -216,7 +216,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
                 from = DateTime.Now.AddYears(-1);
             if (to == DateTime.MinValue)
                 to = DateTime.Now;
-            return (await flipStorageService.GetFlips(PlayerId, from, to)).GroupBy(f=>f.SellAuctionId).Select(f=>f.First());
+            return (await flipStorageService.GetFlips(PlayerId, from, to)).GroupBy(f=>f.Uid).Select(f=>f.First());
         }
 
         [HttpGet]
