@@ -219,7 +219,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             var all = await flipStorageService.GetFlips(PlayerId, from, to);
             if (getAll)
                 return all;
-            return all.GroupBy(f=>f.SellAuctionId).Select(f=>f.First());
+            // re-calculated flips don't have milliseconds in the timestamp, thus the newer flip has lower timestamp
+            return all.GroupBy(f=>f.SellAuctionId).Select(f=>f.OrderBy(f=>f.SellTime).First());
         }
 
         [HttpGet]
