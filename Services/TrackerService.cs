@@ -251,10 +251,11 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     throw new Exception($"auction {JsonConvert.SerializeObject(original)} could not be mapped");
                 return mapped;*/
             }));
-            await IndexCassandra(auctions);
+            logger.LogInformation("Refreshing flips {auctions}", JsonConvert.SerializeObject(auctions));
+            await IndexCassandra(auctions, true);
         }
 
-        public async Task IndexCassandra(IEnumerable<SaveAuction> sells)
+        public async Task IndexCassandra(IEnumerable<SaveAuction> sells, bool extraLog = false)
         {
             using var activity = activitySource.StartActivity("IndexCassandra", ActivityKind.Server);
             try
@@ -268,7 +269,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 {
                     foreach (var item in sells)
                     {
-                        await CalculateAndIndex(new SaveAuction[] { item });
+                        await CalculateAndIndex(new SaveAuction[] { item }, extraLog);
                     }
                     logger.LogInformation($"saved sells {sells.Count()} one by one because dupplicate");
                     return;
@@ -287,7 +288,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             }
         }
 
-        private async Task CalculateAndIndex(IEnumerable<SaveAuction> sells)
+        private async Task CalculateAndIndex(IEnumerable<SaveAuction> sells, bool extraLog = false)
         {
             var sellLookup = sells.Where(s => s.FlatenedNBT.Where(n => n.Key == "uid").Any() && s.HighestBidAmount > 0)
                                 .GroupBy(s => new { uid = s.FlatenedNBT.Where(n => n.Key == "uid").First(), s.End }).Select(g => g.First())
@@ -305,6 +306,11 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 logger.LogInformation($"no purchases found {sells.Count()}");
                 return;
             }
+            if (extraLog)
+            {
+                logger.LogInformation($"Buy lookup {JsonConvert.SerializeObject(buyLookup)}");
+                logger.LogInformation($"Sell lookup {JsonConvert.SerializeObject(sellLookup)}");
+            }
             var soldAuctions = exists.Select(item => new
             {
                 sell = sellLookup.GetValueOrDefault(item.Key),
@@ -313,6 +319,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                                         || v.Timestamp > DateTime.UtcNow))
                                     .OrderByDescending(u => u.Timestamp).FirstOrDefault()
             }).Where(item => item.buy != null).ToList();
+            if (extraLog)
+                logger.LogInformation($"Found {soldAuctions.Count} sold auctions {JsonConvert.SerializeObject(soldAuctions)}");
             var purchaseUid = soldAuctions.Select(u => GetId(u.buy.Uuid)).ToHashSet();
             foreach (var tradeSource in tradeUuidLookup)
             {
