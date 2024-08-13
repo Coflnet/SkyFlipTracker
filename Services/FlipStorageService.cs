@@ -159,11 +159,19 @@ public class FlipStorageService
             .Column(c=>c.AuctionId, cm=>cm.WithName("auction_id").WithDbType<Guid>())
             ), "finder_context");
         // set the table to have a ttl of 14 days and time window compaction
-      //  session.Execute("CREATE TABLE IF NOT EXISTS finder_context (auction_id uuid, finder int, auction_context map<text, text>, context map<text, text>, found_time timestamp, PRIMARY KEY (auction_id, finder))"
-      //   + " WITH default_time_to_live = 1209600 AND compaction = { 'class' : 'TimeWindowCompactionStrategy', 'compaction_window_size' : 1, 'compaction_window_unit' : 'DAYS' }");
+        session.Execute("CREATE TABLE IF NOT EXISTS finder_context (auction_id uuid, finder int, auction_context map<text, text>, context map<text, text>, found_time timestamp, PRIMARY KEY (auction_id, finder))"
+         + " WITH default_time_to_live = 1209600 AND compaction = { 'class' : 'TimeWindowCompactionStrategy', 'compaction_window_size' : 1, 'compaction_window_unit' : 'DAYS' }");
         
         // alter table change finder to int
-        session.Execute("ALTER TABLE finder_context ALTER finder TYPE int");
+        try
+        {
+            session.Execute("ALTER TABLE finder_context ALTER finder TYPE int");
+        }
+        catch (InvalidConfigurationInQueryException)
+        {
+            // drop the table 
+            session.Execute("DROP TABLE finder_context");
+        }
         outspedTable = new Table<OutspedFlip>(session, new MappingConfiguration().Define(new Map<OutspedFlip>()
             .PartitionKey(c => c.ItemTag)
             .ClusteringKey(c => c.Key)
