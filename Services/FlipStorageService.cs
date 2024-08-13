@@ -163,7 +163,7 @@ public class FlipStorageService
          + " WITH default_time_to_live = 1209600 AND compaction = { 'class' : 'TimeWindowCompactionStrategy', 'compaction_window_size' : 1, 'compaction_window_unit' : 'DAYS' }");
         
         // alter table change finder to int
-        session.Execute("ALTER TABLE finder ALTER finder TYPE int");
+        //session.Execute("ALTER TABLE finder ALTER finder TYPE int");
         outspedTable = new Table<OutspedFlip>(session, new MappingConfiguration().Define(new Map<OutspedFlip>()
             .PartitionKey(c => c.ItemTag)
             .ClusteringKey(c => c.Key)
