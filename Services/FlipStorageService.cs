@@ -155,6 +155,7 @@ public class FlipStorageService
             .Column(c => c.AuctionContext, cm => cm.WithDbType<Dictionary<string, string>>().WithName("auction_context"))
             .Column(c => c.Context, cm => cm.WithDbType<Dictionary<string, string>>())
             .Column(c => c.FoundTime, cm => cm.WithDbType<DateTime>().WithName("found_time"))
+            .Column(c => c.Finder, cm => cm.WithDbType<int>())
             .Column(c=>c.AuctionId, cm=>cm.WithName("auction_id"))
             ), "finder_context");
         // set the table to have a ttl of 14 days and time window compaction
