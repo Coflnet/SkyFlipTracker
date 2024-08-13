@@ -231,6 +231,14 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             return await flipStorageService.GetFlip(PlayerId, uid);
         }
 
+        [HttpGet]
+        [Route("/flips/exempt")]
+        [ResponseCache(Duration = 3600, Location = ResponseCacheLocation.Any)]
+        public async Task<IEnumerable<OutspedFlip>> GetExemptFlips()
+        {
+            return await flipStorageService.GetOutspedFlips();
+        }
+
         private long GetId(string uuid)
         {
             return service.GetId(uuid);

@@ -466,6 +466,21 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             if (!sentToPurchaser && diff > TimeSpan.FromSeconds(-4) && diff < TimeSpan.FromSeconds(-3.5))
             {
                 // todo store
+                var all = await flipStorageService.GetFinderContexts(flip.PurchaseAuctionId);
+                var medianSniperFinder = all.Where(f => f.Finder == LowPricedAuction.FinderType.SNIPER_MEDIAN).FirstOrDefault();
+                if(medianSniperFinder == null)
+                {
+                    logger.LogInformation($"Not found context {flip.PurchaseAuctionId:n} ({buy.UId}) found for {flip.Profit} not sent to us");
+                    return;
+                }
+                var key = medianSniperFinder.Context.GetValueOrDefault("key");
+                if (key == null)
+                {
+                    logger.LogInformation($"Not found key {flip.PurchaseAuctionId:n} ({buy.UId}) found for {flip.Profit} not sent to us");
+                    return;
+                }
+                await flipStorageService.SaveOutspedFlip(buy.Tag, key, flip.PurchaseAuctionId);
+                logger.LogInformation($"Flip {flip.PurchaseAuctionId:n} ({buy.UId}) found for {flip.Profit} noew excempt");
             }
 
 

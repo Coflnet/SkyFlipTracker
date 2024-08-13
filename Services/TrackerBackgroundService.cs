@@ -217,7 +217,25 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 {
                     logger.LogError(e, "could not rerequest player auctions");
                 }
+                await StoreContext(lps, scope);
             }, stoppingToken, "sky-fliptracker", 50);
+        }
+
+        private async Task StoreContext(IEnumerable<LowPricedAuction> lps, IServiceScope scope)
+        {
+            var storageService = scope.ServiceProvider.GetRequiredService<FlipStorageService>();
+            // parallelize this
+            await Parallel.ForEachAsync(lps, async (lp, c) =>
+            {
+                try
+                {
+                    await storageService.SaveFinderContext(lp);
+                }
+                catch (Exception e)
+                {
+                    logger.LogError(e, "could not save low priced auction context");
+                }
+            });
         }
 
         private async Task Recheck(IEnumerable<LowPricedAuction> lps, IServiceScope scope, TrackerService service)

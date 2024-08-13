@@ -135,17 +135,3 @@ public class PastFlip
         }
     }
 }
-
-public class OutspedFlip
-{
-    public string Tag { get; set; }
-    public string Key { get; set; }
-}
-
-public class FinderContext
-{
-    public Guid AuctionId { get; set; }
-    public LowPricedAuction.FinderType Finder { get; set; }
-    public Dictionary<string, string> Context { get; set; }
-    public Dictionary<string, string> AuctionContext { get; set; }
-}
