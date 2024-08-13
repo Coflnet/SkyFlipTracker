@@ -13,6 +13,7 @@ using System.Linq;
 using Coflnet.Sky.Core;
 using Coflnet.Sky.Proxy.Client.Api;
 using Coflnet.Sky.Kafka;
+using Newtonsoft.Json;
 
 namespace Coflnet.Sky.SkyAuctionTracker.Services
 {
@@ -233,7 +234,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 }
                 catch (Exception e)
                 {
-                    logger.LogError(e, "could not save low priced auction context");
+                    logger.LogError(e, "could not save low priced auction context {a} {context}", JsonConvert.SerializeObject(lp), JsonConvert.SerializeObject(lp.Auction.Context));
                 }
             });
         }
