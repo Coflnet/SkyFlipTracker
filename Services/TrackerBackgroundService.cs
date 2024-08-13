@@ -40,10 +40,10 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
         {
             using (var scope = scopeFactory.CreateScope())
             {
+                var storageService = scope.ServiceProvider.GetRequiredService<FlipStorageService>();
                 var context = scope.ServiceProvider.GetRequiredService<TrackerDbContext>();
                 // make sure all migrations are applied
                 await context.Database.MigrateAsync();
-                var storageService = scope.ServiceProvider.GetRequiredService<FlipStorageService>();
                 await storageService.Migrate();
             }
 
