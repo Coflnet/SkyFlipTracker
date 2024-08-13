@@ -225,7 +225,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
         {
             var storageService = scope.ServiceProvider.GetRequiredService<FlipStorageService>();
             // parallelize this
-            await Parallel.ForEachAsync(lps, async (lp, c) =>
+            await Parallel.ForEachAsync(lps, new ParallelOptions() { MaxDegreeOfParallelism = 2 }, async (lp, c) =>
             {
                 try
                 {
