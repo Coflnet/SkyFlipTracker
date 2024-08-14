@@ -1,4 +1,4 @@
-VERSION=0.10.4
+VERSION=0.11.0
 
 docker run --rm -v "${PWD}:/local" --network host -u $(id -u ${USER}):$(id -g ${USER})  openapitools/openapi-generator-cli generate \
 -i http://localhost:5017/swagger/v1/swagger.json \
@@ -17,7 +17,7 @@ sed -i 's/ViaTrade = 3/ViaTrade = 2/g' src/Coflnet.Sky.FlipTracker.Client/Model/
 sed -i 's/))]/))]\n    [Flags]/g' src/Coflnet.Sky.FlipTracker.Client/Model/FlipFlags.cs
 
 sed -i 's@annotations</Nullable>@annotations</Nullable>\n    <PackageReadmeFile>README.md</PackageReadmeFile>@g' $path
-sed -i 's@Remove="System.Web" />@Remove="System.Web" />\n    <None Include="../../../../README.md" Pack="true" PackagePath="\"/>@g' $path
+sed -i '34i    <None Include="../../../../README.md" Pack="true" PackagePath="\"/>' $path
 
 dotnet pack
 cp src/Coflnet.Sky.FlipTracker.Client/bin/Release/Coflnet.Sky.FlipTracker.Client.*.nupkg ..
