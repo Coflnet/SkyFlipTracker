@@ -760,7 +760,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             {
                 var parser = new CoinParser();
                 logger.LogInformation("Got trade sell {item}", JsonConvert.SerializeObject(item));
-                if (item.Received.Any(r => !parser.IsCoins(r)))
+                if (item.Received.Any(r => !parser.IsCoins(r)) || item.Received.Count == 0)
                 {
                     logger.LogWarning("Aborting trade save as more than one item or no coins");
                     await Task.Delay(80_000); //timeout
