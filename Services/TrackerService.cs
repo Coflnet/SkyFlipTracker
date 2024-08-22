@@ -767,16 +767,25 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     continue;
                 }
                 logger.LogInformation("Storing trade :)");
-                var coinAmount = parser.GetInventoryCoinSum(item.Received);
-                var sentItem = item.Spent.First();
-                var auction = FromItemRepresent(JsonConvert.DeserializeObject<PlayerState.Client.Model.Item>(JsonConvert.SerializeObject(sentItem)));
+                try
+                {
 
-                auction.HighestBidAmount = coinAmount;
-                auction.End = item.TimeStamp;
-                auction.AuctioneerId = item.MinecraftUuid.ToString("N");
-                auction.Uuid = Guid.Empty.ToString("N");
-                await IndexCassandra([auction]);
-                await Task.Delay(100_000);
+                    var coinAmount = parser.GetInventoryCoinSum(item.Received);
+                    var sentItem = item.Spent.First();
+                    var auction = FromItemRepresent(JsonConvert.DeserializeObject<PlayerState.Client.Model.Item>(JsonConvert.SerializeObject(sentItem)));
+
+                    auction.HighestBidAmount = coinAmount;
+                    auction.End = item.TimeStamp;
+                    auction.AuctioneerId = item.MinecraftUuid.ToString("N");
+                    auction.Uuid = Guid.Empty.ToString("N");
+                    await IndexCassandra([auction]);
+                }
+                catch (System.Exception)
+                {
+                    await Task.Delay(300_000);
+                    throw;
+                }
+                await Task.Delay(300_000);
             }
         }
     }
