@@ -763,7 +763,6 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 if (item.Received.Any(r => !parser.IsCoins(r)) || item.Received.Count == 0 || item.Spent.Count != 1)
                 {
                     logger.LogWarning("Aborting trade save as more than one item or no coins");
-                    await Task.Delay(80_000); //timeout
                     continue;
                 }
                 logger.LogInformation("Storing trade :)");
@@ -787,7 +786,6 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     await Task.Delay(300_000);
                     throw;
                 }
-                await Task.Delay(300_000);
             }
         }
     }
