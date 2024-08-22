@@ -518,7 +518,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             {
                 return (flags, null);
             }
-            if (sell.Uuid ==  Guid.Empty.ToString("N"))
+            if (sell.Uuid == Guid.Empty.ToString("N"))
                 flags |= FlipFlags.ViaTrade;
             else
                 flags |= FlipFlags.DifferentBuyer;
@@ -760,7 +760,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             {
                 var parser = new CoinParser();
                 logger.LogInformation("Got trade sell {item}", JsonConvert.SerializeObject(item));
-                if (item.Received.Any(r => !parser.IsCoins(r)) || item.Received.Count == 0)
+                if (item.Received.Any(r => !parser.IsCoins(r)) || item.Received.Count == 0 || item.Spent.Count != 1)
                 {
                     logger.LogWarning("Aborting trade save as more than one item or no coins");
                     await Task.Delay(80_000); //timeout
