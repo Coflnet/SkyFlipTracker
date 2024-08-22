@@ -778,7 +778,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     auction.End = item.TimeStamp;
                     auction.AuctioneerId = item.MinecraftUuid.ToString("N");
                     auction.Uuid = Guid.Empty.ToString("N");
-                    await IndexCassandra([auction]);
+                    await IndexCassandra([auction], true);
+                    logger.LogInformation("Stored trade {auction}", JsonConvert.SerializeObject(auction));
                 }
                 catch (System.Exception e)
                 {
