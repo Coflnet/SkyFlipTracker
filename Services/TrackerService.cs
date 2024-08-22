@@ -780,8 +780,9 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     auction.Uuid = Guid.Empty.ToString("N");
                     await IndexCassandra([auction]);
                 }
-                catch (System.Exception)
+                catch (System.Exception e)
                 {
+                    logger.LogError(e, "failed to store trade sell");
                     await Task.Delay(300_000);
                     throw;
                 }
