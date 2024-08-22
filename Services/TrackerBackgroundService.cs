@@ -54,6 +54,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             var newAuctions = NewAuctions(stoppingToken);
 
             await Task.WhenAny(
+                Run(ConsumePlayerTrades(stoppingToken), "consuming trades"),
                 Run(flipCons, "consuming flips"),
                 Run(flipEventCons, "flip events cons"),
                 Run(sellCons, "sells con"),
@@ -79,23 +80,40 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
 
         private async Task ConsumeEvents(CancellationToken stoppingToken)
         {
-            await KafkaConsumer.ConsumeBatch<FlipEvent>(config, config["TOPICS:FLIP_EVENT"], async flipEvents =>
+            await ConsumeTryCatch<FlipEvent>(async (flipEvents, service) =>
+            {
+                await service.AddEvents(flipEvents);
+                consumeEvent.Inc(flipEvents.Count());
+            }, "TOPICS:FLIP_EVENT", 15, stoppingToken);
+        }
+
+        private async Task ConsumePlayerTrades(CancellationToken stoppingToken)
+        {
+            await ConsumeTryCatch<TradeModel>(async (trades, service) =>
+            {
+                await service.AddTrades(trades);
+            }, "TOPICS:PLAYER_TRADE", 1, stoppingToken);
+        }
+
+        private async Task ConsumeTryCatch<T>(Func<IEnumerable<T>, TrackerService, Task> NewMethod, string topicName, int batchSize, CancellationToken stoppingToken)
+        {
+            await KafkaConsumer.ConsumeBatch<T>(config, config[topicName], async elements =>
             {
                 for (int i = 0; i < 3; i++)
                     try
                     {
                         using var scope = scopeFactory.CreateScope();
                         var service = scope.ServiceProvider.GetRequiredService<TrackerService>();
-                        await service.AddEvents(flipEvents);
-                        consumeEvent.Inc(flipEvents.Count());
+                        await NewMethod(elements, service);
                         return;
                     }
                     catch (Exception e)
                     {
-                        logger.LogError(e, "could not save event once");
+                        logger.LogError(e, "could not from " + topicName);
                     }
-            }, stoppingToken, "sky-fliptracker", 15);
+            }, stoppingToken, "sky-fliptracker", batchSize);
         }
+
         private async Task NewAuctions(CancellationToken stoppingToken)
         {
             await KafkaConsumer.ConsumeBatch<SaveAuction>(config, config["TOPICS:NEW_AUCTION"], toUpdate =>

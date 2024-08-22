@@ -398,7 +398,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     var name = GetDisplayName(buy, sell);
                     if (buy.AuctioneerId == null)
                         logger.LogInformation($"trade name determined {item.buy.ItemTag}");
-                    if(item.sell.UId == 0)
+                    if (item.sell.UId == 0)
                         item.sell.UId = AuctionService.Instance.GetId(item.sell.Uuid);
                     var flip = new PastFlip()
                     {
@@ -422,7 +422,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     };
                     await flipStorageService.SaveFlip(flip);
                     userFlipCounter.Inc();
-                    if(extraLog)
+                    if (extraLog)
                         logger.LogInformation($"Saved flip {flip.Uid} {JsonConvert.SerializeObject(flip)}");
 
                     if (flipFound == default && changes.Count <= 1 && profit > 3_000_000 && buy.End > DateTime.UtcNow - TimeSpan.FromDays(1))
@@ -468,7 +468,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 // todo store
                 var all = await flipStorageService.GetFinderContexts(flip.PurchaseAuctionId);
                 var medianSniperFinder = all.Where(f => f.Finder == LowPricedAuction.FinderType.SNIPER_MEDIAN).FirstOrDefault();
-                if(medianSniperFinder == null)
+                if (medianSniperFinder == null)
                 {
                     logger.LogInformation($"Not found context {flip.PurchaseAuctionId:n} ({buy.UId}) found for {flip.Profit} not sent to us");
                     return;
@@ -518,7 +518,10 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             {
                 return (flags, null);
             }
-            flags |= FlipFlags.DifferentBuyer;
+            if (sell.Uuid ==  Guid.Empty.ToString("N"))
+                flags |= FlipFlags.ViaTrade;
+            else
+                flags |= FlipFlags.DifferentBuyer;
 
             // check trade
             var items = await itemsApi.ApiItemsFindUuidPostAsync(new(){
@@ -670,7 +673,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             if (potentialItems.Count == 0)
                 throw new Exception($"No item in trade for {uuid}");
             var itemInfo = await itemsApi.ApiItemsIdGetAsync(long.Parse(uuid), 0);
-            var auction = FromitemRepresent(itemInfo);
+            var auction = FromItemRepresent(itemInfo);
             auction.HighestBidAmount = tradeEstimate;
             auction.End = itemTrade.First().TimeStamp;
             auction.Uuid = Guid.Empty.ToString("N");
@@ -682,7 +685,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
 
         }
 
-        public ApiSaveAuction FromitemRepresent(Coflnet.Sky.PlayerState.Client.Model.Item i)
+        public ApiSaveAuction FromItemRepresent(Coflnet.Sky.PlayerState.Client.Model.Item i)
         {
             var auction = new SaveAuction()
             {
@@ -749,6 +752,31 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             if (id == 0)
                 id = 1; // allow uId == 0 to be false if not calculated
             return id;
+        }
+
+        internal async Task AddTrades(IEnumerable<TradeModel> trades)
+        {
+            foreach (var item in trades)
+            {
+                var parser = new CoinParser();
+                logger.LogInformation("Got trade sell {item}", JsonConvert.SerializeObject(item));
+                if (item.Received.Any(r => parser.IsCoins(r)))
+                {
+                    logger.LogWarning("Aborting trade save as more than one item or no coins");
+                    await Task.Delay(80_000); //timeout
+                    continue;
+                }
+                logger.LogInformation("Storing trade :)");
+                var coinAmount = parser.GetInventoryCoinSum(item.Received);
+                var sentItem = item.Spent.First();
+                var auction = FromItemRepresent(JsonConvert.DeserializeObject<PlayerState.Client.Model.Item>(JsonConvert.SerializeObject(sentItem)));
+
+                auction.HighestBidAmount = coinAmount;
+                auction.End = item.TimeStamp;
+                auction.Uuid = Guid.Empty.ToString("N");
+                await IndexCassandra([auction]);
+                await Task.Delay(100_000);
+            }
         }
     }
 
