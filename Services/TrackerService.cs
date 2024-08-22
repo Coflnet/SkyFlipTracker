@@ -773,6 +773,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
 
                 auction.HighestBidAmount = coinAmount;
                 auction.End = item.TimeStamp;
+                auction.AuctioneerId = item.MinecraftUuid.ToString("N");
                 auction.Uuid = Guid.Empty.ToString("N");
                 await IndexCassandra([auction]);
                 await Task.Delay(100_000);

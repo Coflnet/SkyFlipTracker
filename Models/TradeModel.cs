@@ -8,7 +8,7 @@ public class TradeModel
     [Key(0)]
     public string UserId { get; set; }
     [Key(1)]
-    public string MinecraftUsername { get; set; }
+    public Guid MinecraftUuid { get; set; }
     [Key(2)]
     public List<Item> Spent { get; set; }
     [Key(3)]
