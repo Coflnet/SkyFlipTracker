@@ -58,6 +58,8 @@ public class FlipStorageService
 
     public async Task SaveFinderContext(LowPricedAuction flip)
     {
+        RemoveNulls(flip.AdditionalProps);
+        RemoveNulls(flip.Auction.Context);
         var context = new FinderContext
         {
             AuctionId = Guid.Parse(flip.Auction.Uuid),
@@ -67,6 +69,17 @@ public class FlipStorageService
             AuctionContext = flip.Auction.Context
         };
         await finderContexts.Insert(context).ExecuteAsync();
+
+        static void RemoveNulls(Dictionary<string, string> dict)
+        {
+            foreach (var item in dict.Keys)
+            {
+                if (dict[item] == null)
+                {
+                    dict.Remove(item);
+                }
+            }
+        }
     }
 
     public async Task SaveOutspedFlip(string itemTag, string key, Guid trigger)
