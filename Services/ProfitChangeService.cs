@@ -78,7 +78,8 @@ public class ProfitChangeService
     /// <returns></returns>
     public async IAsyncEnumerable<PastFlip.ProfitChange> GetChanges(Coflnet.Sky.Core.SaveAuction buy, Coflnet.Sky.Core.SaveAuction sell)
     {
-        yield return GetAhTax(sell.HighestBidAmount, sell.StartingBid);
+        if (IsTrade(sell)) // no fees on trades
+            yield return GetAhTax(sell.HighestBidAmount, sell.StartingBid);
         var priceProvider = priceProviderFactory.Create(sell);
         if (IsNotcaluclateable(sell))
             yield break;
@@ -235,6 +236,11 @@ public class ProfitChangeService
         }
     }
 
+    private static bool IsTrade(Core.SaveAuction sell)
+    {
+        return sell.Uuid != Guid.Empty.ToString("n");
+    }
+
     public PastFlip.ProfitChange GetAhTax(long highestBid, long startingBid = 0)
     {
         var listCostFactor = 1f;
@@ -384,7 +390,7 @@ public class ProfitChangeService
             if (baseLevel == 0) // wheel of fate applied
             {
                 var previousAttributes = buy.FlatenedNBT.Where(f => Constants.AttributeKeys.Contains(f.Key)).ToList();
-                if(previousAttributes.Count == 0)
+                if (previousAttributes.Count == 0)
                     yield break;
                 var currentAttri = sell.FlatenedNBT.Where(f => Constants.AttributeKeys.Contains(f.Key)).ToList();
                 if (currentAttri.First().Key == item.Key)
