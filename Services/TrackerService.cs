@@ -771,6 +771,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
 
                     var coinAmount = parser.GetInventoryCoinSum(item.Received);
                     var sentItem = item.Spent.First();
+                    if (sentItem.ExtraAttributes == null)
+                        continue; // no trackable item
                     var auction = FromItemRepresent(JsonConvert.DeserializeObject<PlayerState.Client.Model.Item>(JsonConvert.SerializeObject(sentItem)));
 
                     auction.HighestBidAmount = coinAmount;
