@@ -72,6 +72,8 @@ public class FlipStorageService
 
         static void RemoveNulls(Dictionary<string, string> dict)
         {
+            if(dict.Keys == null)
+                return;
             foreach (var item in dict.Keys)
             {
                 if (dict[item] == null)
