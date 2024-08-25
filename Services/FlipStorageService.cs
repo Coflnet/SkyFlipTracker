@@ -72,7 +72,7 @@ public class FlipStorageService
 
         static void RemoveNulls(Dictionary<string, string> dict)
         {
-            if(dict.Keys == null)
+            if(dict == null)
                 return;
             foreach (var item in dict.Keys)
             {
