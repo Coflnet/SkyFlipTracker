@@ -343,7 +343,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             }
             var parallelOptions = new ParallelOptions()
             {
-                MaxDegreeOfParallelism = 2,
+                MaxDegreeOfParallelism = 3,
                 CancellationToken = new CancellationTokenSource(20000).Token
             };
             var noUidTask = CheckNoIdAuctions(sells, parallelOptions);
