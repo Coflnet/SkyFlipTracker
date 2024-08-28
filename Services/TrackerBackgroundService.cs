@@ -201,7 +201,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                         }
                 };
                 await Task.WhenAny(work(), Task.Delay(TimeSpan.FromSeconds(5)));
-            }, stoppingToken, 20);
+            }, stoppingToken, 32);
             throw new Exception("consuming sells stopped");
         }
         private async Task LoadFlip(CancellationToken stoppingToken)
