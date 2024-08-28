@@ -184,19 +184,23 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     logger.LogInformation("skipping old sell");
                     return;
                 }
-                for (int i = 0; i < 3; i++)
-                    try
-                    {
-                        using var scope = scopeFactory.CreateScope();
-                        var service = scope.ServiceProvider.GetRequiredService<TrackerService>();
-                        await service.IndexCassandra(flipEvents);
-                        return;
-                    }
-                    catch (Exception e)
-                    {
-                        logger.LogError(e, "could not save event once");
-                        await Task.Delay(1000);
-                    }
+                var work = async () =>
+                {
+                    for (int i = 0; i < 3; i++)
+                        try
+                        {
+                            using var scope = scopeFactory.CreateScope();
+                            var service = scope.ServiceProvider.GetRequiredService<TrackerService>();
+                            await service.IndexCassandra(flipEvents);
+                            return;
+                        }
+                        catch (Exception e)
+                        {
+                            logger.LogError(e, "could not save event once");
+                            await Task.Delay(1000);
+                        }
+                };
+                await Task.WhenAny(work(), Task.Delay(TimeSpan.FromSeconds(5)));
             }, stoppingToken, 20);
             throw new Exception("consuming sells stopped");
         }
