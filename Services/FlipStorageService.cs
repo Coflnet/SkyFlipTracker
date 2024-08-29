@@ -177,16 +177,6 @@ public class FlipStorageService
         session.Execute("CREATE TABLE IF NOT EXISTS finder_context (auction_id uuid, finder int, auction_context map<text, text>, context map<text, text>, found_time timestamp, PRIMARY KEY (auction_id, finder))"
          + " WITH default_time_to_live = 1209600 AND compaction = { 'class' : 'TimeWindowCompactionStrategy', 'compaction_window_size' : 1, 'compaction_window_unit' : 'DAYS' }");
         
-        // alter table change finder to int
-        try
-        {
-            session.Execute("ALTER TABLE finder_context ALTER finder TYPE int");
-        }
-        catch (InvalidConfigurationInQueryException)
-        {
-            // drop the table 
-            session.Execute("DROP TABLE finder_context");
-        }
         outspedTable = new Table<OutspedFlip>(session, new MappingConfiguration().Define(new Map<OutspedFlip>()
             .PartitionKey(c => c.ItemTag)
             .ClusteringKey(c => c.Key)
@@ -195,8 +185,8 @@ public class FlipStorageService
             .Column(c=>c.TriggeredBy, cm=>cm.WithName("triggered_by"))
             .Column(c=>c.Time)), "outsped_flips");
         // set ttl to 30 days and time window compaction
-      //  session.Execute("CREATE TABLE IF NOT EXISTS outsped_flips (item_tag text, key text, triggered_by uuid, time timestamp, PRIMARY KEY (item_tag, key))"
-      //   + " WITH default_time_to_live = 2592000 AND compaction = { 'class' : 'TimeWindowCompactionStrategy', 'compaction_window_size' : 1, 'compaction_window_unit' : 'DAYS' }");
+        session.Execute("CREATE TABLE IF NOT EXISTS outsped_flips (item_tag text, key text, triggered_by uuid, time timestamp, PRIMARY KEY (item_tag, key))"
+         + " WITH default_time_to_live = 2592000 AND compaction = { 'class' : 'TimeWindowCompactionStrategy', 'compaction_window_size' : 1, 'compaction_window_unit' : 'DAYS' }");
 
     }
 }
