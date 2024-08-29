@@ -284,7 +284,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     await IndexCassandra(sells.Skip(sells.Count() / 2));
                 }
                 else
-                    throw new CoflnetException("load error", "This sell caused error: " + JsonConvert.SerializeObject(sells.First()));
+                    throw new CoflnetException("load error", "This sell caused error: " + JsonConvert.SerializeObject(sells.FirstOrDefault()));
             }
         }
 
