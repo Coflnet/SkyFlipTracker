@@ -177,6 +177,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                         await Task.Delay(1000);
                     }
             }, stoppingToken, 50);
+            var consumeError = false;
             await KafkaConsumer.ConsumeBatch<SaveAuction>(consumeConfig, config["TOPICS:SOLD_AUCTION"], async flipEvents =>
             {
                 if (flipEvents.All(e => e.End < DateTime.UtcNow - TimeSpan.FromDays(5)))
@@ -197,10 +198,17 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                         catch (Exception e)
                         {
                             logger.LogError(e, "could not save event once");
+                            consumeError = true;
                             await Task.Delay(1000);
                         }
                 };
-                await Task.WhenAny(work(), Task.Delay(TimeSpan.FromSeconds(10)));
+                await Task.WhenAny(work(), Task.Delay(TimeSpan.FromSeconds(5)));
+                if (consumeError)
+                {
+                    logger.LogInformation("cassanra index backoff");
+                    await Task.Delay(20_000);
+                    consumeError = false;
+                }
             }, stoppingToken, 32);
             throw new Exception("consuming sells stopped");
         }
