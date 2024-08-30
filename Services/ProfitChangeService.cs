@@ -598,10 +598,13 @@ public class ProfitChangeService
                     Type = item.Type,
                     Level = (byte)(item.Level - 1)
                 };
+                var change = mapper.EnchantValue(enchantDummy, buy.FlatenedNBT, itemValues);
+                if(change == -1)
+                    return null; // no price available, ignore
                 return new PastFlip.ProfitChange()
                 {
-                    Label = $"Enchant {item.Type} {item.Level} added",
-                    Amount = -mapper.EnchantValue(enchantDummy, buy.FlatenedNBT, itemValues)
+                    Label = $"Enchant {item.Type} {item.Level} upgraded",
+                    Amount = -change
                 };
             }
             else

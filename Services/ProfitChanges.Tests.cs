@@ -849,9 +849,11 @@ public class ProfitChangeTests
     public async Task EnchantmentUpgrade()
     {
         var buy = CreateAuction("HYPERION");
-        buy.Enchantments = new() { new() { Type = Core.Enchantment.EnchantmentType.ultimate_chimera, Level = 3 } };
+        buy.Enchantments = new() { new() { Type = Core.Enchantment.EnchantmentType.ultimate_chimera, Level = 3 },
+                new() { Type = Core.Enchantment.EnchantmentType.fire_aspect, Level = 2 } };
         var sell = CreateAuction("HYPERION", highestBidAmount: 10_000_000);
-        sell.Enchantments = new() { new() { Type = Core.Enchantment.EnchantmentType.ultimate_chimera, Level = 4 } };
+        sell.Enchantments = new() { new() { Type = Core.Enchantment.EnchantmentType.ultimate_chimera, Level = 4 },
+                new() { Type = Core.Enchantment.EnchantmentType.fire_aspect, Level = 3 } };
         bazaarApi.Setup(p => p.ApiBazaarPricesGetAsync(0, default))
             .ReturnsAsync(() => new() { new("ENCHANTMENT_ULTIMATE_CHIMERA_3", 30_000_000, 20_000_000) });
 
