@@ -348,11 +348,16 @@ public class ProfitChangeService
         {
             var baseLevel = int.Parse(valueOnBuy.Value ?? buy.FlatenedNBT.GetValueOrDefault("dungeon_item_level") ?? "0");
             var upgradeCost = await hypixelItemService.GetStarCost(sell.Tag, baseLevel, int.Parse(item.Value));
+            var essenceGruped = upgradeCost.Where(u=>u.Type == "ESSENCE").GroupBy(u => "" + u.EssenceType);
+            foreach (var essence in essenceGruped)
+            {
+                var type = essence.Key;
+                var amount = essence.Sum(e => e.Amount);
+                yield return await priceProvider.CostOf($"ESSENCE_{type}", $"{type} essence x{amount} to add {essence.Count()} stars", amount);
+            }
             foreach (var cost in upgradeCost)
             {
-                if (cost.Type == "ESSENCE")
-                    yield return await priceProvider.CostOf($"ESSENCE_{cost.EssenceType}", $"{cost.EssenceType} essence x{cost.Amount} to add star", cost.Amount);
-                else if (cost.Type == "ITEM")
+                if (cost.Type == "ITEM")
                     yield return await priceProvider.CostOf(cost.ItemId, $"{cost.ItemId}x{cost.Amount} for star", cost.Amount);
             }
         }

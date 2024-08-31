@@ -31,7 +31,7 @@ public class ProfitChangeTests
         playerapi = new();
         auctionsApi = new();
         var itemService = new HypixelItemService(new System.Net.Http.HttpClient(), NullLogger<HypixelItemService>.Instance);
-        var priveProviderFactory = new PriceProviderFactory(playerapi.Object, pricesApi.Object, craftsApi.Object, auctionsApi.Object);
+        var priveProviderFactory = new PriceProviderFactory(playerapi.Object, pricesApi.Object, craftsApi.Object, auctionsApi.Object, bazaarApi.Object, NullLogger<PriceProviderFactory>.Instance);
         playerapi.Setup(p => p.ApiPlayerPlayerUuidBidsGetAsync(It.IsAny<string>(), 0, It.IsAny<Dictionary<string, string>>(), 0, default)).ReturnsAsync(() => new List<BidResult>());
         service = new ProfitChangeService(pricesApi.Object, katApi.Object, craftsApi.Object, NullLogger<ProfitChangeService>.Instance, itemsApi.Object, itemService, bazaarApi.Object, priveProviderFactory);
     }
@@ -1164,17 +1164,17 @@ public class ProfitChangeTests
         };
         Mock<IPricesApi> pricesApi = SetupItemPrice(10_000_000);
         var changes = await service.GetChanges(buy, sell).ToListAsync();
-        Assert.That(changes.Count, Is.EqualTo(10), JsonConvert.SerializeObject(changes, Formatting.Indented));
+        Assert.That(changes.Count, Is.EqualTo(7), JsonConvert.SerializeObject(changes, Formatting.Indented));
         Assert.That(changes.Sum(c => c.Amount), Is.EqualTo(-32084266200));
         pricesApi.Verify(p => p.ApiItemPriceItemTagGetAsync("FOURTH_MASTER_STAR", null, 0, default), Times.Once);
         pricesApi.Verify(p => p.ApiItemPriceItemTagGetAsync("THIRD_MASTER_STAR", null, 0, default), Times.Once);
         pricesApi.Verify(p => p.ApiItemPriceItemTagGetAsync("SECOND_MASTER_STAR", null, 0, default), Times.Once);
         pricesApi.Verify(p => p.ApiItemPriceItemTagGetAsync("FIRST_MASTER_STAR", null, 0, default), Times.Once);
         pricesApi.Verify(p => p.ApiItemPriceItemTagGetAsync("THE_ART_OF_WAR", null, 0, default), Times.Once);
-        pricesApi.Verify(p => p.ApiItemPriceItemTagGetAsync("ESSENCE_WITHER", null, 0, default), Times.Exactly(4));
+        pricesApi.Verify(p => p.ApiItemPriceItemTagGetAsync("ESSENCE_WITHER", null, 0, default), Times.Exactly(1));
 
-        Assert.That(changes[2].Label, Is.EqualTo("WITHER essence x500 to add star"));
-        Assert.That(changes[7].Label, Is.EqualTo("Used SECOND_MASTER_STAR to upgraded upgrade_level to 9"));
+        Assert.That(changes[1].Label, Is.EqualTo("WITHER essence x3200 to add 4 stars"));
+        Assert.That(changes[4].Label, Is.EqualTo("Used SECOND_MASTER_STAR to upgraded upgrade_level to 9"));
 
     }
 

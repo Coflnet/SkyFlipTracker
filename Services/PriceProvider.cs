@@ -11,16 +11,18 @@ public class PriceProvider : IPriceProvider
     private readonly IPlayerApi playerApi;
     private readonly IPricesApi pricesApi;
     private readonly ICraftsApi craftsApi;
+    private readonly Dictionary<string, double> priceCache;
     private readonly IAuctionsApi auctionsApi;
     private readonly Core.SaveAuction auction;
 
-    public PriceProvider(IPlayerApi playerApi, IPricesApi pricesApi, Core.SaveAuction auction, IAuctionsApi auctionsApi, ICraftsApi craftsApi)
+    public PriceProvider(IPlayerApi playerApi, IPricesApi pricesApi, Core.SaveAuction auction, IAuctionsApi auctionsApi, ICraftsApi craftsApi, Dictionary<string, double> prices)
     {
         this.playerApi = playerApi;
         this.pricesApi = pricesApi;
         this.auction = auction;
         this.auctionsApi = auctionsApi;
         this.craftsApi = craftsApi;
+        this.priceCache = prices;
     }
 
 
@@ -38,6 +40,14 @@ public class PriceProvider : IPriceProvider
                 Label = title,
                 Amount = -amount
             };
+        if(priceCache.TryGetValue(item, out var price))
+        {
+            return new PastFlip.ProfitChange()
+            {
+                Label = title,
+                Amount = -(long)(price * amount)
+            };
+        }
         var playerBidsResult = await playerApi.ApiPlayerPlayerUuidBidsGetAsync(auction.AuctioneerId, 0, new Dictionary<string, string>() {
             { "tag", item },
             {"EndAfter", DateTimeOffset.UtcNow.AddDays(-14).ToUnixTimeSeconds().ToString()}
