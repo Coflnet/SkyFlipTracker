@@ -267,7 +267,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             {
                 if (error.Message.Contains("with the same key has already been added."))
                 {
-                    foreach (var item in sells)
+                    foreach (var item in sells.ToList())
                     {
                         await CalculateAndIndex([item], extraLog);
                     }

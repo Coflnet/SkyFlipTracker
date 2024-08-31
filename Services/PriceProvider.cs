@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using Coflnet.Sky.Crafts.Client.Api;
 using Coflnet.Sky.Core;
 using Coflnet.Sky.Api.Client.Api;
+using Coflnet.Sky.Api.Client.Model;
 
 namespace Coflnet.Sky.SkyAuctionTracker.Services;
 
@@ -40,7 +41,7 @@ public class PriceProvider : IPriceProvider
                 Label = title,
                 Amount = -amount
             };
-        if(priceCache.TryGetValue(item, out var price))
+        if (priceCache.TryGetValue(item, out var price))
         {
             return new PastFlip.ProfitChange()
             {
@@ -48,10 +49,7 @@ public class PriceProvider : IPriceProvider
                 Amount = -(long)(price * amount)
             };
         }
-        var playerBidsResult = await playerApi.ApiPlayerPlayerUuidBidsGetAsync(auction.AuctioneerId, 0, new Dictionary<string, string>() {
-            { "tag", item },
-            {"EndAfter", DateTimeOffset.UtcNow.AddDays(-14).ToUnixTimeSeconds().ToString()}
-            });
+        List<BidResult> playerBidsResult = await GetPlayerBids(item);
         foreach (var bidSample in playerBidsResult)
         {
             if (bidSample.HighestBid != bidSample.HighestOwnBid)
@@ -95,5 +93,21 @@ public class PriceProvider : IPriceProvider
             Label = title,
             Amount = -(long)median * amount
         };
+    }
+
+    private async Task<List<BidResult>> GetPlayerBids(string item)
+    {
+        try
+        {
+            return await playerApi.ApiPlayerPlayerUuidBidsGetAsync(auction.AuctioneerId, 0, new Dictionary<string, string>() {
+            { "tag", item },
+            {"EndAfter", DateTimeOffset.UtcNow.AddDays(-14).ToUnixTimeSeconds().ToString()}
+            });
+        }
+        catch (System.Exception e)
+        {
+            Console.WriteLine($"getting bids from {auction.AuctioneerId} for {item}" + e);
+            return new List<BidResult>();
+        }
     }
 }
