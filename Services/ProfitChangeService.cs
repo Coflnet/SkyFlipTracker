@@ -76,7 +76,25 @@ public class ProfitChangeService
     /// <param name="buy"></param>
     /// <param name="sell"></param>
     /// <returns></returns>
-    public async IAsyncEnumerable<PastFlip.ProfitChange> GetChanges(Coflnet.Sky.Core.SaveAuction buy, Coflnet.Sky.Core.SaveAuction sell)
+    public async Task<List<PastFlip.ProfitChange>> GetChanges(Coflnet.Sky.Core.SaveAuction buy, Coflnet.Sky.Core.SaveAuction sell)
+    {
+        var list = await GetChangesAsync(buy, sell).ToListAsync();
+        return list.GroupBy(l => l.Label).Select(g =>
+        {
+            var label = g.Key;
+            if(g.Count() > 1)
+            {
+                label += $" (x{g.Count()})";
+            }
+            return new PastFlip.ProfitChange()
+            {
+                Label = label,
+                Amount = g.Sum(l => l.Amount)
+            };
+        }).ToList();
+    }
+
+    private async IAsyncEnumerable<PastFlip.ProfitChange> GetChangesAsync(Coflnet.Sky.Core.SaveAuction buy, Coflnet.Sky.Core.SaveAuction sell)
     {
         if (IsTrade(sell)) // no fees on trades
             yield return GetAhTax(sell.HighestBidAmount, sell.StartingBid);
@@ -348,7 +366,7 @@ public class ProfitChangeService
         {
             var baseLevel = int.Parse(valueOnBuy.Value ?? buy.FlatenedNBT.GetValueOrDefault("dungeon_item_level") ?? "0");
             var upgradeCost = await hypixelItemService.GetStarCost(sell.Tag, baseLevel, int.Parse(item.Value));
-            var essenceGruped = upgradeCost.Where(u=>u.Type == "ESSENCE").GroupBy(u => "" + u.EssenceType);
+            var essenceGruped = upgradeCost.Where(u => u.Type == "ESSENCE").GroupBy(u => "" + u.EssenceType);
             foreach (var essence in essenceGruped)
             {
                 var type = essence.Key;
@@ -604,7 +622,7 @@ public class ProfitChangeService
                     Level = (byte)(item.Level - 1)
                 };
                 var change = mapper.EnchantValue(enchantDummy, buy.FlatenedNBT, itemValues);
-                if(change == -1)
+                if (change == -1)
                     return null; // no price available, ignore
                 return new PastFlip.ProfitChange()
                 {

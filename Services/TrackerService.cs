@@ -379,7 +379,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     List<PastFlip.ProfitChange> changes = new();
                     try
                     {
-                        changes = await profitChangeService.GetChanges(buy, sell).ToListAsync().ConfigureAwait(false);
+                        changes = await profitChangeService.GetChanges(buy, sell).ConfigureAwait(false);
                         if (buy.AuctioneerId == null)
                             logger.LogInformation($"trade changes retrieved  {item.buy.ItemTag}");
                         if (buy.End > sell.End - TimeSpan.FromDays(14))

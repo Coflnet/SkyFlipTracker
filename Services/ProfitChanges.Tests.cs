@@ -66,7 +66,7 @@ public class ProfitChangeTests
                 .ReturnsAsync(() => new() { Median = 200_000_000 });
         itemsApi.Setup(i => i.ItemItemTagGetAsync("ENDER_RELIC", It.IsAny<bool?>(), It.IsAny<int>(), default))
                 .ReturnsAsync(() => new() { Tag = "ENDER_RELIC", Tier = Items.Client.Model.Tier.LEGENDARY });
-        var result = await service.GetChanges(buy, sell).ToListAsync();
+        var result = await service.GetChanges(buy, sell);
         Assert.That(result.Count, Is.EqualTo(4));
     }
     [Test]
@@ -91,7 +91,7 @@ public class ProfitChangeTests
 
         katApi.Setup(k => k.KatAllGetAsync(0, default)).ReturnsAsync(KatResponse());
         Console.WriteLine(JsonConvert.SerializeObject(KatResponse()));
-        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        var changes = await service.GetChanges(buy, sell);
         Assert.That(changes.Count, Is.EqualTo(3 * 2 + 1), JsonConvert.SerializeObject(changes, Formatting.Indented));
         Assert.That(changes[0].Amount, Is.EqualTo(-1210));
         Assert.That(changes[1].Amount, Is.EqualTo(-100_000), changes[1].Label);
@@ -127,7 +127,7 @@ public class ProfitChangeTests
             Tier = Core.Tier.LEGENDARY
         };
         katApi.Setup(k => k.KatAllGetAsync(0, default)).ReturnsAsync(KatResponse("PET_ENDER_DRAGON"));
-        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        var changes = await service.GetChanges(buy, sell);
         Assert.That(changes.Count, Is.EqualTo(3));
         Assert.That(changes[0].Amount, Is.EqualTo(-1220));
         Assert.That(changes[2].Label, Is.EqualTo("Kat materials for LEGENDARY"));
@@ -169,7 +169,7 @@ public class ProfitChangeTests
         });
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), null, 0, default))
                 .ReturnsAsync(() => new() { Median = 1_000_000 });
-        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        var changes = await service.GetChanges(buy, sell);
         Assert.That(changes.Count, Is.EqualTo(3));
         var all = JsonConvert.SerializeObject(changes, Formatting.Indented);
         Assert.That(changes[0].Amount, Is.EqualTo(-7001200));
@@ -212,7 +212,7 @@ public class ProfitChangeTests
         });
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), null, 0, default))
                 .ReturnsAsync(() => new() { Median = 1_000_000 });
-        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        var changes = await service.GetChanges(buy, sell);
         Console.WriteLine(JsonConvert.SerializeObject(changes, Formatting.Indented));
         Assert.That(changes.Count, Is.EqualTo(3), JsonConvert.SerializeObject(changes, Formatting.Indented));
         Assert.That(changes[0].Amount, Is.EqualTo(-7_001_200));
@@ -259,7 +259,7 @@ public class ProfitChangeTests
             new() { ItemId = "UPGRADE_STONE_FROST", CraftCost = 500_000}});
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), null, 0, default))
                 .ReturnsAsync(() => new() { Median = 1_000_000 });
-        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        var changes = await service.GetChanges(buy, sell);
         Assert.That(changes.Count, Is.EqualTo(2));
         Assert.That(changes[1].Amount, Is.EqualTo(-500_000));
         Assert.That(changes[1].Label, Is.EqualTo("Wisp upgrade stone for FROST"));
@@ -273,7 +273,7 @@ public class ProfitChangeTests
         sell.FlatenedNBT.Add("heldItem", "PET_ITEM_TIER_BOOST");
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), null, 0, default))
                 .ReturnsAsync(() => new() { Median = 100_000_000 });
-        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        var changes = await service.GetChanges(buy, sell);
         Assert.That(changes.Count, Is.EqualTo(2), JsonConvert.SerializeObject(changes, Formatting.Indented));
         Assert.That(changes.Sum(c => c.Amount), Is.EqualTo(-100001210));
     }
@@ -287,7 +287,7 @@ public class ProfitChangeTests
         katApi.Setup(k => k.KatAllGetAsync(0, default)).ReturnsAsync(KatResponse("PET_SCATHA"));
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), null, 0, default))
                 .ReturnsAsync(() => new() { Median = 100_000_000 });
-        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        var changes = await service.GetChanges(buy, sell);
         Assert.That(changes.Count, Is.EqualTo(4), JsonConvert.SerializeObject(changes, Formatting.Indented));
     }
 
@@ -302,7 +302,7 @@ public class ProfitChangeTests
                 .ReturnsAsync(() => new() { Median = 5_000_000 });
         katApi.Setup(k => k.KatAllGetAsync(0, default)).ReturnsAsync(KatResponse("PET_ENDER_DRAGON"));
 
-        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        var changes = await service.GetChanges(buy, sell);
         Assert.That(changes.Count, Is.EqualTo(3), JsonConvert.SerializeObject(changes));
         Assert.That(changes[1].Label, Is.EqualTo("Kat cost for LEGENDARY"));
         Assert.That(changes[1].Amount, Is.EqualTo(-40_000_000));
@@ -318,7 +318,7 @@ public class ProfitChangeTests
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("PERFECT_TOPAZ_GEM", null, 0, default))
                 .ReturnsAsync(() => new() { Median = value });
 
-        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        var changes = await service.GetChanges(buy, sell);
         Assert.That(changes[1].Label, Is.EqualTo("PERFECT TOPAZ gem removed"));
         Assert.That(changes[1].Amount, Is.EqualTo(value * 98 / 100 - 500_000), "gem removal cost is 500k");
     }
@@ -343,12 +343,12 @@ public class ProfitChangeTests
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("FLAWLESS_JASPER_GEM", null, 0, default))
                 .ReturnsAsync(() => new() { Median = value2 / 2 });
 
-        var changes = await service.GetChanges(buy, sell).ToListAsync();
-        Assert.That(changes[3].Label, Is.EqualTo("PERFECT JASPER gem removed"));
-        Assert.That(changes[3].Amount, Is.EqualTo((value * 98 / 100) - 500_000), "gem removal cost is 500k");
+        var changes = await service.GetChanges(buy, sell);
+        Assert.That(changes[3].Label, Is.EqualTo("PERFECT JASPER gem removed (x2)"));
+        Assert.That(changes[3].Amount, Is.EqualTo(((value * 98 / 100) - 500_000)*2), "gem removal cost is 500k");
         Assert.That(changes[1].Label, Is.EqualTo("PERFECT RUBY gem added"));
         Assert.That(changes[1].Amount, Is.EqualTo(-value2));
-        Assert.That(changes.Count, Is.EqualTo(5));
+        Assert.That(changes.Count, Is.EqualTo(4));
     }
 
     [Test]
@@ -358,7 +358,7 @@ public class ProfitChangeTests
         buy.FlatenedNBT.Add("heldItem", "PET_ITEM_TIER_BOOST");
         var sell = CreateAuction("PET_ENDER_DRAGON", "PET_ITEM_TIER_BOOST", 1000, Core.Tier.LEGENDARY);
         sell.FlatenedNBT.Add("heldItem", "PET_ITEM_TIER_BOOST");
-        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        var changes = await service.GetChanges(buy, sell);
         Assert.That(changes.Count, Is.EqualTo(1), JsonConvert.SerializeObject(changes));
     }
     [Test]
@@ -382,7 +382,7 @@ public class ProfitChangeTests
         };
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), null, 0, default))
                 .ReturnsAsync(() => new() { Median = 5_000_000 });
-        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        var changes = await service.GetChanges(buy, sell);
         Assert.That(changes.Count, Is.EqualTo(2));
         Assert.That(changes.Sum(c => c.Amount), Is.EqualTo(-(5_000_000 + 600_000 + 201200)));
     }
@@ -412,7 +412,7 @@ public class ProfitChangeTests
                 .ReturnsAsync(() => new() { Median = 80_000 });
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("FUMING_POTATO_BOOK", null, 0, default))
                 .ReturnsAsync(() => new() { Median = 1_180_000 });
-        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        var changes = await service.GetChanges(buy, sell);
         Assert.That(changes.Count, Is.EqualTo(3));
         Assert.That(changes[2].Amount, Is.EqualTo(-80_000*10));
         Assert.That(changes[1].Amount, Is.EqualTo(-1_180_000*5));
@@ -442,7 +442,7 @@ public class ProfitChangeTests
         };
         var price = Random.Shared.Next(1, 5_000_000);
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("RUNE_SOULTWIST", null, 0, default)).ReturnsAsync(() => new() { Median = price });
-        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        var changes = await service.GetChanges(buy, sell);
         Assert.That(changes.Count, Is.EqualTo(2));
         Assert.That(changes.Last().Amount, Is.EqualTo(-price));
     }
@@ -471,7 +471,7 @@ public class ProfitChangeTests
         };
         var price = 80_000_000;
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(runeTag, null, 0, default)).ReturnsAsync(() => new() { Median = price });
-        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        var changes = await service.GetChanges(buy, sell);
         Assert.That(changes.Count, Is.EqualTo(2));
         Assert.That(changes.Last().Amount, Is.EqualTo(-targetChange));
     }
@@ -497,7 +497,7 @@ public class ProfitChangeTests
         };
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), null, 0, default))
                 .ReturnsAsync(() => new() { Median = 5_000_000 });
-        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        var changes = await service.GetChanges(buy, sell);
         Assert.That(changes.Count, Is.EqualTo(1), JsonConvert.SerializeObject(changes, Formatting.Indented));
         Assert.That(changes.Sum(c => c.Amount), Is.EqualTo(-201200));
     }
@@ -531,7 +531,7 @@ public class ProfitChangeTests
                 } } });
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), null, 0, default)).ReturnsAsync(() => new() { Median = 200_000_000 });
         itemsApi.Setup(i => i.ItemItemTagGetAsync("HYPERION", It.IsAny<bool?>(), It.IsAny<int>(), default)).ReturnsAsync(() => new() { Tag = "HYPERION", Tier = Items.Client.Model.Tier.LEGENDARY });
-        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        var changes = await service.GetChanges(buy, sell);
         Assert.That(changes.Count, Is.EqualTo(4), JsonConvert.SerializeObject(changes, Formatting.Indented));
         Assert.That(changes.Sum(c => c.Amount), Is.EqualTo(-600001210));
         Assert.That(changes[1].Label, Is.EqualTo("Applied IMPLOSION_SCROLL"));
@@ -564,7 +564,7 @@ public class ProfitChangeTests
             });
         itemsApi.Setup(i => i.ItemItemTagGetAsync("MASTER_SKULL_TIER_6", It.IsAny<bool?>(), It.IsAny<int>(), default))
             .ReturnsAsync(() => new() { Tag = "MASTER_SKULL_TIER_6", Tier = Items.Client.Model.Tier.EPIC });
-        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        var changes = await service.GetChanges(buy, sell);
         Assert.That(changes.Count, Is.EqualTo(3), JsonConvert.SerializeObject(changes, Formatting.Indented));
         Assert.That(changes.Any(c => c.Label == "crafting material MASTER_SKULL_TIER_4 x3"), JsonConvert.SerializeObject(changes, Formatting.Indented));
     }
@@ -592,7 +592,7 @@ public class ProfitChangeTests
             Tier = Core.Tier.LEGENDARY
         };
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), null, 0, default)).ReturnsAsync(() => new() { Median = 200_000_000 });
-        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        var changes = await service.GetChanges(buy, sell);
         Assert.That(changes.Count, Is.EqualTo(2), JsonConvert.SerializeObject(changes, Formatting.Indented));
     }
 
@@ -620,7 +620,7 @@ public class ProfitChangeTests
         };
         var price = Random.Shared.Next();
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("PET_SKIN_ENDERMITE_DYNAMITE", null, 0, default)).ReturnsAsync(() => new() { Median = price });
-        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        var changes = await service.GetChanges(buy, sell);
         Assert.That(changes.Count, Is.EqualTo(2), JsonConvert.SerializeObject(changes, Formatting.Indented));
         Assert.That(changes.Last().Amount, Is.EqualTo(-price));
     }
@@ -647,7 +647,7 @@ public class ProfitChangeTests
         var json = JsonConvert.SerializeObject(buy);
         buy = JsonConvert.DeserializeObject<ApiSaveAuction>(json);
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), null, 0, default)).ReturnsAsync(() => new() { Median = 200_000_000 });
-        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        var changes = await service.GetChanges(buy, sell);
         Console.WriteLine(json);
         Console.WriteLine(JsonConvert.SerializeObject(buy, Formatting.Indented));
         Assert.That(changes.Count, Is.EqualTo(1), JsonConvert.SerializeObject(changes, Formatting.Indented));
@@ -673,7 +673,7 @@ public class ProfitChangeTests
             Tier = Core.Tier.LEGENDARY
         };
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), null, 0, default)).ReturnsAsync(() => new() { Median = 1_000_000 });
-        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        var changes = await service.GetChanges(buy, sell);
         Assert.That(changes.Count, Is.EqualTo(2), JsonConvert.SerializeObject(changes, Formatting.Indented));
         Assert.That(changes.Sum(c => c.Amount), Is.EqualTo(-80201200));
         Assert.That(changes[1].Label, Is.EqualTo("80x Thunder in a bottle"));
@@ -699,7 +699,7 @@ public class ProfitChangeTests
             Tier = Core.Tier.LEGENDARY
         };
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), null, 0, default)).ReturnsAsync(() => new() { Median = 1_000_000 });
-        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        var changes = await service.GetChanges(buy, sell);
         Assert.That(changes.Count, Is.EqualTo(2), JsonConvert.SerializeObject(changes, Formatting.Indented));
         Assert.That(changes.Sum(c => c.Amount), Is.EqualTo(-9201200));
         Assert.That(changes[1].Label, Is.EqualTo("9x Thunder in a bottle"));
@@ -724,7 +724,7 @@ public class ProfitChangeTests
             Tier = Core.Tier.MYTHIC
         };
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), null, 0, default)).ReturnsAsync(() => new() { Median = 1_000_000 });
-        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        var changes = await service.GetChanges(buy, sell);
         Assert.That(changes.Count, Is.EqualTo(2), JsonConvert.SerializeObject(changes, Formatting.Indented));
         Assert.That(changes.Sum(c => c.Amount), Is.EqualTo(-100201200));
         Assert.That(changes[1].Label, Is.EqualTo("100x Thunder in a bottle"));
@@ -738,11 +738,11 @@ public class ProfitChangeTests
         var sell = CreateAuction("ATTRIBUTE_SHARD");
         sell.FlatenedNBT["mana_pool"] = "3";
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("ATTRIBUTE_SHARD", new() { { "mana_pool", "2" } }, 0, default)).ReturnsAsync(() => new() { Median = 5000 });
-        var result = await service.GetChanges(buy, sell).ToListAsync();
+        var result = await service.GetChanges(buy, sell);
         Assert.That(result.Count, Is.EqualTo(2));
         Assert.That(result[1].Amount, Is.EqualTo(-5000));
         sell.FlatenedNBT["mana_pool"] = "5";
-        result = await service.GetChanges(buy, sell).ToListAsync();
+        result = await service.GetChanges(buy, sell);
         Assert.That(result.Count, Is.EqualTo(2));
         Assert.That(result[1].Amount, Is.EqualTo(-35000));
     }
@@ -761,7 +761,7 @@ public class ProfitChangeTests
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("AURORA_CHESTPLATE", new() { { "magic_find", "2" } }, 0, default)).ReturnsAsync(() => new() { Median = 2_000_000 });
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("AURORA_CHESTPLATE", new() { { "mana_pool", "2" } }, 0, default)).ReturnsAsync(() => new() { Median = 5_000_000 });
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("AURORA_CHESTPLATE", new() { { "mana_pool", "5" } }, 0, default)).ReturnsAsync(() => new() { Median = 10_000_000 });
-        var result = await service.GetChanges(buy, sell).ToListAsync();
+        var result = await service.GetChanges(buy, sell);
         Assert.That(result.Count, Is.EqualTo(3));
         Assert.That(result[1].Amount, Is.EqualTo(-312000000));
         Assert.That(result[2].Amount, Is.EqualTo(-56000000));
@@ -780,7 +780,7 @@ public class ProfitChangeTests
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("WHEEL_OF_FATE", null, 0, default)).ReturnsAsync(() => new() { Median = 12_000_000 });
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("MOLTEN_CLOAK", new() { { "mana_regeneration", "2" } }, 0, default)).ReturnsAsync(() => new() { Median = 5000 });
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("MOLTEN_CLOAK", new() { { "dominance", "2" } }, 0, default)).ReturnsAsync(() => new() { Median = 5000 });
-        var result = await service.GetChanges(buy, sell).ToListAsync();
+        var result = await service.GetChanges(buy, sell);
         Assert.That(result.Count, Is.EqualTo(2));
         Assert.That(result[1].Amount, Is.EqualTo(-12000000));
         pricesApi.Verify(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), It.IsAny<Dictionary<string, string>>(), 0, default), Times.Once);
@@ -795,7 +795,7 @@ public class ProfitChangeTests
         sell.FlatenedNBT["mana_regeneration"] = "3";
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("GAUNTLET_OF_CONTAGION", new() { { "mana_regeneration", "2" } }, 0, default)).ReturnsAsync(() => new() { Median = 13_000_000 });
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("ATTRIBUTE_SHARD", new() { { "mana_regeneration", "2" } }, 0, default)).ReturnsAsync(() => new() { Median = 2_000_000 });
-        var result = await service.GetChanges(buy, sell).ToListAsync();
+        var result = await service.GetChanges(buy, sell);
         Assert.That(result.Count, Is.EqualTo(2));
         Assert.That(result[1].Amount, Is.EqualTo(-2000000));
     }
@@ -824,7 +824,7 @@ public class ProfitChangeTests
         };
         bazaarApi.Setup(p => p.ApiBazaarPricesGetAsync(0, default))
             .ReturnsAsync(() => new() { new("ENCHANTMENT_SHARPNESS_6", 3_000_000, 2_000_000) });
-        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        var changes = await service.GetChanges(buy, sell);
         Assert.That(changes.Count, Is.EqualTo(2), JsonConvert.SerializeObject(changes, Formatting.Indented));
         Assert.That(changes.Sum(c => c.Amount), Is.EqualTo(-2_201_200));
     }
@@ -840,7 +840,7 @@ public class ProfitChangeTests
                 new("ENCHANTMENT_ULTIMATE_CHIMERA_1", 105900000, 100_000_000),
                 new("ENCHANTMENT_ULTIMATE_CHIMERA_4", 0, 33),
                 });
-        var result = await service.GetChanges(buy, sell).ToListAsync();
+        var result = await service.GetChanges(buy, sell);
         Assert.That(result.Count, Is.EqualTo(2));
         Assert.That(result[1].Amount, Is.EqualTo(-600_000_000));
     }
@@ -857,7 +857,7 @@ public class ProfitChangeTests
         bazaarApi.Setup(p => p.ApiBazaarPricesGetAsync(0, default))
             .ReturnsAsync(() => new() { new("ENCHANTMENT_ULTIMATE_CHIMERA_3", 30_000_000, 20_000_000) });
 
-        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        var changes = await service.GetChanges(buy, sell);
 
         Assert.That(changes.Count, Is.EqualTo(2), JsonConvert.SerializeObject(changes, Formatting.Indented));
         Assert.That(changes.Sum(c => c.Amount), Is.EqualTo(-20_201_200));
@@ -873,7 +873,7 @@ public class ProfitChangeTests
         bazaarApi.Setup(p => p.ApiBazaarPricesGetAsync(0, default))
             .ReturnsAsync(() => new() { new("ENCHANTMENT_DEDICATION_3", 3_900_000, 3_000_000),
                     new("ENCHANTMENT_DEDICATION_4", 100_000_000, 100_000_000) });
-        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        var changes = await service.GetChanges(buy, sell);
         Assert.That(changes.Count, Is.EqualTo(2), JsonConvert.SerializeObject(changes, Formatting.Indented));
         Assert.That(changes[1].Amount, Is.EqualTo(-100_000_000));
     }
@@ -889,7 +889,7 @@ public class ProfitChangeTests
                     new("ENCHANTMENT_ULTIMATE_CHIMERA_1", 103_000_000, 102_000_000),
                     new("ENCHANTMENT_ULTIMATE_CHIMERA_5", 500_000_000, 500_000_000) });
 
-        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        var changes = await service.GetChanges(buy, sell);
 
         Assert.That(changes.Count, Is.EqualTo(2), JsonConvert.SerializeObject(changes, Formatting.Indented));
         Assert.That(changes[1].Amount, Is.EqualTo(-1632000000));
@@ -918,7 +918,7 @@ public class ProfitChangeTests
             Tier = Core.Tier.LEGENDARY
         };
         bazaarApi.Setup(p => p.ApiBazaarPricesGetAsync(0, default)).ReturnsAsync(() => new() { new("ENCHANTMENT_SHARPNESS_7", 20_000_000, 20_000_000) });
-        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        var changes = await service.GetChanges(buy, sell);
         Assert.That(changes.Count, Is.EqualTo(2), JsonConvert.SerializeObject(changes, Formatting.Indented));
         Assert.That(changes.Sum(c => c.Amount), Is.EqualTo(-20_201_200));
     }
@@ -956,7 +956,7 @@ public class ProfitChangeTests
         };
         bazaarApi.Setup(p => p.ApiBazaarPricesGetAsync(0, default))
             .ReturnsAsync(() => new() { new($"ENCHANTMENT_{ench.ToString().ToUpper()}_1", bazaarPrice, bazaarPrice) });
-        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        var changes = await service.GetChanges(buy, sell);
         Assert.That(changes.Count, Is.EqualTo(2), JsonConvert.SerializeObject(changes, Formatting.Indented));
         Assert.That(changes.Skip(1).First().Amount, Is.EqualTo(expectedDiff));
     }
@@ -990,7 +990,7 @@ public class ProfitChangeTests
         itemsApi.Setup(i => i.ItemItemTagGetAsync("FIERY_KUUDRA_CORE", It.IsAny<bool?>(), It.IsAny<int>(), default))
             .ReturnsAsync(() => new() { Tag = "FIERY_KUUDRA_CORE", Tier = Items.Client.Model.Tier.EPIC });
 
-        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        var changes = await service.GetChanges(buy, sell);
 
         Assert.That(changes.Count, Is.EqualTo(2), JsonConvert.SerializeObject(changes, Formatting.Indented));
         Assert.That(changes.Sum(c => c.Amount), Is.EqualTo(-60201200));
@@ -1037,7 +1037,7 @@ public class ProfitChangeTests
                     }}});
         itemsApi.Setup(i => i.ItemItemTagGetAsync("SOS_FLARE", It.IsAny<bool?>(), It.IsAny<int>(), default))
             .ReturnsAsync(() => new() { Tag = "SOS_FLARE", Tier = Items.Client.Model.Tier.LEGENDARY });
-        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        var changes = await service.GetChanges(buy, sell);
         Assert.That(changes.Count, Is.EqualTo(4), JsonConvert.SerializeObject(changes, Formatting.Indented));
         var upgradeCost = 2_000_000 + 20 * 100_000;
         Assert.That(-changes.Sum(c => c.Amount), Is.EqualTo(craftCost + ahFees + upgradeCost));
@@ -1070,7 +1070,7 @@ public class ProfitChangeTests
             Tier = Core.Tier.LEGENDARY
         };
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("BOOK_OF_STATS", null, 0, default)).ReturnsAsync(() => new() { Median = 1_000_000 });
-        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        var changes = await service.GetChanges(buy, sell);
         Assert.That(changes.Count, Is.EqualTo(expectedChangecount), JsonConvert.SerializeObject(changes));
         if (changes.Count == 2)
             Assert.That(changes[1].Amount, Is.EqualTo(-1_000_000));
@@ -1088,7 +1088,7 @@ public class ProfitChangeTests
             buy.Enchantments = new() { new() { Type = Core.Enchantment.EnchantmentType.efficiency, Level = startingLevel } };
         bazaarApi.Setup(p => p.ApiBazaarPricesGetAsync(0, default))
             .ReturnsAsync(() => new() { new("SIL_EX", 17_000_000, 16_000_000) });
-        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        var changes = await service.GetChanges(buy, sell);
         Assert.That(changes.Count, Is.EqualTo(2), JsonConvert.SerializeObject(changes, Formatting.Indented));
         Assert.That(changes.Sum(c => c.Amount), Is.EqualTo(cost));
         Assert.That(changes[1].Label, Is.EqualTo(message));
@@ -1103,7 +1103,7 @@ public class ProfitChangeTests
         buy.Enchantments = new() { new() { Type = Core.Enchantment.EnchantmentType.scavenger, Level = 5 } };
         bazaarApi.Setup(p => p.ApiBazaarPricesGetAsync(0, default))
             .ReturnsAsync(() => new() { new("GOLDEN_BOUNTY", 27_000_000, 26_000_000) });
-        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        var changes = await service.GetChanges(buy, sell);
         Assert.That(changes.Count, Is.EqualTo(2), JsonConvert.SerializeObject(changes, Formatting.Indented));
         Assert.That(changes.Sum(c => c.Amount), Is.EqualTo(-29501200));
         Assert.That(changes[1].Label, Is.EqualTo("Enchant scavenger 6"));
@@ -1118,7 +1118,7 @@ public class ProfitChangeTests
         bazaarApi.Setup(p => p.ApiBazaarPricesGetAsync(0, default))
             .ReturnsAsync(() => new() { new("STOCK_OF_STONKS", 3_000_000, 3_000_000) });
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("STOCK_OF_STONKS", null, 0, default)).ReturnsAsync(() => new() { Median = 3_000_000 });
-        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        var changes = await service.GetChanges(buy, sell);
         Assert.That(changes.Count, Is.EqualTo(3), JsonConvert.SerializeObject(changes, Formatting.Indented));
         Assert.That(changes.Sum(c => c.Amount), Is.EqualTo(-233161200));
         Assert.That(changes[1].Label, Is.EqualTo("Additional coins"));
@@ -1132,7 +1132,7 @@ public class ProfitChangeTests
         var sell = CreateAuction("DRILL", "drill", 100_000_000);
         sell.FlatenedNBT["drill_part_engine"] = "amber_polished_drill_engine";
         SetupItemPrice(5_000_000);
-        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        var changes = await service.GetChanges(buy, sell);
         Assert.That(changes.Count, Is.EqualTo(2), JsonConvert.SerializeObject(changes, Formatting.Indented));
         Assert.That(changes[1].Amount, Is.EqualTo(-5000000));
     }
@@ -1163,7 +1163,7 @@ public class ProfitChangeTests
             Tier = Core.Tier.LEGENDARY
         };
         Mock<IPricesApi> pricesApi = SetupItemPrice(10_000_000);
-        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        var changes = await service.GetChanges(buy, sell);
         Assert.That(changes.Count, Is.EqualTo(7), JsonConvert.SerializeObject(changes, Formatting.Indented));
         Assert.That(changes.Sum(c => c.Amount), Is.EqualTo(-32084266200));
         pricesApi.Verify(p => p.ApiItemPriceItemTagGetAsync("FOURTH_MASTER_STAR", null, 0, default), Times.Once);
@@ -1187,7 +1187,7 @@ public class ProfitChangeTests
         sell.FlatenedNBT["upgrade_level"] = "5";
         sell.FlatenedNBT["dungeon_item_level"] = "4";
         SetupItemPrice(10_000_000);
-        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        var changes = await service.GetChanges(buy, sell);
         Assert.That(changes.Count, Is.EqualTo(2), "dungeon item level used as start");
 
     }
@@ -1206,7 +1206,7 @@ public class ProfitChangeTests
         sell.FlatenedNBT["blocksBroken"] = "20001";
         sell.Enchantments.Add(new() { Type = Core.Enchantment.EnchantmentType.efficiency, Level = 10 });
         SetupItemPrice(500_000);
-        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        var changes = await service.GetChanges(buy, sell);
         Assert.That(changes.Count, Is.EqualTo(2), JsonConvert.SerializeObject(changes, Formatting.Indented));
         Assert.That(changes[1].Amount, Is.EqualTo(-19995));
     }
@@ -1238,7 +1238,7 @@ public class ProfitChangeTests
             Tier = Core.Tier.EPIC
         };
         SetupPetLevelService();
-        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        var changes = await service.GetChanges(buy, sell);
         Assert.That(changes.Count, Is.EqualTo(2), JsonConvert.SerializeObject(changes, Formatting.Indented));
         Assert.That(changes.Sum(c => c.Amount), Is.EqualTo(-398413));
     }
@@ -1271,7 +1271,7 @@ public class ProfitChangeTests
         SetupPetLevelService("PET_SUBZERO_WISP",
             pricesApi => pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("HYPERGOLIC_GABAGOOL", null, 0, default)).ReturnsAsync(() => new() { Median = 8_000_000 })
             , 800_000_000);
-        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        var changes = await service.GetChanges(buy, sell);
         Assert.That(changes.Count, Is.EqualTo(2), JsonConvert.SerializeObject(changes, Formatting.Indented));
         Assert.That(changes.Sum(c => c.Amount), Is.EqualTo(-50907660));
     }
@@ -1284,7 +1284,7 @@ public class ProfitChangeTests
         var sell = CreateAuction("PET_BAT", "[Lvl 60] Bat", 10_000_000, Core.Tier.LEGENDARY);
         sell.FlatenedNBT["exp"] = "128176815.6";
         SetupPetLevelService();
-        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        var changes = await service.GetChanges(buy, sell);
         Assert.That(changes.Count, Is.EqualTo(1), JsonConvert.SerializeObject(changes, Formatting.Indented));
     }
     [Test]
@@ -1297,7 +1297,7 @@ public class ProfitChangeTests
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("PET_GOLDEN_DRAGON", new() { { "PetLevel", "1" }, { "Rarity", "LEGENDARY" } }, 0, default)).ReturnsAsync(() => new() { Median = 600_000_000 });
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("PET_GOLDEN_DRAGON", new() { { "PetLevel", "200" }, { "Rarity", "LEGENDARY" }, { "PetItem", "NOT_TIER_BOOST" } }, 0, default)).ReturnsAsync(() => new() { Median = 1200_000_000 });
         ;
-        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        var changes = await service.GetChanges(buy, sell);
         pricesApi.Verify(p => p.ApiItemPriceItemTagGetAsync("PET_GOLDEN_DRAGON", new() { { "PetLevel", "200" }, { "Rarity", "LEGENDARY" }, { "PetItem", "NOT_TIER_BOOST" } }, 0, default), Times.Once);
         Assert.That(changes.Count, Is.EqualTo(2), JsonConvert.SerializeObject(changes, Formatting.Indented));
         Assert.That(changes[1].Amount, Is.EqualTo(-10657764));
@@ -1337,7 +1337,7 @@ public class ProfitChangeTests
                      });
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), null, 0, default)).ReturnsAsync(() => new() { Median = 1_000_000 });
         itemsApi.Setup(i => i.ItemItemTagGetAsync("HYPERION", It.IsAny<bool?>(), It.IsAny<int>(), default)).ReturnsAsync(() => new() { Tag = "HYPERION", Tier = Items.Client.Model.Tier.LEGENDARY });
-        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        var changes = await service.GetChanges(buy, sell);
         Assert.That(changes.Count, Is.EqualTo(4), JsonConvert.SerializeObject(changes, Formatting.Indented));
         Assert.That(changes[1].Label, Is.EqualTo("crafting material GIANT_FRAGMENT_LASER x8"));
         Assert.That(changes[1].Amount, Is.EqualTo(-8_000_000));
@@ -1361,7 +1361,7 @@ public class ProfitChangeTests
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("NIBBLE_CHOCOLATE_STICK", null, 0, default)).ReturnsAsync(() => new() { Median = 220_000 });
         itemsApi.Setup(i => i.ItemItemTagGetAsync("PRESTIGE_CHOCOLATE_REALM", It.IsAny<bool?>(), It.IsAny<int>(), default))
             .ReturnsAsync(() => new() { Tag = "PRESTIGE_CHOCOLATE_REALM", Tier = Items.Client.Model.Tier.LEGENDARY });
-        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        var changes = await service.GetChanges(buy, sell);
         Assert.That(changes.Count, Is.EqualTo(2), JsonConvert.SerializeObject(changes, Formatting.Indented));
         Assert.That(changes[1].Amount, Is.EqualTo(-3960_000));
     }
@@ -1377,7 +1377,7 @@ public class ProfitChangeTests
         var sell = CreateAuction("WITHER_RELIC");
         sell.FlatenedNBT["talisman_enrichment"] = property;
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(itemname, null, 0, default)).ReturnsAsync(() => new() { Median = 1_000_000 });
-        var result = await service.GetChanges(buy, sell).ToListAsync();
+        var result = await service.GetChanges(buy, sell);
         Assert.That(result.Count, Is.EqualTo(itemname == null ? 1 : 2));
         if (itemname != null)
             Assert.That(result[1].Amount, Is.EqualTo(-1000000));
@@ -1412,7 +1412,7 @@ public class ProfitChangeTests
                      });
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), null, 0, default)).ReturnsAsync(() => new() { Median = 1_000_000 });
         itemsApi.Setup(i => i.ItemItemTagGetAsync("HYPERION", It.IsAny<bool?>(), It.IsAny<int>(), default)).ReturnsAsync(() => new() { Tag = "HYPERION", Tier = Items.Client.Model.Tier.LEGENDARY });
-        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        var changes = await service.GetChanges(buy, sell);
         Assert.That(changes.Count, Is.EqualTo(3), JsonConvert.SerializeObject(changes, Formatting.Indented));
         Assert.That(changes[1].Label, Is.EqualTo("crafting material WITHER_CATALYST x10"));
     }
@@ -1434,7 +1434,7 @@ public class ProfitChangeTests
         auctionsApi.Setup(a => a.ApiAuctionAuctionUuidGetAsync(buy.Uuid, 0, default))
             .ReturnsAsync(() => new() { Count = 8, HighestBidAmount = 5_000_000 });
 
-        var changes = await service.GetChanges(buy, sell).ToListAsync();
+        var changes = await service.GetChanges(buy, sell);
         Assert.That(changes.Count, Is.EqualTo(2), JsonConvert.SerializeObject(changes, Formatting.Indented));
         Assert.That(changes[1].Amount, Is.EqualTo(-5_000_000));
     }
