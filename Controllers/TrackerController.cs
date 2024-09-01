@@ -50,6 +50,13 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             return flip;
         }
 
+        [HttpGet]
+        [Route("flip/{AuctionId}")]
+        public async Task<IEnumerable<FinderContext>> GetFlip(string AuctionId)
+        {
+            return await flipStorageService.GetFinderContexts(Guid.Parse(AuctionId));
+        }
+
         /// <summary>
         /// Tracks a flip event for an auction
         /// </summary>
