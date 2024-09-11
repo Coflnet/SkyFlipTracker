@@ -230,6 +230,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             {
                 if (lps.Count() == 0)
                     return;
+                if (lps.All(lp => lp.Auction.End < DateTime.UtcNow - TimeSpan.FromDays(4)))
+                    return;
 
                 using var scope = scopeFactory.CreateScope();
                 var service = scope.ServiceProvider.GetRequiredService<TrackerService>();
@@ -240,6 +242,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     TargetPrice = (int)(int.MaxValue > lp.TargetPrice ? lp.TargetPrice : int.MaxValue)
                 }));
                 consumeCounter.Inc(lps.Count());
+                if (lps.All(lp => lp.Auction.End < DateTime.UtcNow))
+                    return;
                 try
                 {
                     await Recheck(lps, scope, service);
