@@ -260,7 +260,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             using var activity = activitySource.StartActivity("IndexCassandra", ActivityKind.Server);
             try
             {
-                await CalculateAndIndex(sells, extraLog);
+                await CalculateAndIndex(sells.ToList(), extraLog);
                 return;
             }
             catch (System.Exception error)
@@ -288,7 +288,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             }
         }
 
-        private async Task CalculateAndIndex(IEnumerable<SaveAuction> sells, bool extraLog = false)
+        private async Task CalculateAndIndex(List<SaveAuction> sells, bool extraLog = false)
         {
             var sellLookup = sells.Where(s => s.FlatenedNBT.Where(n => n.Key == "uid").Any() && s.HighestBidAmount > 0)
                                 .GroupBy(s => new { uid = s.FlatenedNBT.Where(n => n.Key == "uid").First(), s.End }).Select(g => g.First())
@@ -358,7 +358,12 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 try
                 {
                     var sell = item.sell;
-                    var first = sells.First();
+                    var first = sells.FirstOrDefault();
+                    if (first == null)
+                    {
+                        logger.LogWarning("No sell found in {item}", JsonConvert.SerializeObject(item));
+                        return;
+                    }
                     if (!sells.All(s => s.AuctioneerId == first.AuctioneerId) && (await flipStorageService.GetFlips(Guid.Parse(sell.AuctioneerId), sell.End, sell.End)).Any())
                         return; // no refresh request and already stored, skip calculation
                     if (buy.AuctioneerId == null)
@@ -463,7 +468,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             var firstSend = sendEvents.Where(e => e.Type == FlipEventType.FLIP_RECEIVE).OrderBy(e => e.Timestamp).FirstOrDefault();
             var diff = boughtAt?.Timestamp - firstSend?.Timestamp;
             logger.LogInformation($"Flip {flip.PurchaseAuctionId:n} found for {flip.Profit} by us {sentToPurchaser} bought {boughtAt?.Timestamp} {sendEvents.Count} diff {diff}");
-            if (!sentToPurchaser && diff > TimeSpan.FromSeconds(-4) && diff < TimeSpan.FromSeconds(-3.5))
+            if (!sentToPurchaser && diff > TimeSpan.FromSeconds(-4) && diff < TimeSpan.FromSeconds(-3.2))
             {
                 // todo store
                 var all = await flipStorageService.GetFinderContexts(flip.PurchaseAuctionId);
