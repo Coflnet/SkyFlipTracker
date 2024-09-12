@@ -132,7 +132,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     }
                 }
                 return Task.CompletedTask;
-            }, stoppingToken, "sky-fliptracker", 8);
+            }, stoppingToken, "sky-fliptracker", 40, AutoOffsetReset.Latest);
         }
         private async Task SoldAuction(CancellationToken stoppingToken)
         {
