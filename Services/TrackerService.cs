@@ -727,7 +727,6 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 if (endIndex < 0)
                 {
                     Console.Write($"Could not find level in {buy.ItemName}");
-                    Task.Delay(1000).Wait();
                     return name;
                 }
                 var level = ParseFloat(buy.ItemName.Substring(start, endIndex));
