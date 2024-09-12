@@ -192,7 +192,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                         {
                             using var scope = scopeFactory.CreateScope();
                             var service = scope.ServiceProvider.GetRequiredService<TrackerService>();
-                            await service.IndexCassandra(flipEvents);
+                            await service.IndexCassandra(flipEvents.Where(e=>e.End > DateTime.UtcNow - TimeSpan.FromDays(5)));
                             return;
                         }
                         catch (Exception e)
