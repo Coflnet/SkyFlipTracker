@@ -257,6 +257,9 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
 
         public async Task IndexCassandra(IEnumerable<SaveAuction> sells, bool extraLog = false)
         {
+            var count = sells.Count();
+            if (count == 0)
+                return;
             using var activity = activitySource.StartActivity("IndexCassandra", ActivityKind.Server);
             try
             {
@@ -271,17 +274,17 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     {
                         await CalculateAndIndex([item], extraLog);
                     }
-                    logger.LogInformation($"saved sells {sells.Count()} one by one because dupplicate");
+                    logger.LogInformation($"saved sells {count} one by one because dupplicate");
                     return;
                 }
-                if (sells.Count() < 4)
-                    dev.Logger.Instance.Error(error, $"cassandra index failed batch size {sells.Count()}");
+                if (count < 4)
+                    dev.Logger.Instance.Error(error, $"cassandra index failed batch size {count}");
 
                 await Task.Delay(200);
-                if (sells.Count() > 1)
+                if (count > 1)
                 {
-                    await IndexCassandra(sells.Take(sells.Count() / 2));
-                    await IndexCassandra(sells.Skip(sells.Count() / 2));
+                    await IndexCassandra(sells.Take(count / 2));
+                    await IndexCassandra(sells.Skip(count / 2));
                 }
                 else
                     throw new CoflnetException("load error", "This sell caused error: " + JsonConvert.SerializeObject(sells.FirstOrDefault()));
