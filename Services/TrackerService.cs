@@ -36,6 +36,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
         private readonly ActivitySource activitySource;
         private readonly PlayerState.Client.Api.IItemsApi itemsApi;
         private readonly PlayerState.Client.Api.ITransactionApi transactionApi;
+        private readonly RepresentationConverter representationConverter;
         private const short Version = 1;
         private const int COIN_ID = 1_000_001;
         readonly Counter flipFoundCounter = Metrics.CreateCounter("sky_fliptracker_saved_finding", "How many found flips were saved");
@@ -56,7 +57,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             IScoresApi scoresApi,
             ISettingsApi settingsApi,
             PlayerState.Client.Api.IItemsApi itemsApi,
-            PlayerState.Client.Api.ITransactionApi transactionApi)
+            PlayerState.Client.Api.ITransactionApi transactionApi,
+            RepresentationConverter representationConverter)
         {
             this.db = db;
             this.logger = logger;
@@ -71,6 +73,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             this.settingsApi = settingsApi;
             this.itemsApi = itemsApi;
             this.transactionApi = transactionApi;
+            this.representationConverter = representationConverter;
         }
 
         public async Task<Flip> AddFlip(Flip flip)
@@ -255,7 +258,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             await IndexCassandra(auctions, true);
         }
 
-        public async Task IndexCassandra(IEnumerable<SaveAuction> sells, bool extraLog = false)
+        public virtual async Task IndexCassandra(IEnumerable<SaveAuction> sells, bool extraLog = false)
         {
             var count = sells.Count();
             if (count == 0)
@@ -681,7 +684,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             if (potentialItems.Count == 0)
                 throw new Exception($"No item in trade for {uuid}");
             var itemInfo = await itemsApi.ApiItemsIdGetAsync(long.Parse(uuid), 0);
-            var auction = FromItemRepresent(itemInfo);
+            var auction = representationConverter.FromItemRepresent(itemInfo);
             auction.HighestBidAmount = tradeEstimate;
             auction.End = itemTrade.First().TimeStamp;
             auction.Uuid = Guid.Empty.ToString("N");
@@ -693,25 +696,6 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
 
         }
 
-        public ApiSaveAuction FromItemRepresent(Coflnet.Sky.PlayerState.Client.Model.Item i)
-        {
-            var auction = new SaveAuction()
-            {
-                Count = i.Count ?? 0,
-                Tag = i.Tag,
-                ItemName = i.ItemName,
-            };
-            auction.Enchantments = i.Enchantments?.Select(e => new Enchantment()
-            {
-                Type = Enum.TryParse<Enchantment.EnchantmentType>(e.Key, out var type) ? type : Enchantment.EnchantmentType.unknown,
-                Level = (byte)(e.Value ?? 0)
-            }).ToList() ?? new();
-            auction.Tier = Enum.TryParse<Tier>(i.ExtraAttributes.FirstOrDefault(a => a.Key == "tier").Value?.ToString() ?? "", out var tier) ? tier : Tier.UNKNOWN;
-            auction.Reforge = Enum.TryParse<ItemReferences.Reforge>(i.ExtraAttributes.FirstOrDefault(a => a.Key == "modifier").Value?.ToString() ?? "", out var reforge) ? reforge : ItemReferences.Reforge.Unknown;
-            i.ExtraAttributes.Remove("modifier");
-            auction.SetFlattenedNbt(NBT.FlattenNbtData(NBT.FromDeserializedJson(i.ExtraAttributes)));
-            return JsonConvert.DeserializeObject<ApiSaveAuction>(JsonConvert.SerializeObject(auction));
-        }
 
         public static string GetDisplayName(ApiSaveAuction buy, SaveAuction sell)
         {
@@ -764,40 +748,14 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
 
         internal async Task AddTrades(IEnumerable<TradeModel> trades)
         {
-            foreach (var item in trades)
+            foreach (var trade in trades)
             {
-                var parser = new CoinParser();
-                logger.LogInformation("Got trade sell {item}", JsonConvert.SerializeObject(item));
-                if (item.Received.Any(r => !parser.IsCoins(r)) || item.Received.Count == 0 || item.Spent.Count != 1)
-                {
-                    logger.LogWarning("Aborting trade save as more than one item or no coins");
-                    continue;
-                }
-                logger.LogInformation("Storing trade :)");
-                try
-                {
-
-                    var coinAmount = parser.GetInventoryCoinSum(item.Received);
-                    var sentItem = item.Spent.First();
-                    if (sentItem.ExtraAttributes == null)
-                        continue; // no trackable item
-                    var auction = FromItemRepresent(JsonConvert.DeserializeObject<PlayerState.Client.Model.Item>(JsonConvert.SerializeObject(sentItem)));
-
-                    auction.HighestBidAmount = coinAmount;
-                    auction.End = item.TimeStamp;
-                    auction.AuctioneerId = item.MinecraftUuid.ToString("N");
-                    auction.Uuid = Guid.Empty.ToString("N");
-                    await IndexCassandra([auction], true);
-                    logger.LogInformation("Stored trade {auction}", JsonConvert.SerializeObject(auction));
-                }
-                catch (System.Exception e)
-                {
-                    logger.LogError(e, "failed to store trade sell");
-                    await Task.Delay(300_000);
-                    throw;
-                }
+                var auctions = await representationConverter.ConvertToDummyAuctions(trade);
+                await IndexCassandra(auctions);
             }
         }
+
+
     }
 
     public class FlipSumaryEvent
