@@ -54,7 +54,7 @@ public class RepresentationConverter
                 {
                     var percentageOfEstimation = (float)p.Median / estimationSum;
                     a.HighestBidAmount = (long)(coinAmount * percentageOfEstimation);
-                    logger.LogInformation("Adjusted price to {price} {coinAmount} {median} {estSum}", a.HighestBidAmount, coinAmount, p.Median, estimationSum);
+                    logger.LogInformation("Adjusted price to {price} {coinAmount} {median} {estSum} {key}", a.HighestBidAmount, coinAmount, p.Median, estimationSum, p.MedianKey);
                     return a;
                 }).ToList();
             }
