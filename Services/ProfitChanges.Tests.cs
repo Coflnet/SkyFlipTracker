@@ -845,17 +845,18 @@ public class ProfitChangeTests
         Assert.That(result[1].Amount, Is.EqualTo(-600_000_000));
     }
 
-    [Test]
-    public async Task EnchantmentUpgrade()
+    [TestCase(Core.Enchantment.EnchantmentType.ultimate_chimera, 3, 4, "ENCHANTMENT_ULTIMATE_CHIMERA_3")]
+    [TestCase(Core.Enchantment.EnchantmentType.ultimate_legion, 4, 5, "ENCHANTMENT_ULTIMATE_LEGION_4")]
+    public async Task EnchantmentUpgrade(Core.Enchantment.EnchantmentType type, byte start, byte end, string bazaarItem)
     {
         var buy = CreateAuction("HYPERION");
-        buy.Enchantments = new() { new() { Type = Core.Enchantment.EnchantmentType.ultimate_chimera, Level = 3 },
+        buy.Enchantments = new() { new() { Type = type, Level = start },
                 new() { Type = Core.Enchantment.EnchantmentType.fire_aspect, Level = 2 } };
         var sell = CreateAuction("HYPERION", highestBidAmount: 10_000_000);
-        sell.Enchantments = new() { new() { Type = Core.Enchantment.EnchantmentType.ultimate_chimera, Level = 4 },
+        sell.Enchantments = new() { new() { Type = type, Level = end },
                 new() { Type = Core.Enchantment.EnchantmentType.fire_aspect, Level = 3 } };
         bazaarApi.Setup(p => p.ApiBazaarPricesGetAsync(0, default))
-            .ReturnsAsync(() => new() { new("ENCHANTMENT_ULTIMATE_CHIMERA_3", 30_000_000, 20_000_000) });
+            .ReturnsAsync(() => new() { new(bazaarItem, 30_000_000, 20_000_000) });
 
         var changes = await service.GetChanges(buy, sell);
 

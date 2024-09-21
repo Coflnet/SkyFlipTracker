@@ -82,7 +82,7 @@ public class ProfitChangeService
         return list.GroupBy(l => l.Label).Select(g =>
         {
             var label = g.Key;
-            if(g.Count() > 1)
+            if (g.Count() > 1)
             {
                 label += $" (x{g.Count()})";
             }
@@ -650,7 +650,8 @@ public class ProfitChangeService
 
         static bool IsProbablyCombinable(Core.Enchantment item)
         {
-            return item.Level < 6 && (!Constants.VeryValuableEnchant.TryGetValue(item.Type, out var value) || value < item.Level);
+            return item.Level < 6 && (!Constants.VeryValuableEnchant.TryGetValue(item.Type, out var value)
+                || value < item.Level || item.Type.ToString().Contains("ultimate"));
         }
     }
 
@@ -710,42 +711,6 @@ public class ProfitChangeService
         if (itemMetadata == null)
             throw new Exception($"could not find item metadata for {tag}");
         return itemMetadata;
-    }
-
-    private async Task<PastFlip.ProfitChange> CostOf(string item, string title, long amount = 1)
-    {
-        if (item == "MOVE_JERRY")
-            return new PastFlip.ProfitChange()
-            {
-                Label = title,
-                Amount = -1
-            };
-        if (item == "SKYBLOCK_COIN")
-            return new PastFlip.ProfitChange()
-            {
-                Label = title,
-                Amount = -amount
-            };
-
-        var itemPrice = await pricesApi.ApiItemPriceItemTagGetAsync(item)
-                    ?? throw new Exception($"Failed to find price for {item}");
-        var median = itemPrice.Median;
-        if (itemPrice.Max == 0 && item.StartsWith("ENCHANTMENT"))
-        {
-            // get lvl 1 and scale up, sample ENCHANTMENT_ULTIMATE_CHIMERA_4
-            var lvl1Price = await pricesApi.ApiItemPriceItemTagGetAsync(item.Substring(0, item.LastIndexOf('_') + 1) + "1");
-            median = lvl1Price.Median * int.Parse(item.Substring(item.LastIndexOf('_') + 1));
-        }
-        else if (itemPrice.Median == 500_000_000)
-        {
-            var allCrafts = await craftsApi.CraftsAllGetAsync();
-            median = (long)(allCrafts.Where(c => c.ItemId == item).FirstOrDefault()?.CraftCost ?? 500_000_000);
-        }
-        return new PastFlip.ProfitChange()
-        {
-            Label = title,
-            Amount = -(long)median * amount
-        };
     }
 
     private async Task<PastFlip.ProfitChange> ValueOf(string item, string title, int amount = 1)
