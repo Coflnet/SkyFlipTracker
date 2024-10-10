@@ -376,7 +376,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                         logger.LogInformation($"trade check {item.buy.ItemTag}");
                     (FlipFlags flags, var change) = await CheckTrade(buy, sell);
                     var purchaseId = GetId(buy.Uuid);
-                    var flipFound = finders.Where(f => f != null && f.AuctionId == purchaseId).OrderByDescending(f => f.Timestamp).FirstOrDefault();
+                    var flipFound = finders.Where(f => f != null && f.AuctionId == purchaseId).OrderBy(f => f.Timestamp).FirstOrDefault();
                     flipSumaryEventProducer.Produce(new FlipSumaryEvent()
                     {
                         Flipper = item.sell.AuctioneerId,
