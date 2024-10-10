@@ -23,7 +23,8 @@ public class PriceProviderFactory : IPriceProviderFactory
     private readonly IAuctionsApi auctionsApi;
     private readonly Bazaar.Client.Api.IBazaarApi bazaarApi;
     private DateTime lastRefresh = DateTime.MinValue;
-    private Dictionary<string, double> prices = new ();
+    private Dictionary<string, double> prices = new();
+    private Dictionary<string, Queue<double>> priceHistory = new();
     private readonly ILogger<PriceProviderFactory> logger;
 
 
@@ -54,13 +55,21 @@ public class PriceProviderFactory : IPriceProviderFactory
         {
             try
             {
-                if (DateTime.Now.AddMinutes(-5) > lastRefresh)
+                if (DateTime.Now.AddMinutes(-10) > lastRefresh)
                 {
                     lastRefresh = DateTime.Now;
                     var priceList = await bazaarApi.ApiBazaarPricesGetAsync();
                     foreach (var item in priceList)
                     {
-                        this.prices[item.ProductId] = item.BuyPrice;
+                        if (!priceHistory.ContainsKey(item.ProductId))
+                        {
+                            priceHistory[item.ProductId] = new Queue<double>();
+                        }
+                        var history = priceHistory[item.ProductId];
+                        history.Enqueue(item.BuyPrice);
+                        if (history.Count > 30)
+                            history.Dequeue();
+                        prices[item.ProductId] = history.OrderBy(x => x).ElementAt(history.Count / 2);
                     }
                 }
             }
