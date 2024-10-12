@@ -436,6 +436,13 @@ public class ProfitChangeService
             var level2Cost = costOfLvl2?.Median ?? attributeShardCost?.Median ?? 2_000_000;
             if (level2Cost == 0)
                 level2Cost = 2_000_000;
+            if(buy.Tag != sell.Tag)
+            {
+                // check for other tag
+                var costOfLvl2Other = await pricesApi.ApiItemPriceItemTagGetAsync(buy.Tag, new() { { item.Key, basedOnLvl2.ToString() } });
+                if (costOfLvl2Other?.Median > 0)
+                    level2Cost = costOfLvl2Other.Median;
+            }
             var target = Math.Min((attributeShardCost?.Median == 0) ? 2_000_000 : attributeShardCost.Median, level2Cost);
             if (target == 0)
             {

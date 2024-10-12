@@ -758,15 +758,18 @@ public class ProfitChangeTests
         var sell = CreateAuction("VANQUISHED_GHAST_CLOAK");
         sell.FlatenedNBT["veteran"] = "7";
         sell.FlatenedNBT["mending"] = "7";
-        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("ATTRIBUTE_SHARD", new() { { "veteran", "2" } }, 0, default)).ReturnsAsync(() => new() { Median = 5000 });
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("ATTRIBUTE_SHARD", new() { { "veteran", "2" } }, 0, default)).ReturnsAsync(() => new() { Median = 500000 });
         // issue was caused by no sells for the item with the same attribute making median 0
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("VANQUISHED_GHAST_CLOAK", new() { { "veteran", "2" } }, 0, default)).ReturnsAsync(() => new() { Median = 0 });
-        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("ATTRIBUTE_SHARD", new() { { "mending", "2" } }, 0, default)).ReturnsAsync(() => new() { Median = 5000 });
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("GHAST_CLOAK", new() { { "veteran", "2" } }, 0, default)).ReturnsAsync(() => new() { Median = 200000 });
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("ATTRIBUTE_SHARD", new() { { "mending", "2" } }, 0, default)).ReturnsAsync(() => new() { Median = 500000 });
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("SILVER_FANG", null, 0, default)).ReturnsAsync(() => new() { Median = 200 });
         itemsApi.Setup(i => i.ItemItemTagGetAsync("VANQUISHED_GHAST_CLOAK", It.IsAny<bool?>(), It.IsAny<int>(), default))
             .ReturnsAsync(() => new() { Tag = "VANQUISHED_GHAST_CLOAK", Tier = Items.Client.Model.Tier.EPIC });
         var result = await service.GetChanges(buy, sell);
         Assert.That(result.Count, Is.EqualTo(4));
+        Assert.That(result[2].Amount, Is.EqualTo(-6300000), JsonConvert.SerializeObject(result, Formatting.Indented));
+        Assert.That(result[3].Amount, Is.EqualTo(-15750000), "no cheaper median on buy item type");
     }
     [Test]
     public async Task CombineHighLevelAttribut()
