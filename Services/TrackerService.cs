@@ -440,7 +440,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     {
                         logger.LogInformation($"Flip {flip.PurchaseAuctionId:n} not found for {flip.Profit}");
                     }
-                    if (flipFound != default && changes.Count <= 1 && profit > 2_000_000 && buy.End > DateTime.UtcNow - TimeSpan.FromDays(1))
+                    if (flipFound != default && changes.Count <= 1 && profit > 1_000_000 && buy.End > DateTime.UtcNow - TimeSpan.FromDays(1))
                     {
                         await LogFoundFlips(buy, flip);
                     }
