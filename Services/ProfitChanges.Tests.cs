@@ -747,6 +747,28 @@ public class ProfitChangeTests
         Assert.That(result[1].Amount, Is.EqualTo(-35000));
     }
     [Test]
+    public async Task AddAttributesToCraftFlip()
+    {
+        craftsApi.Setup(c => c.CraftsAllGetAsync(0, default)).ReturnsAsync(() => new() {
+                new() { ItemId = "VANQUISHED_GHAST_CLOAK", Ingredients = new() { new() { ItemId = "GHAST_CLOAK", Count = 1 }, new(){ItemId="SILVER_FANG", Count=256} } }
+            });
+        var buy = CreateAuction("GHAST_CLOAK");
+        buy.FlatenedNBT["veteran"] = "1";
+        buy.FlatenedNBT["mending"] = "1";
+        var sell = CreateAuction("VANQUISHED_GHAST_CLOAK");
+        sell.FlatenedNBT["veteran"] = "7";
+        sell.FlatenedNBT["mending"] = "7";
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("ATTRIBUTE_SHARD", new() { { "veteran", "2" } }, 0, default)).ReturnsAsync(() => new() { Median = 5000 });
+        // issue was caused by no sells for the item with the same attribute making median 0
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("VANQUISHED_GHAST_CLOAK", new() { { "veteran", "2" } }, 0, default)).ReturnsAsync(() => new() { Median = 0 });
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("ATTRIBUTE_SHARD", new() { { "mending", "2" } }, 0, default)).ReturnsAsync(() => new() { Median = 5000 });
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("SILVER_FANG", null, 0, default)).ReturnsAsync(() => new() { Median = 200 });
+        itemsApi.Setup(i => i.ItemItemTagGetAsync("VANQUISHED_GHAST_CLOAK", It.IsAny<bool?>(), It.IsAny<int>(), default))
+            .ReturnsAsync(() => new() { Tag = "VANQUISHED_GHAST_CLOAK", Tier = Items.Client.Model.Tier.EPIC });
+        var result = await service.GetChanges(buy, sell);
+        Assert.That(result.Count, Is.EqualTo(4));
+    }
+    [Test]
     public async Task CombineHighLevelAttribut()
     {
         var buy = CreateAuction("AURORA_CHESTPLATE");

@@ -433,8 +433,10 @@ public class ProfitChangeService
             var basedOnLvl2 = 2;
             var attributeShardCost = await pricesApi.ApiItemPriceItemTagGetAsync("ATTRIBUTE_SHARD", new() { { item.Key, basedOnLvl2.ToString() } });
             var costOfLvl2 = await pricesApi.ApiItemPriceItemTagGetAsync(sell.Tag, new() { { item.Key, basedOnLvl2.ToString() } });
-            var target = Math.Min((attributeShardCost?.Median == 0) ? 2_000_000 : attributeShardCost.Median,
-                                costOfLvl2?.Median ?? attributeShardCost?.Median ?? 2_000_000);
+            var level2Cost = costOfLvl2?.Median ?? attributeShardCost?.Median ?? 2_000_000;
+            if (level2Cost == 0)
+                level2Cost = 2_000_000;
+            var target = Math.Min((attributeShardCost?.Median == 0) ? 2_000_000 : attributeShardCost.Median, level2Cost);
             if (target == 0)
             {
                 logger.LogInformation($"could not find attribute cost for {item.Key} lvl {basedOnLvl2} on {sell.Tag}");
