@@ -345,7 +345,7 @@ public class ProfitChangeTests
 
         var changes = await service.GetChanges(buy, sell);
         Assert.That(changes[3].Label, Is.EqualTo("PERFECT JASPER gem removed (x2)"));
-        Assert.That(changes[3].Amount, Is.EqualTo(((value * 98 / 100) - 500_000)*2), "gem removal cost is 500k");
+        Assert.That(changes[3].Amount, Is.EqualTo(((value * 98 / 100) - 500_000) * 2), "gem removal cost is 500k");
         Assert.That(changes[1].Label, Is.EqualTo("PERFECT RUBY gem added"));
         Assert.That(changes[1].Amount, Is.EqualTo(-value2));
         Assert.That(changes.Count, Is.EqualTo(4));
@@ -414,8 +414,8 @@ public class ProfitChangeTests
                 .ReturnsAsync(() => new() { Median = 1_180_000 });
         var changes = await service.GetChanges(buy, sell);
         Assert.That(changes.Count, Is.EqualTo(3));
-        Assert.That(changes[2].Amount, Is.EqualTo(-80_000*10));
-        Assert.That(changes[1].Amount, Is.EqualTo(-1_180_000*5));
+        Assert.That(changes[2].Amount, Is.EqualTo(-80_000 * 10));
+        Assert.That(changes[1].Amount, Is.EqualTo(-1_180_000 * 5));
     }
     [Test]
     public async Task RuneAdded()
@@ -1267,6 +1267,60 @@ public class ProfitChangeTests
         var changes = await service.GetChanges(buy, sell);
         Assert.That(changes.Count, Is.EqualTo(2), JsonConvert.SerializeObject(changes, Formatting.Indented));
         Assert.That(changes.Sum(c => c.Amount), Is.EqualTo(-398413));
+    }
+    [Test]
+    public async Task KeepExp()
+    {
+        /*
+        "flatNbt": {
+    "type": "SKELETON",
+    "active": "False",
+    "exp": "5231125.526989745",
+    "tier": "LEGENDARY",
+    "hideInfo": "False",
+    "heldItem": "DWARF_TURTLE_SHELMET",
+    "candyUsed": "0",
+    "uniqueId": "effdd5de-d6ae-45aa-94b2-6d950b9d097f",
+    "hideRightClick": "False",
+    "noMove": "False",
+    "uid": "c5229265c806",
+    "uuid": "dae5b255-b0ae-4814-8301-c5229265c806"
+  }
+  */
+        var buy = new Core.SaveAuction()
+        {
+            Uuid = Guid.NewGuid().ToString("N"),
+            Tag = "PET_SKELETON",
+            HighestBidAmount = 5_000_000,
+            FlatenedNBT = new(){
+                        {"exp", "5231125.526989745"},
+                        {"heldItem", "DWARF_TURTLE_SHELMET"},
+                        {"candyUsed", "0"},
+                        {"uniqueId", "effdd5de-d6ae-45aa-94b2-6d950b9d097f"},
+                        {"uid", "c5229265c806"},
+                        {"uuid", "dae5b255-b0ae-4814-8301-c5229265c806"} },
+            Enchantments = new(),
+            ItemName = "[Lvl 78] Skeleton",
+            Tier = Core.Tier.EPIC
+        };
+        var sell = new Core.SaveAuction()
+        {
+            Uuid = Guid.NewGuid().ToString("N"),
+            Tag = "PET_SKELETON",
+            HighestBidAmount = 10_000_000,
+            FlatenedNBT = new() {
+                        {"exp", "5231125.526989745"},
+                        {"heldItem", "DWARF_TURTLE_SHELMET"},
+                        {"candyUsed", "0"},
+                    },
+            Enchantments = new(),
+            ItemName = "[Lvl 78] Skeleton",
+            Tier = Core.Tier.EPIC
+        };
+        SetupPetLevelService();
+        var changes = await service.GetChanges(buy, sell);
+        Assert.That(changes.Count, Is.EqualTo(1), JsonConvert.SerializeObject(changes, Formatting.Indented));
+        Assert.That(changes.Sum(c => c.Amount), Is.EqualTo(-201200));
     }
     [Test]
     public async Task SubzeroWispUpgradeWithHypergolicGabagool()

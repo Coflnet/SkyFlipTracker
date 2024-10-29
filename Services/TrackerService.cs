@@ -474,7 +474,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             var firstSend = sendEvents.Where(e => e.Type == FlipEventType.FLIP_RECEIVE).OrderBy(e => e.Timestamp).FirstOrDefault();
             var diff = boughtAt?.Timestamp - firstSend?.Timestamp;
             logger.LogInformation($"Flip {flip.PurchaseAuctionId:n} found for {flip.Profit} by us {sentToPurchaser} bought {boughtAt?.Timestamp} {sendEvents.Count} diff {diff}");
-            if (!sentToPurchaser && diff > TimeSpan.FromSeconds(-4) && diff < TimeSpan.FromSeconds(-3.2))
+            if (!sentToPurchaser && diff > TimeSpan.FromSeconds(-4) && (diff < TimeSpan.FromSeconds(-3.2) || flip.Profit > 50_000_000 && diff < TimeSpan.FromSeconds(-0.1)))
             {
                 // todo store
                 var all = await flipStorageService.GetFinderContexts(flip.PurchaseAuctionId);
