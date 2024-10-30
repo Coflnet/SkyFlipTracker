@@ -606,10 +606,17 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     if (sell == null && buyResp.FlatenedNBT.Count > 0)
                         continue;
                     sell = item.First();
-                    var profit = sell.HighestBidAmount - buyResp.HighestBidAmount;
+                    var buyPrice = buyResp.HighestBidAmount;
                     var tax = profitChangeService.GetAhTax(sell.HighestBidAmount, sell.StartingBid);
-                    profit += tax.Amount;
                     var changes = new List<PastFlip.ProfitChange>() { tax };
+                    if(sell.Count < buyResp.Count)
+                    {
+                        buyPrice = buyPrice * sell.Count / buyResp.Count;
+                        var reduction = buyResp.HighestBidAmount - buyPrice;
+                        changes.Add(new PastFlip.ProfitChange($"Stacked item sold partially", -reduction));
+                    }
+                    var profit = sell.HighestBidAmount - buyPrice;
+                    profit += tax.Amount;
                     if (previousAuction != null)
                     {
                         profit -= previousAuction.HighestBid;
