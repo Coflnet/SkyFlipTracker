@@ -824,6 +824,20 @@ public class ProfitChangeTests
         Assert.That(result.Count, Is.EqualTo(2));
         Assert.That(result[1].Amount, Is.EqualTo(-2000000));
     }
+    [Test]
+    public async Task HigherlevelAttributeCheaper()
+    {
+        var buy = CreateAuction("AURORA_CHESTPLATE");
+        buy.FlatenedNBT["mana_pool"] = "5";
+        var sell = CreateAuction("AURORA_CHESTPLATE");
+        sell.FlatenedNBT["mana_pool"] = "6";
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("AURORA_CHESTPLATE", new() { { "mana_pool", "2" } }, 0, default)).ReturnsAsync(() => new() { Median = 22_000_000 });
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("AURORA_CHESTPLATE", new() { { "mana_pool", "5" } }, 0, default)).ReturnsAsync(() => new() { Median = 14_000_000 });
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("ATTRIBUTE_SHARD", new() { { "mana_pool", "2" } }, 0, default)).ReturnsAsync(() => new() { Median = 5_000_000 });
+        var result = await service.GetChanges(buy, sell);
+        Assert.That(result.Count, Is.EqualTo(2));
+        Assert.That(result[1].Amount, Is.EqualTo(-14000000));
+    }
 
     [Test]
     public async Task Enchantments()

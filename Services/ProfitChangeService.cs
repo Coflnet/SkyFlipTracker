@@ -450,14 +450,23 @@ public class ProfitChangeService
                 yield break;
             }
             var sellValue = Math.Pow(2, sellLevel - basedOnLvl2) * target;
+            var buyValue = Math.Pow(2, baseLevel - basedOnLvl2) * target;
             if (sellLevel > 5)
             {
                 // check for higher level
                 var costOfLvl5 = await pricesApi.ApiItemPriceItemTagGetAsync(sell.Tag, new() { { item.Key, "5" } });
                 var needed = Math.Pow(2, sellLevel - 5);
                 sellValue = Math.Min(needed * (costOfLvl5?.Median ?? int.MaxValue), sellValue);
+                if(buyValue > sellValue)
+                {
+                    // check for buyprice based on level 5 as well
+                    var costOfLvl5Other = await pricesApi.ApiItemPriceItemTagGetAsync(buy.Tag, new() { { item.Key, "5" } });
+                    var buyNeeded = Math.Pow(2, baseLevel - 5); 
+                    if (costOfLvl5Other?.Median > 0)
+                        buyValue = Math.Min(buyNeeded * costOfLvl5Other.Median, sellValue);
+                }
+
             }
-            var buyValue = Math.Pow(2, baseLevel - basedOnLvl2) * target;
 
             yield return new PastFlip.ProfitChange()
             {
