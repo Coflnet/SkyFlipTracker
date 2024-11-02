@@ -788,7 +788,7 @@ public class ProfitChangeTests
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("AURORA_CHESTPLATE", new() { { "mana_pool", "5" } }, 0, default)).ReturnsAsync(() => new() { Median = 10_000_000 });
         var result = await service.GetChanges(buy, sell);
         Assert.That(result.Count, Is.EqualTo(3));
-        Assert.That(result[1].Amount, Is.EqualTo(-312000000));
+        Assert.That(result[1].Amount, Is.EqualTo(-315000000));
         Assert.That(result[2].Amount, Is.EqualTo(-56000000));
     }
     [Test]
@@ -824,11 +824,12 @@ public class ProfitChangeTests
         Assert.That(result.Count, Is.EqualTo(2));
         Assert.That(result[1].Amount, Is.EqualTo(-2000000));
     }
-    [Test]
-    public async Task HigherlevelAttributeCheaper()
+    [TestCase("5", -14000000)]
+    [TestCase("4", -21000000)]
+    public async Task HigherlevelAttributeCheaper(string startLevel, int target)
     {
         var buy = CreateAuction("AURORA_CHESTPLATE");
-        buy.FlatenedNBT["mana_pool"] = "5";
+        buy.FlatenedNBT["mana_pool"] = startLevel;
         var sell = CreateAuction("AURORA_CHESTPLATE");
         sell.FlatenedNBT["mana_pool"] = "6";
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("AURORA_CHESTPLATE", new() { { "mana_pool", "2" } }, 0, default)).ReturnsAsync(() => new() { Median = 22_000_000 });
@@ -836,7 +837,7 @@ public class ProfitChangeTests
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("ATTRIBUTE_SHARD", new() { { "mana_pool", "2" } }, 0, default)).ReturnsAsync(() => new() { Median = 5_000_000 });
         var result = await service.GetChanges(buy, sell);
         Assert.That(result.Count, Is.EqualTo(2));
-        Assert.That(result[1].Amount, Is.EqualTo(-14000000));
+        Assert.That(result[1].Amount, Is.EqualTo(target));
     }
 
     [Test]

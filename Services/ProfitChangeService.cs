@@ -436,7 +436,7 @@ public class ProfitChangeService
             var level2Cost = costOfLvl2?.Median ?? attributeShardCost?.Median ?? 2_000_000;
             if (level2Cost == 0)
                 level2Cost = 2_000_000;
-            if(buy.Tag != sell.Tag)
+            if (buy.Tag != sell.Tag)
             {
                 // check for other tag
                 var costOfLvl2Other = await pricesApi.ApiItemPriceItemTagGetAsync(buy.Tag, new() { { item.Key, basedOnLvl2.ToString() } });
@@ -457,15 +457,18 @@ public class ProfitChangeService
                 var costOfLvl5 = await pricesApi.ApiItemPriceItemTagGetAsync(sell.Tag, new() { { item.Key, "5" } });
                 var needed = Math.Pow(2, sellLevel - 5);
                 sellValue = Math.Min(needed * (costOfLvl5?.Median ?? int.MaxValue), sellValue);
-                if(buyValue > sellValue)
+                var costOfLvl5Other = await pricesApi.ApiItemPriceItemTagGetAsync(buy.Tag, new() { { item.Key, "5" } });
+                if (baseLevel < 5 && costOfLvl5Other?.Median > 0)
+                {
+                    buyValue = Math.Min(buyValue, costOfLvl5Other.Median / 2);
+                }
+                if (buyValue > sellValue)
                 {
                     // check for buyprice based on level 5 as well
-                    var costOfLvl5Other = await pricesApi.ApiItemPriceItemTagGetAsync(buy.Tag, new() { { item.Key, "5" } });
-                    var buyNeeded = Math.Pow(2, baseLevel - 5); 
+                    var buyNeeded = Math.Pow(2, baseLevel - 5);
                     if (costOfLvl5Other?.Median > 0)
                         buyValue = Math.Min(buyNeeded * costOfLvl5Other.Median, sellValue);
                 }
-
             }
 
             yield return new PastFlip.ProfitChange()
