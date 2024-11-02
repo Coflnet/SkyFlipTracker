@@ -824,17 +824,17 @@ public class ProfitChangeTests
         Assert.That(result.Count, Is.EqualTo(2));
         Assert.That(result[1].Amount, Is.EqualTo(-2000000));
     }
-    [TestCase("5", -14000000)]
-    [TestCase("4", -21000000)]
-    public async Task HigherlevelAttributeCheaper(string startLevel, int target)
+    [TestCase("5", 22_000_000, 14_000_000, -14000000, 5_000_000)]
+    [TestCase("4", 43_000_000, 40_000_000, -24000000, 2_000_000)]
+    public async Task HigherlevelAttributeCheaper(string startLevel, int lvl2Price, int lvl5Price, int target, int shardPrice)
     {
         var buy = CreateAuction("AURORA_CHESTPLATE");
         buy.FlatenedNBT["mana_pool"] = startLevel;
         var sell = CreateAuction("AURORA_CHESTPLATE");
         sell.FlatenedNBT["mana_pool"] = "6";
-        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("AURORA_CHESTPLATE", new() { { "mana_pool", "2" } }, 0, default)).ReturnsAsync(() => new() { Median = 22_000_000 });
-        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("AURORA_CHESTPLATE", new() { { "mana_pool", "5" } }, 0, default)).ReturnsAsync(() => new() { Median = 14_000_000 });
-        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("ATTRIBUTE_SHARD", new() { { "mana_pool", "2" } }, 0, default)).ReturnsAsync(() => new() { Median = 5_000_000 });
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("AURORA_CHESTPLATE", new() { { "mana_pool", "2" } }, 0, default)).ReturnsAsync(() => new() { Median = lvl2Price });
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("AURORA_CHESTPLATE", new() { { "mana_pool", "5" } }, 0, default)).ReturnsAsync(() => new() { Median = lvl5Price });
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("ATTRIBUTE_SHARD", new() { { "mana_pool", "2" } }, 0, default)).ReturnsAsync(() => new() { Median = shardPrice });
         var result = await service.GetChanges(buy, sell);
         Assert.That(result.Count, Is.EqualTo(2));
         Assert.That(result[1].Amount, Is.EqualTo(target));
