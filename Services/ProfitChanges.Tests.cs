@@ -825,7 +825,7 @@ public class ProfitChangeTests
         Assert.That(result[1].Amount, Is.EqualTo(-2000000));
     }
     [TestCase("5", 22_000_000, 14_000_000, -14000000, 5_000_000)]
-    [TestCase("4", 43_000_000, 40_000_000, -24000000, 2_000_000)]
+    [TestCase("4", 63_000_000, 0, -24000000, 2_000_000)]
     public async Task HigherlevelAttributeCheaper(string startLevel, int lvl2Price, int lvl5Price, int target, int shardPrice)
     {
         var buy = CreateAuction("AURORA_CHESTPLATE");

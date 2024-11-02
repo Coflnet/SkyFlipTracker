@@ -456,7 +456,8 @@ public class ProfitChangeService
                 // check for higher level
                 var costOfLvl5 = await pricesApi.ApiItemPriceItemTagGetAsync(sell.Tag, new() { { item.Key, "5" } });
                 var needed = Math.Pow(2, sellLevel - 5);
-                sellValue = Math.Min(needed * (costOfLvl5?.Median ?? int.MaxValue), sellValue);
+                if (costOfLvl5?.Median > 0)
+                    sellValue = Math.Min(needed * (costOfLvl5?.Median ?? int.MaxValue), sellValue);
                 var costOfLvl5Other = await pricesApi.ApiItemPriceItemTagGetAsync(buy.Tag, new() { { item.Key, "5" } });
                 if (baseLevel < 5 && costOfLvl5Other?.Median > 0)
                 {
