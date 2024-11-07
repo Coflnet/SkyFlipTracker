@@ -81,7 +81,7 @@ public class RepresentationConverter
         auction.Enchantments = i.Enchantments?.Select(e => new Enchantment()
         {
             Type = Enum.TryParse<Enchantment.EnchantmentType>(e.Key, out var type) ? type : Enchantment.EnchantmentType.unknown,
-            Level = (byte)(e.Value ?? 0)
+            Level = (byte)e.Value
         }).ToList() ?? new();
         auction.Tier = Enum.TryParse<Tier>(i.ExtraAttributes.FirstOrDefault(a => a.Key == "tier").Value?.ToString() ?? "", out var tier) ? tier : Tier.UNKNOWN;
         auction.Reforge = Enum.TryParse<ItemReferences.Reforge>(i.ExtraAttributes.FirstOrDefault(a => a.Key == "modifier").Value?.ToString() ?? "", out var reforge) ? reforge : ItemReferences.Reforge.Unknown;

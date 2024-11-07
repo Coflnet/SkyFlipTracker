@@ -203,7 +203,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 if (timeToBuy > TimeSpan.FromSeconds(10))
                     continue;
                 var playerUuid = item.Bids.First().Bidder;
-                var disabled = await settingsApi.SettingsUserIdSettingKeyGetAsync(playerUuid, "disable-buy-speed-board");
+                var disabled = await settingsApi.SettingsGetSettingAsync(playerUuid, "disable-buy-speed-board");
                 if (disabled != null)
                 {
                     logger.LogInformation($"user {playerUuid} disabled buy speed board");
