@@ -869,20 +869,24 @@ public class ProfitChangeTests
         Assert.That(changes.Sum(c => c.Amount), Is.EqualTo(-2_201_200));
     }
 
-    [Test]
-    public async Task NoVolumeEnchantFallbackToLvl1()
+    [TestCase(2, -1879080000)]
+    [TestCase(4, -1010040000)]
+    public async Task NoVolumeEnchantFallbackToLvl1(byte startLevel, long loss)
     {
         var buy = CreateAuction("HYPERION");
-        buy.Enchantments = new() { new() { Type = Core.Enchantment.EnchantmentType.ultimate_chimera, Level = 2 } };
+        buy.Enchantments = new() { new() { Type = Core.Enchantment.EnchantmentType.ultimate_chimera, Level = startLevel } };
         var sell = CreateAuction("HYPERION");
-        sell.Enchantments = new() { new() { Type = Core.Enchantment.EnchantmentType.ultimate_chimera, Level = 4 } };
+        sell.Enchantments = new() { new() { Type = Core.Enchantment.EnchantmentType.ultimate_chimera, Level = 5 } };
         bazaarApi.Setup(p => p.ApiBazaarPricesGetAsync(0, default)).ReturnsAsync(() => new() {
-                new("ENCHANTMENT_ULTIMATE_CHIMERA_1", 105900000, 100_000_000),
-                new("ENCHANTMENT_ULTIMATE_CHIMERA_4", 0, 33),
+                new("ENCHANTMENT_ULTIMATE_CHIMERA_1", 130_000_000, 132900000),
+                new("ENCHANTMENT_ULTIMATE_CHIMERA_2", 0, 141_000_000),
+                new("ENCHANTMENT_ULTIMATE_CHIMERA_3", 0, 44_000_000),
+                new("ENCHANTMENT_ULTIMATE_CHIMERA_4", 0, 190_000_000),
+                new("ENCHANTMENT_ULTIMATE_CHIMERA_5", 0, 330_000_000),
                 });
         var result = await service.GetChanges(buy, sell);
         Assert.That(result.Count, Is.EqualTo(2));
-        Assert.That(result[1].Amount, Is.EqualTo(-600_000_000));
+        Assert.That(result[1].Amount, Is.EqualTo(loss));
     }
 
     [TestCase(Core.Enchantment.EnchantmentType.ultimate_chimera, 3, 4, "ENCHANTMENT_ULTIMATE_CHIMERA_3")]

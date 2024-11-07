@@ -622,7 +622,7 @@ public class ProfitChangeService
         {
             var allBazaar = await bazaarApi.ApiBazaarPricesGetAsync();
             var itemValues = allBazaar.GroupBy(a => a.ProductId).ToDictionary(b => b.Key, b => b.Max(x => x.SellPrice));
-            var sellValue = mapper.EnchantValue(item, sell.FlatenedNBT, itemValues);
+            var sellValue = GetCostForEnchant(item, sell, itemValues, item); //mapper.EnchantValue(item, sell.FlatenedNBT, itemValues);
             var buyValue = 0L;
             var enchantAtBuy = buy.Enchantments.Where(e => e.Type == item.Type).FirstOrDefault();
             if (enchantAtBuy != default && (enchantAtBuy.Level != item.Level - 1 //&& item.Level < 7
@@ -643,8 +643,8 @@ public class ProfitChangeService
                     Type = item.Type,
                     Level = (byte)(item.Level - 1)
                 };
-                var change = mapper.EnchantValue(enchantDummy, buy.FlatenedNBT, itemValues);
-                if (change == -1)
+                long change = GetCostForEnchant(item, buy, itemValues, enchantDummy);
+                if(change == -1)
                     return null; // no price available, ignore
                 return new PastFlip.ProfitChange()
                 {
@@ -675,6 +675,23 @@ public class ProfitChangeService
             return item.Level < 6 && (!Constants.VeryValuableEnchant.TryGetValue(item.Type, out var value)
                 || value < item.Level || item.Type.ToString().Contains("ultimate"));
         }
+    }
+
+    private long GetCostForEnchant(Core.Enchantment item, Core.SaveAuction buy, Dictionary<string, double> itemValues, Core.Enchantment enchantDummy)
+    {
+        var lvl1Dummy = new Core.Enchantment()
+        {
+            Type = item.Type,
+            Level = 1
+        };
+        var lvl1Worth = mapper.EnchantValue(lvl1Dummy, buy.FlatenedNBT, itemValues);
+        var change = mapper.EnchantValue(enchantDummy, buy.FlatenedNBT, itemValues);
+        if (change == -1)
+            return -1; // no price available, ignore
+        if (Constants.EnchantToAttribute.ContainsKey(item.Type))
+            return change;
+        var scaled = lvl1Worth * Math.Pow(2, enchantDummy.Level - 1);
+        return Math.Max(change, (long)(scaled * 0.95 ));
     }
 
     private static Crafts.Client.Model.ProfitableCraft AddCraftPathIngredients(string tagOnPurchase, List<Crafts.Client.Model.ProfitableCraft> allCrafts, List<Crafts.Client.Model.Ingredient> allIngredients, int depth = 0)
