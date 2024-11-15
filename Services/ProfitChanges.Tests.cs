@@ -551,8 +551,8 @@ public class ProfitChangeTests
         var sell = new Core.SaveAuction()
         {
             Uuid = Guid.NewGuid().ToString("N"),
-            Tag = "MASTER_SKULL_TIER_6",
-            HighestBidAmount = 10_000_000,
+            Tag = "MASTER_SKULL_TIER_7",
+            HighestBidAmount = 40_000_000,
             FlatenedNBT = new(),
             Tier = Core.Tier.EPIC
         };
@@ -560,13 +560,16 @@ public class ProfitChangeTests
             .ReturnsAsync(() => new() { Median = 5_000_000 });
         craftsApi.Setup(p => p.CraftsAllGetAsync(0, default)).ReturnsAsync(() => new() {
                 new() { ItemId = "MASTER_SKULL_TIER_6", Ingredients = new() { new() { ItemId = "MASTER_SKULL_TIER_5", Count = 4 } } },
-                new() { ItemId = "MASTER_SKULL_TIER_5", Ingredients = new() { new() { ItemId = "MASTER_SKULL_TIER_4", Count = 4 } } }
+                new() { ItemId = "MASTER_SKULL_TIER_5", Ingredients = new() { new() { ItemId = "MASTER_SKULL_TIER_4", Count = 4 } } },
+                new() { ItemId = "MASTER_SKULL_TIER_7", Ingredients = new() { new() { ItemId = "MASTER_SKULL_TIER_6", Count = 4 } } }
             });
-        itemsApi.Setup(i => i.ItemItemTagGetAsync("MASTER_SKULL_TIER_6", It.IsAny<bool?>(), It.IsAny<int>(), default))
-            .ReturnsAsync(() => new() { Tag = "MASTER_SKULL_TIER_6", Tier = Items.Client.Model.Tier.EPIC });
+        itemsApi.Setup(i => i.ItemItemTagGetAsync("MASTER_SKULL_TIER_7", It.IsAny<bool?>(), It.IsAny<int>(), default))
+            .ReturnsAsync(() => new() { Tag = "MASTER_SKULL_TIER_7", Tier = Items.Client.Model.Tier.EPIC });
         var changes = await service.GetChanges(buy, sell);
-        Assert.That(changes.Count, Is.EqualTo(3), JsonConvert.SerializeObject(changes, Formatting.Indented));
+        Assert.That(changes.Count, Is.EqualTo(4), JsonConvert.SerializeObject(changes, Formatting.Indented));
         Assert.That(changes.Any(c => c.Label == "crafting material MASTER_SKULL_TIER_4 x3"), JsonConvert.SerializeObject(changes, Formatting.Indented));
+        Assert.That(changes.Any(c => c.Label == "crafting material MASTER_SKULL_TIER_5 x3"), JsonConvert.SerializeObject(changes, Formatting.Indented));
+        Assert.That(changes.Any(c => c.Label == "crafting material MASTER_SKULL_TIER_6 x3"), JsonConvert.SerializeObject(changes, Formatting.Indented));
     }
 
     [Test]

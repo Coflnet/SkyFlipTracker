@@ -644,7 +644,7 @@ public class ProfitChangeService
                     Level = (byte)(item.Level - 1)
                 };
                 long change = GetCostForEnchant(item, buy, itemValues, enchantDummy);
-                if(change == -1)
+                if (change == -1)
                     return null; // no price available, ignore
                 return new PastFlip.ProfitChange()
                 {
@@ -691,7 +691,7 @@ public class ProfitChangeService
         if (Constants.EnchantToAttribute.ContainsKey(item.Type))
             return change;
         var scaled = lvl1Worth * Math.Pow(2, enchantDummy.Level - 1);
-        return Math.Max(change, (long)(scaled * 0.95 ));
+        return Math.Max(change, (long)(scaled * 0.95));
     }
 
     private static Crafts.Client.Model.ProfitableCraft AddCraftPathIngredients(string tagOnPurchase, List<Crafts.Client.Model.ProfitableCraft> allCrafts, List<Crafts.Client.Model.Ingredient> allIngredients, int depth = 0)
@@ -716,8 +716,11 @@ public class ProfitChangeService
             var foundSubCraft = AddCraftPathIngredients(tagOnPurchase, allCrafts, subCraft.Ingredients, depth + 1);
             if (foundSubCraft != null)
             {
-                allIngredients.AddRange(subCraft.Ingredients.Where(i => i.ItemId != foundSubCraft.ItemId && i.ItemId != subCraft.ItemId));
+                allIngredients.AddRange(subCraft.Ingredients.Where(i => i.ItemId != subCraft.ItemId));
                 RemoveItem(allIngredients, item);
+                var subCaftToRemove = foundSubCraft.Ingredients.Where(i => i.ItemId == foundSubCraft.ItemId).FirstOrDefault();
+                if (subCaftToRemove != null)
+                    RemoveItem(allIngredients, subCaftToRemove);
                 return subCraft;
             }
         }
