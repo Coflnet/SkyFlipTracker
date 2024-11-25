@@ -52,7 +52,7 @@ public class FlipStorageService
             {
                 session.ChangeKeyspace(config["CASSANDRA:KEYSPACE"]);
             }
-            throw e;
+            throw;
         }
     }
 

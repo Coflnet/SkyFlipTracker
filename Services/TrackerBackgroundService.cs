@@ -116,10 +116,12 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
 
         private async Task NewAuctions(CancellationToken stoppingToken)
         {
-            await KafkaConsumer.ConsumeBatch<SaveAuction>(config, config["TOPICS:NEW_AUCTION"], toUpdate =>
+            await KafkaConsumer.ConsumeBatch<SaveAuction>(config, config["TOPICS:NEW_AUCTION"], async toUpdate =>
             {
                 foreach (var item in toUpdate)
                 {
+                    if (item.StartingBid > 100_000_000 && item.Start > DateTime.UtcNow - TimeSpan.FromMinutes(1))
+                        CheckLister(item); // expensive items may be underlisted
                     if (!item.Coop.Any(c => AnalyseController.BadPlayersList.Contains(c)))
                     {
                         continue;
@@ -131,9 +133,35 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                         AnalyseController.BadPlayersList.Add(uuid);
                     }
                 }
-                return Task.CompletedTask;
             }, stoppingToken, "sky-fliptracker", 40, AutoOffsetReset.Latest);
         }
+
+        private void CheckLister(SaveAuction item)
+        {
+            Task.Run(async () =>
+            {
+                using var scope = scopeFactory.CreateScope();
+                var rerequestService = scope.ServiceProvider.GetRequiredService<IBaseApi>();
+                for (int i = 0; i < 5; i++)
+                {
+                    if (i == 2)
+                    {
+                        await Task.Delay(20000);
+                        continue; // normal update
+                    }
+                    try
+                    {
+                        await rerequestService.BaseAhPlayerIdPostAsync(item.AuctioneerId, "checkLister");
+                    }
+                    catch (Exception e)
+                    {
+                        logger.LogError(e, "could not rerequest player auctions");
+                    }
+                    await Task.Delay(20_000);
+                }
+            });
+        }
+
         private async Task SoldAuction(CancellationToken stoppingToken)
         {
 
@@ -192,7 +220,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                         {
                             using var scope = scopeFactory.CreateScope();
                             var service = scope.ServiceProvider.GetRequiredService<TrackerService>();
-                            await service.IndexCassandra(flipEvents.Where(e=>e.End > DateTime.UtcNow - TimeSpan.FromDays(5)));
+                            await service.IndexCassandra(flipEvents.Where(e => e.End > DateTime.UtcNow - TimeSpan.FromDays(5)));
                             return;
                         }
                         catch (Exception e)
