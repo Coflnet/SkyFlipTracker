@@ -209,7 +209,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     logger.LogInformation($"user {playerUuid} disabled buy speed board");
                     continue;
                 }
-                var leaderboardSlug = "sky-buyspeed-" + DateTime.UtcNow.ToString("yyyy-MM-dd");
+                var leaderboardSlug = $"sky-buyspeed-{DateTime.UtcNow.RoundDown(TimeSpan.FromDays(7)):yyyy-MM-dd}";
                 await scoresApi.ScoresLeaderboardSlugPostAsync(leaderboardSlug, new Leaderboard.Client.Model.ScoreCreate()
                 {
                     UserId = playerUuid,
