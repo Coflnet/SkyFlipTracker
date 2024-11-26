@@ -323,6 +323,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                             try
                             {
                                 await rerequestService.BaseAhPlayerIdPostAsync(item.Auction.AuctioneerId, "recheck");
+                                await Task.Delay(40_000);
+                                await rerequestService.BaseAhPlayerIdPostAsync(item.Auction.AuctioneerId, "recheck40");
                             }
                             catch (Exception)
                             {

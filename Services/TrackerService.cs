@@ -214,8 +214,13 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 {
                     UserId = playerUuid,
                     Score = (long)(timeToBuy.TotalSeconds * -1000),
-                    HighScore = true
+                    HighScore = true,
+                    DaysToKeep = 20
                 });
+                if(timeToBuy < TimeSpan.FromSeconds(5))
+                {
+                    logger.LogInformation($"user {playerUuid} bought {item.Tag} in {timeToBuy.TotalSeconds} seconds posted toboard {leaderboardSlug}");
+                }
             }
         }
 
