@@ -142,6 +142,9 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             {
                 using var scope = scopeFactory.CreateScope();
                 var rerequestService = scope.ServiceProvider.GetRequiredService<IBaseApi>();
+                var purchaseAble = item.Start + TimeSpan.FromSeconds(19) - DateTime.UtcNow;
+                if (purchaseAble > TimeSpan.FromSeconds(1))
+                    await Task.Delay(purchaseAble);
                 for (int i = 0; i < 5; i++)
                 {
                     if (i == 2)
@@ -151,7 +154,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     }
                     try
                     {
-                        await rerequestService.BaseAhPlayerIdPostAsync(item.AuctioneerId, "checkLister");
+                        await rerequestService.BaseAhPlayerIdPostAsync(item.AuctioneerId, "checkLister" + i);
                     }
                     catch (Exception e)
                     {
