@@ -282,7 +282,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
 
             int escrowedUserCount = await GetEscrowedUserCount(maxAge, maxTime, numeric, relevantFlips);
             double avg = 0;
-            var macroedFlips = timeDif.Where(t => t.TotalSeconds > 3.62 && t.TotalSeconds < 4).ToList();
+            var macroedFlips = timeDif.Where(t => t.TotalSeconds > 3.64 && t.TotalSeconds < 4).ToList();
             var macroedTimeDif = await GetMacroedFlipsLongTerm(shadowTiming, maxTime, numeric, macroedFlips);
             double antiMacro = GetShortTermAntiMacroDelay(maxAge, timeDif, macroedFlips.Where(t => t.age < maxAge * shortMacroMultiplier).ToList());
 
@@ -378,7 +378,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
 
         private static double GetShortTermAntiMacroDelay(TimeSpan maxAge, IEnumerable<(double TotalSeconds, TimeSpan age)> timeDif, List<(double TotalSeconds, TimeSpan age)> macroedFlips)
         {
-            var antiMacro = GetSpeedPenalty(maxAge * shortMacroMultiplier, timeDif.Where(t => t.TotalSeconds > 3.47 && t.TotalSeconds < 4 && t.age < maxAge * shortMacroMultiplier), 0.2);
+            var antiMacro = GetSpeedPenalty(maxAge * shortMacroMultiplier, timeDif.Where(t => t.TotalSeconds > 3.57 && t.TotalSeconds < 4 && t.age < maxAge * shortMacroMultiplier), 0.2);
             antiMacro += GetSpeedPenalty(maxAge * shortMacroMultiplier, macroedFlips, 0.2);
             return antiMacro;
         }
@@ -390,7 +390,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             {
                 var longTermFlips = await GetRelevantFlips(maxTime, maxTime - shadowTiming, numeric);
                 var longTermTimeDif = await GetTimings(maxTime, numeric, longTermFlips);
-                macroedTimeDif = longTermTimeDif.Where(t => t.TotalSeconds > 3.51 && t.TotalSeconds < 4).Select(f => new MacroedFlip() { TotalSeconds = f.TotalSeconds, BuyTime = DateTime.Now - f.age });
+                macroedTimeDif = longTermTimeDif.Where(t => t.TotalSeconds > 3.65 && t.TotalSeconds < 4).Select(f => new MacroedFlip() { TotalSeconds = f.TotalSeconds, BuyTime = DateTime.Now - f.age });
             }
 
             return macroedTimeDif;
