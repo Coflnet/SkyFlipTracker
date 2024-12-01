@@ -204,9 +204,9 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     continue;
                 var playerUuid = item.Bids.First().Bidder;
                 var disabled = await settingsApi.SettingsGetSettingAsync(playerUuid, "disable-buy-speed-board");
-                if (disabled != null)
+                if (!string.IsNullOrEmpty(disabled))
                 {
-                    logger.LogInformation($"user {playerUuid} disabled buy speed board");
+                    logger.LogInformation($"user {playerUuid} disabled buy speed board: {disabled}");
                     continue;
                 }
                 var leaderboardSlug = $"sky-buyspeed-{DateTime.UtcNow.RoundDown(TimeSpan.FromDays(7)):yyyy-MM-dd}";
