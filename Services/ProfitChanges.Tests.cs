@@ -1188,28 +1188,8 @@ public class ProfitChangeTests
     [Test]
     public async Task AddedMasterStars()
     {
-        var buy = new Core.SaveAuction()
-        {
-            Uuid = Guid.NewGuid().ToString("N"),
-            Tag = "HYPERION",
-            HighestBidAmount = 879_000_000,
-            FlatenedNBT = new(){
-                    {"upgrade_level", "1"}},
-            Enchantments = new(),
-            Tier = Core.Tier.EPIC
-        };
-        var sell = new Core.SaveAuction()
-        {
-            Uuid = Guid.NewGuid().ToString("N"),
-            Tag = "HYPERION",
-            HighestBidAmount = 979_000_000,
-            FlatenedNBT = new() {
-                    {"upgrade_level", "9"},
-                    {"art_of_war_count", "1"}
-                },
-            Enchantments = new(),
-            Tier = Core.Tier.LEGENDARY
-        };
+        var tag = "HYPERION";
+        (var buy, var sell)  = SetupStarsFlip(tag);
         Mock<IPricesApi> pricesApi = SetupItemPrice(10_000_000);
         var changes = await service.GetChanges(buy, sell);
         Assert.That(changes.Count, Is.EqualTo(7), JsonConvert.SerializeObject(changes, Formatting.Indented));
@@ -1224,6 +1204,49 @@ public class ProfitChangeTests
         Assert.That(changes[1].Label, Is.EqualTo("WITHER essence x3200 to add 4 stars"));
         Assert.That(changes[4].Label, Is.EqualTo("Used SECOND_MASTER_STAR to upgraded upgrade_level to 9"));
 
+    }
+    [Test]
+    public async Task AddedMasterStarsCrimson()
+    {
+        (var buy, var sell)  = SetupStarsFlip("TERROR_HELMET");
+        Mock<IPricesApi> pricesApi = SetupItemPrice(2_000_000);
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("ESSENCE_CRIMSON", null, 0, default)).ReturnsAsync(() => new() { Median = 2200 });
+        var changes = await service.GetChanges(buy, sell);
+        Assert.That(changes.Count, Is.EqualTo(5), JsonConvert.SerializeObject(changes, Formatting.Indented));
+        Assert.That(changes.Sum(c => c.Amount), Is.EqualTo(-47223200));
+        pricesApi.Verify(p => p.ApiItemPriceItemTagGetAsync("FOURTH_MASTER_STAR", null, 0, default), Times.Never);
+        pricesApi.Verify(p => p.ApiItemPriceItemTagGetAsync("THE_ART_OF_WAR", null, 0, default), Times.Once);
+        pricesApi.Verify(p => p.ApiItemPriceItemTagGetAsync("ESSENCE_CRIMSON", null, 0, default), Times.Exactly(1));
+
+        Assert.That(changes[1].Label, Is.EqualTo("CRIMSON essence x435 to add 8 stars"));
+        Assert.That(changes[3].Label, Is.EqualTo("HEAVY_PEARLx3 for star"));
+    }
+
+    private static (Core.SaveAuction buy, Core.SaveAuction sell) SetupStarsFlip(string tag)
+    {
+        var buy = new Core.SaveAuction()
+        {
+            Uuid = Guid.NewGuid().ToString("N"),
+            Tag = tag,
+            HighestBidAmount = 879_000_000,
+            FlatenedNBT = new(){
+                    {"upgrade_level", "1"}},
+            Enchantments = new(),
+            Tier = Core.Tier.EPIC
+        };
+        var sell = new Core.SaveAuction()
+        {
+            Uuid = Guid.NewGuid().ToString("N"),
+            Tag = tag,
+            HighestBidAmount = 979_000_000,
+            FlatenedNBT = new() {
+                    {"upgrade_level", "9"},
+                    {"art_of_war_count", "1"}
+                },
+            Enchantments = new(),
+            Tier = Core.Tier.LEGENDARY
+        };
+        return (buy, sell);
     }
 
     [Test]

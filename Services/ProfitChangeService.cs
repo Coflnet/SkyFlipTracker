@@ -495,7 +495,7 @@ public class ProfitChangeService
             }
         }
         // missing nbt
-        if (!mapper.TryGetIngredients(item.Key, item.Value, valueOnBuy.Value, out var items))
+        if (!mapper.TryGetIngredients(sell.Tag, item.Key, item.Value, valueOnBuy.Value, out var items))
             yield break;
 
         foreach (var ingredient in items.GroupBy(i => i).Select(g => (g.Key, count: g.Count())))
