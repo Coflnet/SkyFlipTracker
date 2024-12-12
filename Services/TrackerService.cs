@@ -593,7 +593,9 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             await Parallel.ForEachAsync(noUidCheck, async (item, token) =>
             {
                 var logMore = item.First().Tag == "PINK_DONUT_PERSONALITY";
-                var query = new Dictionary<string, string>() { { "tag", item.Key.Tag } };
+                var query = new Dictionary<string, string>() { 
+                    { "tag", item.Key.Tag },
+                    { "EndAfter", (DateTime.UtcNow - TimeSpan.FromDays(14)).ToUnix().ToString() } };
                 var purchases = await playerApi.ApiPlayerPlayerUuidBidsGetAsync(item.Key.AuctioneerId, 0, query);
                 if (logMore)
                     logger.LogInformation($"Found {purchases.Count} purchases for {item.Key.AuctioneerId} {item.Key.Tag}");
