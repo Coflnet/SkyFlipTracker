@@ -229,7 +229,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
         [HttpGet]
         [Route("/flips/{PlayerId}/{uid}")]
         [ResponseCache(Duration = 60, Location = ResponseCacheLocation.Any, VaryByQueryKeys = new[] { "from", "to" })]
-        public async Task<PastFlip> GetFlipsOfPlayer(Guid PlayerId, long uid)
+        public async Task<PastFlip> GetFlipsOfPlayerByUid(Guid PlayerId, long uid)
         {
             return await flipStorageService.GetFlip(PlayerId, uid);
         }
@@ -244,14 +244,14 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
 
         [HttpPost]
         [Route("/flips/complicated")]
-        public async Task SaveFlips(ComplicatedFlip flip)
+        public async Task SaveComplicatedFlip(ComplicatedFlip flip)
         {
             await flipStorageService.StoreComplicated(flip);
         }
 
         [HttpGet]
         [Route("/flips/complicated/{tag}")]
-        public async Task<IEnumerable<ComplicatedFlip>> GetFlips(string tag)
+        public async Task<IEnumerable<ComplicatedFlip>> GetComplicatedFlips(string tag)
         {
             return await flipStorageService.GetComplicatedFlips(tag);
         }

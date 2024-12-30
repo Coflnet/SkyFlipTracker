@@ -1,8 +1,8 @@
-VERSION=0.11.3
+VERSION=0.14.0
 PACKAGE_NAME=Coflnet.Sky.FlipTracker.Client
 
 docker run --rm -v "${PWD}:/local" --network host -u $(id -u ${USER}):$(id -g ${USER})  openapitools/openapi-generator-cli generate \
--i http://localhost:5017/swagger/v1/swagger.json \
+-i http://localhost:5017/api/openapi/v1/openapi.json \
 -g csharp \
 -o /local/out --additional-properties=packageName=$PACKAGE_NAME,packageVersion=$VERSION,licenseId=MIT,targetFramework=net6.0
 
