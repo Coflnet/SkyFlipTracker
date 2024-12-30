@@ -44,14 +44,6 @@ namespace Coflnet.Sky.SkyAuctionTracker
         {
             services.AddControllers().AddJsonOptions(options =>
                     options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
-            services.AddSwaggerGen(c =>
-            {
-                c.SwaggerDoc("v1", new OpenApiInfo { Title = "SkyTracker", Version = "v1" });
-                // Set the comments path for the Swagger JSON and UI.
-                var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
-                var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
-                c.IncludeXmlComments(xmlPath);
-            });
 
             // Replace with your server version and type.
             // Use 'MariaDbServerVersion' for MariaDB.
@@ -109,22 +101,13 @@ namespace Coflnet.Sky.SkyAuctionTracker
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
         {
-            app.UseExceptionHandler(errorApp =>
-            {
-                ErrorHandler.Add(errorApp, "tracker");
-            });
+            app.UseCoflnetCore();
             if (env.IsDevelopment())
             {
                 app.UseDeveloperExceptionPage();
             }
             app.UseResponseCompression();
             app.UseResponseCaching();
-            app.UseSwagger();
-            app.UseSwaggerUI(c =>
-            {
-                c.SwaggerEndpoint("/swagger/v1/swagger.json", "SkyTracker v1");
-                c.RoutePrefix = "api";
-            });
 
             app.UseRouting();
 

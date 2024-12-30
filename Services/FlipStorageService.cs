@@ -25,6 +25,7 @@ public class FlipStorageService
     private IConfiguration config;
     private Table<OutspedFlip> outspedTable;
     private Table<FinderContext> finderContexts;
+    private Table<ComplicatedFlip> complicatedFlips;
     private ISession session;
     public FlipStorageService(ILogger<FlipStorageService> logger, IConfiguration config, ISession session)
     {
@@ -188,5 +189,28 @@ public class FlipStorageService
         session.Execute("CREATE TABLE IF NOT EXISTS outsped_flips (item_tag text, key text, triggered_by uuid, time timestamp, PRIMARY KEY (item_tag, key))"
          + " WITH default_time_to_live = 2592000 AND compaction = { 'class' : 'TimeWindowCompactionStrategy', 'compaction_window_size' : 1, 'compaction_window_unit' : 'DAYS' }");
 
+        complicatedFlips = new Table<ComplicatedFlip>(session, new MappingConfiguration().Define(new Map<ComplicatedFlip>()
+            .PartitionKey(c => c.ItemTag)
+            .ClusteringKey(c => c.AuctionId)
+            .Column(c=>c.AttributeValues, cm=>cm.AsFrozen().WithName("attribute_values"))
+            .Column(c=>c.AuctionId, cm=>cm.WithDbType<Guid>().WithName("auction_id"))
+            .Column(c=>c.ItemTag, cm=>cm.WithName("item_tag"))
+            .Column(c=>c.EndedAt, cm=>cm.WithDbType<DateTime>().WithName("ended_at"))
+            ), "complicated_flips");
+        // set ttl to 30 days and time window compaction
+        session.Execute("CREATE TABLE IF NOT EXISTS complicated_flips (item_tag text, auction_id uuid, attribute_values map<text, bigint>, ended_at timestamp, PRIMARY KEY (item_tag, auction_id))"
+         + " WITH default_time_to_live = 2592000 AND compaction = { 'class' : 'TimeWindowCompactionStrategy', 'compaction_window_size' : 1, 'compaction_window_unit' : 'DAYS' }");
+    }
+
+    public async Task StoreComplicated(ComplicatedFlip flip)
+    {
+        var insert = complicatedFlips.Insert(flip);
+        insert.SetTTL(2592000); // 30 days
+        await insert.ExecuteAsync();
+    }
+
+    public async Task<IEnumerable<ComplicatedFlip>> GetComplicatedFlips(string itemTag)
+    {
+        return await complicatedFlips.Where(f => f.ItemTag == itemTag).ExecuteAsync();
     }
 }

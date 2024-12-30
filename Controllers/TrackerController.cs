@@ -2,11 +2,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Coflnet.Sky.SkyAuctionTracker.Models;
-using System;
-using System.Linq;
 using Microsoft.EntityFrameworkCore;
-using System.Collections;
-using System.Collections.Generic;
 using Coflnet.Sky.SkyAuctionTracker.Services;
 
 namespace Coflnet.Sky.SkyAuctionTracker.Controllers
@@ -244,6 +240,20 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
         public async Task<IEnumerable<OutspedFlip>> GetExemptFlips()
         {
             return await flipStorageService.GetOutspedFlips();
+        }
+
+        [HttpPost]
+        [Route("/flips/complicated")]
+        public async Task SaveFlips(ComplicatedFlip flip)
+        {
+            await flipStorageService.StoreComplicated(flip);
+        }
+
+        [HttpGet]
+        [Route("/flips/complicated/{tag}")]
+        public async Task<IEnumerable<ComplicatedFlip>> GetFlips(string tag)
+        {
+            return await flipStorageService.GetComplicatedFlips(tag);
         }
 
         private long GetId(string uuid)
