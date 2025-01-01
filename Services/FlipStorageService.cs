@@ -201,15 +201,6 @@ public class FlipStorageService
         // set ttl to 30 days and time window compaction
         session.Execute("CREATE TABLE IF NOT EXISTS complicated_flips (item_tag text, auction_id uuid, attribute_values map<text, bigint>, ended_at timestamp, sold_for bigint, PRIMARY KEY (item_tag, auction_id))"
          + " WITH default_time_to_live = 2592000 AND compaction = { 'class' : 'TimeWindowCompactionStrategy', 'compaction_window_size' : 1, 'compaction_window_unit' : 'DAYS' }");
-        try
-        {
-            // alter table to add sold_for
-            session.Execute("ALTER TABLE complicated_flips ADD sold_for bigint");
-        }
-        catch (AlreadyExistsException)
-        {
-            // ignore
-        }
     }
 
     public async Task StoreComplicated(ComplicatedFlip flip)
