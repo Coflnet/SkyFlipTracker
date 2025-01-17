@@ -297,8 +297,11 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             var recentFlipCount = timeDif.Where(t => t.age < TimeSpan.FromHours(10)).Count();
             if (recentFlipCount < 5)
                 penaltiy /= (5 - recentFlipCount);
+            var purchaseCountSummary = CalculatePurchaseCountSummary(timeDif, flipVal, flipworth);
+            if (purchaseCountSummary > 0 && penaltiy < 0.8)
+                penaltiy += Math.Min(purchaseCountSummary, 1.5);
 
-            if(timeDif.All(t=>t.age > TimeSpan.FromHours(1)) && flipworth < 50_000_000 && penaltiy < 0.05)
+            if (timeDif.All(t => t.age > TimeSpan.FromHours(1)) && flipworth < 80_000_000 && penaltiy < 0.05)
                 penaltiy = 0;
 
             return new SpeedCompResult()
@@ -317,6 +320,18 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
                 TopBuySpeed = timeDif.Any() ? timeDif.Max(d => d.TotalSeconds) : 0,
                 AntiMacro = antiMacro
             };
+        }
+
+        private static double CalculatePurchaseCountSummary(IEnumerable<(double TotalSeconds, TimeSpan age)> timeDif, AuctionEstimateTupple[] flipVal, long flipworth)
+        {
+            var averageValue = flipworth / flipVal.Count();
+            var rate = averageValue / 20_000_000d;
+            Console.WriteLine("Rate: " + rate);
+            var inLastHour = timeDif.Where(t => t.age < TimeSpan.FromHours(1)).Count();
+            Console.WriteLine("In last hour: " + inLastHour);
+            var countSum = Math.Min(inLastHour * 0.05 * rate, 1.1);
+            var purchaseCountSummary = (0.5 - timeDif.Min(t => t.age).TotalHours) * countSum;
+            return purchaseCountSummary;
         }
 
         private async Task<AuctionEstimateTupple[]> GetBoughtFlipsWorth(TimeSpan maxAge, DateTime maxTime, List<FlipEvent> relevantFlips)
