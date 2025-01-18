@@ -230,17 +230,17 @@ public class ProfitChangeTests
             Uuid = Guid.NewGuid().ToString("N"),
             Tag = "PET_DROPLET_WISP",
             HighestBidAmount = 1000,
-            FlatenedNBT = new(),
-            Tier = Core.Tier.RARE
+            FlatenedNBT  = new() { { "exp", "1" } },
+            Tier = Core.Tier.UNCOMMON
         };
         // {"enchantments":[],"uuid":"0d328f25303f49e189805d9507a73ced","count":1,"startingBid":200000000,"tag":"PET_FROST_WISP","itemName":"[Lvl 100] Frost Wisp","start":"2023-07-28T10:53:18","end":"2023-07-28T10:53:54","auctioneerId":"e93dc3450d1f428a9acd60ee768ad750","profileId":null,"coop":null,"coopMembers":null,"highestBidAmount":200000000,"bids":[{"bidder":"75eaf1d0664f49e69d1b61857b864393","profileId":"5fa85f9232b3405f93780fa5e7a0bf31","amount":200000000,"timestamp":"2023-07-28T10:53:58"}],"anvilUses":0,"nbtData":{"data":{"petInfo":"{\"type\":\"FROST_WISP\",\"active\":false,\"exp\":1.2773376E7,\"tier\":\"RARE\",\"hideInfo\":false,\"heldItem\":\"CROCHET_TIGER_PLUSHIE\",\"candyUsed\":0,\"uuid\":\"94b9855c-72d6-4cc0-b046-345863b9ee51\",\"hideRightClick\":false,\"extraData\":{\"blaze_kills\":205712.0}}","uid":"345863b9ee51"}},"itemCreatedAt":"2023-07-27T22:45:00","reforge":"None","category":"MISC","tier":"RARE","bin":true,"flatNbt":{"type":"FROST_WISP","active":"False","exp":"12773376","tier":"RARE","hideInfo":"False","heldItem":"CROCHET_TIGER_PLUSHIE","candyUsed":"0","uuid":"94b9855c-72d6-4cc0-b046-345863b9ee51","hideRightClick":"False","uid":"345863b9ee51","blaze_kills":"205712"}}
         var sell = new Core.SaveAuction()
         {
             Uuid = Guid.NewGuid().ToString("N"),
-            Tag = "PET_FROST_WISP",
+            Tag = "PET_SUBSERO_WISP",
             HighestBidAmount = 1000,
-            FlatenedNBT = new(),
-            Tier = Core.Tier.EPIC
+            FlatenedNBT = new() { { "exp", "2" } },
+            Tier = Core.Tier.LEGENDARY
         };
         katApi.Setup(k => k.KatAllGetAsync(0, default)).ReturnsAsync(KatResponse("PET_ENDER_DRAGON"));
         katApi.Setup(k => k.KatRawGetAsync(0, default)).ReturnsAsync(new List<Crafts.Client.Model.KatUpgradeCost>()
@@ -256,13 +256,16 @@ public class ProfitChangeTests
             }
         });
         craftsApi.Setup(c => c.CraftsAllGetAsync(0, default)).ReturnsAsync(() => new() {
-            new() { ItemId = "UPGRADE_STONE_FROST", CraftCost = 500_000}});
+            new() { ItemId = "UPGRADE_STONE_GLACIAL", CraftCost = 100_000_000},
+            new() { ItemId = "UPGRADE_STONE_FROST", CraftCost = 11_500_000},
+            new() { ItemId = "UPGRADE_STONE_SUBZERO", CraftCost = 270_000_000}});
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), null, 0, default))
-                .ReturnsAsync(() => new() { Median = 1_000_000 });
+                .ReturnsAsync(() => new() { Median = 6_000_000 });
         var changes = await service.GetChanges(buy, sell);
-        Assert.That(changes.Count, Is.EqualTo(2));
-        Assert.That(changes[1].Amount, Is.EqualTo(-500_000));
+        Assert.That(changes.Count, Is.EqualTo(5));
+        Assert.That(changes[1].Amount, Is.EqualTo(-11500000));
         Assert.That(changes[1].Label, Is.EqualTo("Wisp upgrade stone for FROST"));
+        Assert.That(changes[4].Label, Is.EqualTo("Exp cost for 9247386 exp"));
     }
 
     [Test]
@@ -1189,7 +1192,7 @@ public class ProfitChangeTests
     public async Task AddedMasterStars()
     {
         var tag = "HYPERION";
-        (var buy, var sell)  = SetupStarsFlip(tag);
+        (var buy, var sell) = SetupStarsFlip(tag);
         Mock<IPricesApi> pricesApi = SetupItemPrice(10_000_000);
         var changes = await service.GetChanges(buy, sell);
         Assert.That(changes.Count, Is.EqualTo(7), JsonConvert.SerializeObject(changes, Formatting.Indented));
@@ -1208,7 +1211,7 @@ public class ProfitChangeTests
     [Test]
     public async Task AddedMasterStarsCrimson()
     {
-        (var buy, var sell)  = SetupStarsFlip("TERROR_HELMET");
+        (var buy, var sell) = SetupStarsFlip("TERROR_HELMET");
         Mock<IPricesApi> pricesApi = SetupItemPrice(2_000_000);
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("ESSENCE_CRIMSON", null, 0, default)).ReturnsAsync(() => new() { Median = 2200 });
         var changes = await service.GetChanges(buy, sell);

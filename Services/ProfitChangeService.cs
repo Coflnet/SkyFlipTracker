@@ -391,19 +391,25 @@ public class ProfitChangeService
             var level1Cost = await pricesApi.ApiItemPriceItemTagGetAsync(sell.Tag, new() { { "PetLevel", "1" }, { "Rarity", "LEGENDARY" } });
             var level100Cost = await pricesApi.ApiItemPriceItemTagGetAsync(sell.Tag,
                     new() { { "PetLevel", endLevel }, { "Rarity", "LEGENDARY" }, { "PetItem", "NOT_TIER_BOOST" } }) ?? new();
-            var perExpCost = (float)(level100Cost.Median - level1Cost.Median) / maxExpForPet;
-            if (sell.Tag == "PET_SUBZERO_WISP")
+            var perExpCost = (float)((level100Cost?.Median ?? 10) - (level1Cost?.Median ?? 0)) / maxExpForPet;
+            var currentExp = ParseFloat(item.Value);
+            float addedExp = Math.Min(currentExp, maxExpForPet) - ParseFloat(valueOnBuy.Value ?? "0");
+            if (sell.Tag.EndsWith("_WISP"))
             {
                 // can get exp with hypergolic gabagool
                 var gabagoolCost = await pricesApi.ApiItemPriceItemTagGetAsync("HYPERGOLIC_GABAGOOL");
                 perExpCost = Math.Min(perExpCost, gabagoolCost.Median / 3276800);
+                if (buy.Tier < Core.Tier.RARE && sell.Tier >= Core.Tier.RARE)
+                    addedExp += 2055220; // exp to get uncommon to lvl 80 and upgrade
+                if (buy.Tier < Core.Tier.EPIC && sell.Tier >= Core.Tier.EPIC)
+                    addedExp += 2957665; // exp to get rare to lvl 80 and upgrade
+                if (buy.Tier < Core.Tier.LEGENDARY && sell.Tier >= Core.Tier.LEGENDARY)
+                    addedExp += 4234500; // exp to get epic to lvl 80 and upgrade
             }
-            var currentExp = ParseFloat(item.Value);
-            float addedExp = Math.Min(currentExp, maxExpForPet) - ParseFloat(valueOnBuy.Value ?? "0");
             if (addedExp > 0)
                 yield return new PastFlip.ProfitChange()
                 {
-                    Label = $"Exp cost for {item.Value} exp",
+                    Label = $"Exp cost for {addedExp} exp",
                     Amount = -(long)(perExpCost * addedExp)
                 };
         }
@@ -570,7 +576,15 @@ public class ProfitChangeService
                 if (sell.Tag.EndsWith("_WISP"))
                 {
                     var allCrafts = await craftsApi.CraftsAllGetAsync();
-                    var kind = sell.Tag.Split('_')[1];
+                    Console.WriteLine($"wisp upgrade stone for {i}({(Core.Tier)rarityInt}) {sell.Tag}");
+                    var kind = (Core.Tier)i switch
+                    {
+                        Core.Tier.UNCOMMON => "FROST",
+                        Core.Tier.RARE => "GLACIAL",
+                        Core.Tier.EPIC => "SUBZERO",
+                        _ => throw new Exception($"could not find wisp upgrade stone for {i}({(Core.Tier)rarityInt}) {sell.Tag}")
+                    };
+                    // craft cost is used because subZero can't be/isn't traded
                     var craft = allCrafts.Where(c => c.ItemId == $"UPGRADE_STONE_{kind}").FirstOrDefault();
                     if (craft == null)
                         throw new Exception($"could not find craft for wisp UPGRADE_STONE_{kind}");
@@ -579,7 +593,7 @@ public class ProfitChangeService
                         Label = $"Wisp upgrade stone for {kind}",
                         Amount = (long)-craft.CraftCost
                     };
-                    break;
+                    continue;
                 }
                 if (raw == null)
                     throw new Exception($"could not find kat cost for tier {i}({(Core.Tier)rarityInt}) and tag {sell.Tag} {buy.Uuid} -> {sell.Uuid}");
