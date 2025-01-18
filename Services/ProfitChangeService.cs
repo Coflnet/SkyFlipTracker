@@ -378,6 +378,8 @@ public class ProfitChangeService
                 if (cost.Type == "ITEM")
                     yield return await priceProvider.CostOf(cost.ItemId, $"{cost.ItemId}x{cost.Amount} for star", cost.Amount);
             }
+            if (!hypixelItemService.IsDungeonItemSync(sell.Tag))
+                yield break;
         }
         if (item.Key == "exp")
         {

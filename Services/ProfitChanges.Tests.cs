@@ -1206,7 +1206,6 @@ public class ProfitChangeTests
 
         Assert.That(changes[1].Label, Is.EqualTo("WITHER essence x3200 to add 4 stars"));
         Assert.That(changes[4].Label, Is.EqualTo("Used SECOND_MASTER_STAR to upgraded upgrade_level to 9"));
-
     }
     [Test]
     public async Task AddedMasterStarsCrimson()
@@ -1223,6 +1222,22 @@ public class ProfitChangeTests
 
         Assert.That(changes[1].Label, Is.EqualTo("CRIMSON essence x435 to add 8 stars"));
         Assert.That(changes[3].Label, Is.EqualTo("HEAVY_PEARLx3 for star"));
+    }
+    [Test]
+    public async Task AddedMasterStarsHellFireRod()
+    {
+        (var buy, var sell) = SetupStarsFlip("HELLFIRE_ROD");
+        Mock<IPricesApi> pricesApi = SetupItemPrice(2_000_000);
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("ESSENCE_CRIMSON", null, 0, default)).ReturnsAsync(() => new() { Median = 2200 });
+        var changes = await service.GetChanges(buy, sell);
+        Assert.That(changes.Count, Is.EqualTo(21), JsonConvert.SerializeObject(changes, Formatting.Indented));
+        Assert.That(changes.Sum(c => c.Amount), Is.EqualTo(-1417834200));
+        pricesApi.Verify(p => p.ApiItemPriceItemTagGetAsync("FOURTH_MASTER_STAR", null, 0, default), Times.Never);
+        pricesApi.Verify(p => p.ApiItemPriceItemTagGetAsync("THE_ART_OF_WAR", null, 0, default), Times.Once);
+        pricesApi.Verify(p => p.ApiItemPriceItemTagGetAsync("ESSENCE_CRIMSON", null, 0, default), Times.Exactly(1));
+
+        Assert.That(changes[1].Label, Is.EqualTo("CRIMSON essence x3440 to add 8 stars"));
+        Assert.That(changes[3].Label, Is.EqualTo("MAGMA_FISH_SILVERx2 for star"));
     }
 
     private static (Core.SaveAuction buy, Core.SaveAuction sell) SetupStarsFlip(string tag)
