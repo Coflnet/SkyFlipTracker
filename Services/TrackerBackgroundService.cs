@@ -120,7 +120,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             {
                 foreach (var item in toUpdate)
                 {
-                    if (item.StartingBid > 100_000_000 && item.Start > DateTime.UtcNow - TimeSpan.FromMinutes(1))
+                    if (item.StartingBid > 80_000_000 && item.Start > DateTime.UtcNow - TimeSpan.FromMinutes(1))
                         CheckLister(item); // expensive items may be underlisted
                     if (!item.Coop.Any(c => AnalyseController.BadPlayersList.Contains(c)))
                     {
@@ -149,11 +149,12 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 {
                     if (i == 2)
                     {
-                        await Task.Delay(20000);
+                        await Task.Delay(10000);
                         continue; // normal update
                     }
                     try
                     {
+                        logger.LogInformation("requesting ah update for {auctioneedr} because of {uuid}", item.AuctioneerId, item.Uuid);
                         await rerequestService.BaseAhPlayerIdPostAsync(item.AuctioneerId, "checkLister" + i);
                     }
                     catch (Exception e)
