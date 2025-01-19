@@ -327,14 +327,12 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             if (flipVal.Count() == 0)
                 return 0;
             var averageValue = flipworth / flipVal.Count();
-            var rate = averageValue / 20_000_000d;
-            Console.WriteLine("Rate: " + rate);
+            var rate = averageValue / 22_000_000d;
             var inLastHour = timeDif.Where(t => t.age < TimeSpan.FromHours(1)).Count();
             if (inLastHour == 0)
                 return 0;
-            Console.WriteLine("In last hour: " + inLastHour);
             var countSum = Math.Min(inLastHour * 0.05 * rate, 1.1);
-            var purchaseCountSummary = (0.5 - timeDif.Min(t => t.age).TotalHours) * countSum;
+            var purchaseCountSummary = (0.6 - timeDif.Min(t => t.age).TotalHours) * countSum;
             return purchaseCountSummary;
         }
 
