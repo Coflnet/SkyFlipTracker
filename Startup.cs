@@ -1,8 +1,5 @@
-global using System;
 global using System.Collections.Generic;
 global using System.Linq;
-using System.IO;
-using System.Reflection;
 using System.Text.Json.Serialization;
 using Coflnet.Sky.SkyAuctionTracker.Models;
 using Coflnet.Sky.SkyAuctionTracker.Services;
@@ -13,7 +10,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.OpenApi.Models;
 using Coflnet.Sky.Crafts.Client.Api;
 using Coflnet.Sky.Api.Client.Api;
 using Prometheus;
@@ -26,6 +22,7 @@ using Coflnet.Core;
 using Coflnet.Sky.Kafka;
 using StackExchange.Redis;
 using Coflnet.Sky.Sniper.Client.Api;
+using Coflnet.Sky.McConnect.Api;
 
 namespace Coflnet.Sky.SkyAuctionTracker
 {
@@ -73,6 +70,7 @@ namespace Coflnet.Sky.SkyAuctionTracker
             services.AddSingleton<ICraftsApi>(conf => new CraftsApi(Configuration["CRAFTS_BASE_URL"]));
             services.AddSingleton<IItemsApi>(conf => new ItemsApi(Configuration["ITEMS_BASE_URL"]));
             services.AddSingleton<ISettingsApi>(conf => new SettingsApi(Configuration["SETTINGS_BASE_URL"]));
+            services.AddSingleton<IConnectApi>(conf => new ConnectApi(Configuration["MCCONNECT_BASE_URL"]));
             services.AddSingleton<Bazaar.Client.Api.IBazaarApi>(conf => new Bazaar.Client.Api.BazaarApi(Configuration["BAZAAR_BASE_URL"]));
             services.AddSingleton<IScoresApi>(conf => new ScoresApi(Configuration["LEADERBOARD_BASE_URL"]));
             services.AddSingleton<Crafts.Client.Api.IKatApi>(conf => new Crafts.Client.Api.KatApi(Configuration["CRAFTS_BASE_URL"]));

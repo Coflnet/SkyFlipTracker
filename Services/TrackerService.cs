@@ -217,7 +217,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     HighScore = true,
                     DaysToKeep = 20
                 });
-                if(timeToBuy < TimeSpan.FromSeconds(5))
+                if (timeToBuy < TimeSpan.FromSeconds(5))
                 {
                     logger.LogInformation($"user {playerUuid} bought {item.Tag} in {timeToBuy.TotalSeconds} seconds posted toboard {leaderboardSlug}");
                 }
@@ -466,15 +466,20 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
         {
             using var scope = scopeFactory.CreateScope();
             using var dbScoped = scope.ServiceProvider.GetRequiredService<TrackerDbContext>();
-            var playerId = GetId(buy.Bids.OrderByDescending(b => b.Amount).First().Bidder);
+            var mcService = scope.ServiceProvider.GetRequiredService<McConnect.Api.IConnectApi>();
+            var buyerUuid = buy.Bids.OrderByDescending(b => b.Amount).First().Bidder;
+            var playerId = GetId(buyerUuid);
             var purchaseUid = GetId(buy.Uuid);
+            var userTask = mcService.ConnectMinecraftMcUuidGetAsync(buyerUuid); ;
             var sendEvents = await dbScoped.FlipEvents.Where(f => purchaseUid == f.AuctionId).ToListAsync();
             if (sendEvents.Count <= 1)
             {
                 logger.LogInformation($"Flip {flip.PurchaseAuctionId:n} ({buy.UId}) found for {flip.Profit} not sent to anybody");
                 return;
             }
-            var sentToPurchaser = sendEvents.Where(e => e.Type == FlipEventType.FLIP_RECEIVE && e.PlayerId == playerId).Any();
+            var user = await userTask;
+            var userIds = user.Accounts.Select(a => GetId(a.AccountUuid)).ToHashSet();
+            var sentToPurchaser = sendEvents.Where(e => e.Type == FlipEventType.FLIP_RECEIVE && userIds.Contains(e.PlayerId)).Any();
             var boughtAt = sendEvents.Where(e => e.Type == FlipEventType.AUCTION_SOLD).FirstOrDefault();
             var firstSend = sendEvents.Where(e => e.Type == FlipEventType.FLIP_RECEIVE).OrderBy(e => e.Timestamp).FirstOrDefault();
             var diff = boughtAt?.Timestamp - firstSend?.Timestamp;
@@ -593,7 +598,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             await Parallel.ForEachAsync(noUidCheck, async (item, token) =>
             {
                 var logMore = item.First().Tag == "PINK_DONUT_PERSONALITY";
-                var query = new Dictionary<string, string>() { 
+                var query = new Dictionary<string, string>() {
                     { "tag", item.Key.Tag },
                     { "EndAfter", (DateTime.UtcNow - TimeSpan.FromDays(14)).ToUnix().ToString() } };
                 var purchases = await playerApi.ApiPlayerPlayerUuidBidsGetAsync(item.Key.AuctioneerId, 0, query);
@@ -616,7 +621,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     var buyPrice = buyResp.HighestBidAmount;
                     var tax = profitChangeService.GetAhTax(sell.HighestBidAmount, sell.StartingBid);
                     var changes = new List<PastFlip.ProfitChange>() { tax };
-                    if(sell.Count < buyResp.Count)
+                    if (sell.Count < buyResp.Count)
                     {
                         buyPrice = buyPrice * sell.Count / buyResp.Count;
                         var reduction = buyResp.HighestBidAmount - buyPrice;
