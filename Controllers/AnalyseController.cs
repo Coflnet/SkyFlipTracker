@@ -40,7 +40,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             "d61b636f545243a4814e66f595524e96",
             "b9e339dd54f0439482a2085af3964af4", "b0fd9dc352e54914bee815236debcba6", "a198dcc96fee4c18ae45beeb6e7a072b", // same as next line
             "40b42eeb7f084da09875de3dbdaf0b19", "6f897ee8aa56492a865d70f200da4634", "0f448f2df8a4401d9b2042d7435bbf30", // group in above
-            "dead7dac795242b59338b54900ea1430", "5746eb5b373545cca8c0f7b340010155", "f720fe62066e412982ea7a759a73b7b1", // this file is getting long
+            "dead7dac795242b59338b54900ea1430", "f720fe62066e412982ea7a759a73b7b1", // this file is getting long
             "386e38574d9149afafd7ea8ccd1e015c", "4a616d12f0994a7691d5ca6f07499c2b", "1565ceccd53c4664aa55d424a25d1daf", // ximmer as well
             "407fcb6e116245c8b3284f733a931c5b", "f3f10d95a1b544e3b5df88fbfcae5fba", "ddb96c0938cd4e498ed57b2814b3d9b7",
             "c9bf10d8f394436283f3718d12c6950b", "cd1b67e5ce8c4dfcabcf74c6afe2478c", "c0b2620403b943309f6f98d164bb7249", //  https://discord.com/channels/267680588666896385/1244436738437550142/1244569273574101054
@@ -49,7 +49,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             "8bc5c2f2fcf94d2187c9b97061c549ad", "3d6f741a528f439fafcd1458f91e3aec", "8b79c16342194a22b0476fd1d1390c1a",
             "cd6d17e1f82047e7b30c56bbfafa2627", "5cdc6982c88948dbbd2f453b5857e26c", "5c34d8bfe68f4cb2b2271bd046628c8e", "5fb31a20e6bf47f4bd887ebbe3e717df",
             "d223be875ed04d72b237789bd92b04d2", "877e47356af746a0ad638a4cdb0d4249",
-            "ac42489d3a584975a9a339b7eb443c08", "e96f32ee1ce14f90ba33272a35c2c936", "5ca97128ac0c41269ba9a985b2c61e72",
+             "e96f32ee1ce14f90ba33272a35c2c936", "5ca97128ac0c41269ba9a985b2c61e72",
             "f00b66f6631e483a8f47649e9e6d917e", "c607088b49154618a257b577005c58dd", // credit card fraud
             "7c6a6d77d406486286ab7672942229a9", "05f5b16d90b3473daff552cf6b65b5e8" // didn't repay loan with interest
         };
