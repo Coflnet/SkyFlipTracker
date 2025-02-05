@@ -362,6 +362,20 @@ public class ProfitChangeService
                     yield return await priceProvider.CostOf(cost.ItemId, $"Slot unlock item {cost.ItemId}x{cost.Amount}", cost.Amount ?? 1);
             }
         }
+        if (item.Key == "runic_kills")
+        {
+            var kills = int.Parse(item.Value);
+            var previousKills = int.Parse(valueOnBuy.Value ?? "0");
+            var difference = Math.Min(kills - previousKills, 1000);
+            if (difference > 0)
+            {
+                yield return new()
+                {
+                    Amount = -difference * 1000,
+                    Label = $"{difference} Runic mob kills"
+                };
+            }
+        }
         if (item.Key == "upgrade_level")
         {
             var baseLevel = int.Parse(valueOnBuy.Value ?? buy.FlatenedNBT.GetValueOrDefault("dungeon_item_level") ?? "0");

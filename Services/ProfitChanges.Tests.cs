@@ -1420,6 +1420,16 @@ public class ProfitChangeTests
     }
 
     [Test]
+    public async Task RunicKillsUpgrade()
+    {
+        var buy = CreateAuction("RUNEBOOK", "Runebook", 15_000_000, Core.Tier.COMMON);
+        var sell = CreateAuction("RUNEBOOK", "Runebook", 100_000_000, Core.Tier.LEGENDARY);
+        sell.FlatenedNBT["runic_kills"] = "1032";
+        var changes = await service.GetChanges(buy, sell);
+        Assert.That(changes.Count, Is.EqualTo(2), JsonConvert.SerializeObject(changes, Formatting.Indented));
+        Assert.That(changes[1].Amount, Is.EqualTo(-1000000));
+    }
+    [Test]
     public async Task AddedExpOverLvl100()
     {
         var buy = CreateAuction("PET_BAT", "[Lvl 30] Bat", 5_000_000, Core.Tier.LEGENDARY);
