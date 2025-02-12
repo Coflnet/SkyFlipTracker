@@ -1460,7 +1460,7 @@ public class ProfitChangeTests
         var buy = CreateAuction("CRIMSON_CHESTPLATE", "Crimson Chestplate", 20_000_000, Core.Tier.LEGENDARY);
         buy.FlatenedNBT["mana_pool"] = "7";
         buy.FlatenedNBT["mana_regeneration"] = "5";
-        var sell = CreateAuction("AURORA_CHESTPLATE", "Aurora Chestplate", 200_000_000, Core.Tier.LEGENDARY);
+        var sell = CreateAuction("AURORA_CHESTPLATE", "Loving Aurora Chestplate ✪✪✪✪✪", 200_000_000, Core.Tier.LEGENDARY);
         sell.FlatenedNBT["mana_pool"] = "7";
         sell.FlatenedNBT["mana_regeneration"] = "7";
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("AURORA_CHESTPLATE", new() { { "mana_pool", "1-7" }, { "mana_regeneration", "1-7" } }, 0, default)).ReturnsAsync(() => new() { Median = 160_000_000 });
