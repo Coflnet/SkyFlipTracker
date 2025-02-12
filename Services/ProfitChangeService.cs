@@ -303,7 +303,7 @@ public class ProfitChangeService
             {
                 filter.Add(item.Key, $"1-{item.Value}");
             }
-            yield return await priceProvider.CostOf(sell.Tag, $"{sell.ItemName} godroll", 1, filter);
+            yield return await priceProvider.CostOf(sell.Tag, $"{ItemReferences.RemoveReforgesAndLevel(sell.ItemName)} godroll", 1, filter);
             yield break;
         }
         var allCrafts = await craftsApi.CraftsAllGetAsync();
