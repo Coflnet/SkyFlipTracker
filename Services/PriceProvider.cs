@@ -27,7 +27,7 @@ public class PriceProvider : IPriceProvider
     }
 
 
-    public async Task<PastFlip.ProfitChange> CostOf(string item, string title, long amount = 1)
+    public async Task<PastFlip.ProfitChange> CostOf(string item, string title, long amount = 1, Dictionary<string, string> filters = null)
     {
         if (item == "MOVE_JERRY")
             return new PastFlip.ProfitChange()
@@ -49,7 +49,7 @@ public class PriceProvider : IPriceProvider
                 Amount = -(long)(price * amount)
             };
         }
-        List<BidResult> playerBidsResult = await GetPlayerBids(item);
+        List<BidResult> playerBidsResult = await GetPlayerBids(item, filters);
         foreach (var bidSample in playerBidsResult)
         {
             if (bidSample.HighestBid != bidSample.HighestOwnBid)
@@ -72,8 +72,9 @@ public class PriceProvider : IPriceProvider
                     Amount = -auctionDetails.HighestBidAmount
                 };
         }
-
-        var itemPrice = await pricesApi.ApiItemPriceItemTagGetAsync(item)
+        filters?.Remove("EndAfter");
+        filters?.Remove("tag");
+        var itemPrice = await pricesApi.ApiItemPriceItemTagGetAsync(item, filters)
                     ?? throw new Exception($"Failed to find price for {item}");
         var median = itemPrice.Median;
         if (itemPrice.Max == 0 && item.StartsWith("ENCHANTMENT"))
@@ -95,14 +96,14 @@ public class PriceProvider : IPriceProvider
         };
     }
 
-    private async Task<List<BidResult>> GetPlayerBids(string item)
+    private async Task<List<BidResult>> GetPlayerBids(string item, Dictionary<string, string> filters)
     {
+        filters ??= new Dictionary<string, string>();
+        filters["tag"] = item;
+        filters["EndAfter"] = DateTimeOffset.UtcNow.AddDays(-14).ToUnixTimeSeconds().ToString();
         try
         {
-            return await playerApi.ApiPlayerPlayerUuidBidsGetAsync(auction.AuctioneerId, 0, new Dictionary<string, string>() {
-            { "tag", item },
-            {"EndAfter", DateTimeOffset.UtcNow.AddDays(-14).ToUnixTimeSeconds().ToString()}
-            });
+            return await playerApi.ApiPlayerPlayerUuidBidsGetAsync(auction.AuctioneerId, 0, filters);
         }
         catch (System.Exception e)
         {

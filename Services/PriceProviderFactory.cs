@@ -7,7 +7,7 @@ using Microsoft.Extensions.Logging;
 namespace Coflnet.Sky.SkyAuctionTracker.Services;
 public interface IPriceProvider
 {
-    Task<PastFlip.ProfitChange> CostOf(string item, string title, long amount = 1);
+    Task<PastFlip.ProfitChange> CostOf(string item, string title, long amount = 1, Dictionary<string, string> filters = null);
 
 }
 

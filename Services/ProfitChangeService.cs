@@ -29,6 +29,8 @@ public class ProfitChangeService
     private Bazaar.Client.Api.IBazaarApi bazaarApi;
     private HypixelItemService hypixelItemService;
     private IPriceProviderFactory priceProviderFactory;
+    private string[] CrisonArmor = new string[] { "CRIMSON", "TERROR", "AURORA", "FERVOR", "HOLLOW" };
+
     /// <summary>
     /// Keys containing itemTags that can be removed
     /// </summary>
@@ -292,6 +294,18 @@ public class ProfitChangeService
         {
             tagOnPurchase = "NECRON_BLADE";
         }
+        if (CrisonArmor.Contains(sell.Tag.Split('_').First()) && (float)buy.HighestBidAmount / sell.HighestBidAmount < 0.5)
+        {
+            // probably used a godroll to convert
+            var attributes = sell.FlatenedNBT.Where(f => Constants.AttributeKeys.Contains(f.Key)).ToList();
+            var filter = new Dictionary<string, string>();
+            foreach (var item in attributes)
+            {
+                filter.Add(item.Key, $"1-{item.Value}");
+            }
+            yield return await priceProvider.CostOf(sell.Tag, $"{sell.ItemName} godroll", 1, filter);
+            yield break;
+        }
         var allCrafts = await craftsApi.CraftsAllGetAsync();
         var craft = allCrafts.Where(c => c.ItemId == sell.Tag).FirstOrDefault();
         if (craft == null)
@@ -465,7 +479,7 @@ public class ProfitChangeService
                 if (costOfLvl2Other?.Median > 0)
                     level2Cost = costOfLvl2Other.Median;
             }
-            var target = Math.Min((attributeShardCost?.Median == 0) ? 2_000_000 : attributeShardCost.Median, level2Cost);
+            var target = Math.Min(((attributeShardCost?.Median ?? 0) == 0) ? 2_000_000 : attributeShardCost.Median, level2Cost);
             if (target == 0)
             {
                 logger.LogInformation($"could not find attribute cost for {item.Key} lvl {basedOnLvl2} on {sell.Tag}");

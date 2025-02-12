@@ -1454,6 +1454,22 @@ public class ProfitChangeTests
         Assert.That(changes.Count, Is.EqualTo(2), JsonConvert.SerializeObject(changes, Formatting.Indented));
         Assert.That(changes[1].Amount, Is.EqualTo(-10657764));
     }
+    [Test]
+    public async Task CrimsonToAuroraGodroll()
+    {
+        var buy = CreateAuction("CRIMSON_CHESTPLATE", "Crimson Chestplate", 20_000_000, Core.Tier.LEGENDARY);
+        buy.FlatenedNBT["mana_pool"] = "7";
+        buy.FlatenedNBT["mana_regeneration"] = "5";
+        var sell = CreateAuction("AURORA_CHESTPLATE", "Aurora Chestplate", 200_000_000, Core.Tier.LEGENDARY);
+        sell.FlatenedNBT["mana_pool"] = "7";
+        sell.FlatenedNBT["mana_regeneration"] = "7";
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("AURORA_CHESTPLATE", new() { { "mana_pool", "1-7" }, { "mana_regeneration", "1-7" } }, 0, default)).ReturnsAsync(() => new() { Median = 160_000_000 });
+        var changes = await service.GetChanges(buy, sell);
+        pricesApi.Verify(p => p.ApiItemPriceItemTagGetAsync("AURORA_CHESTPLATE", new() { { "mana_pool", "1-7" }, { "mana_regeneration", "1-7" } }, 0, default), Times.Once);
+        Assert.That(changes.Count, Is.EqualTo(3), JsonConvert.SerializeObject(changes, Formatting.Indented));
+        Assert.That(changes[1].Amount, Is.EqualTo(-160000000));
+        Assert.That(changes[1].Label, Is.EqualTo("Aurora Chestplate godroll"));
+    }
 
     [Test]
     public async Task MultiLevelCraft()
