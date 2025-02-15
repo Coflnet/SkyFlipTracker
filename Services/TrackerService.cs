@@ -18,6 +18,7 @@ using Coflnet.Leaderboard.Client.Api;
 using Coflnet.Sky.Settings.Client.Api;
 using Coflnet.Sky.PlayerState.Client.Model;
 using System.Collections.Concurrent;
+using Microsoft.Extensions.Configuration;
 
 namespace Coflnet.Sky.SkyAuctionTracker.Services
 {
@@ -444,6 +445,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     if (flipFound == default && changes.Count <= 1 && profit > 3_000_000 && buy.End > DateTime.UtcNow - TimeSpan.FromDays(1))
                     {
                         logger.LogInformation($"Flip {flip.PurchaseAuctionId:n} not found for {flip.Profit}");
+                        MissedFlip(flip, "Flip not found at all");
                     }
                     if (flipFound != default && changes.Count <= 1 && profit > 1_000_000 && buy.End > DateTime.UtcNow - TimeSpan.FromDays(1))
                     {
@@ -462,6 +464,28 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             await noUidTask;
         }
 
+        private void MissedFlip(PastFlip flip, string v)
+        {
+            using var scope = scopeFactory.CreateScope();
+            var configuration = scope.ServiceProvider.GetRequiredService<IConfiguration>();
+            var webhook = configuration["UNFOUND_FLIP_WEBHOOK"];
+            if(webhook == null)
+                return;
+            var client = new System.Net.Http.HttpClient();
+            var body = JsonConvert.SerializeObject(new
+            {
+                embeds = new[] { new {
+                    description = $"Flipped for {flip.Profit} coins within {flip.SellTime - flip.PurchaseTime}",
+                    url = $"https://sky.coflnet.com/auction/{flip.PurchaseAuctionId:n}",
+                    title = v,
+                    footer = new { text = "SkyCofl", icon_url = "https://sky.coflnet.com/logo192.png" },
+                    thumbnail = new { url = $"https://sky.coflnet.com/static/icon/{flip.ItemTag}" },
+                    avatar_url = "https://sky.coflnet.com/logo192.png",
+                    } }
+            });
+            client.PostAsync(webhook, new System.Net.Http.StringContent(body, System.Text.Encoding.UTF8, "application/json"));
+        }
+
         private async Task LogFoundFlips(ApiSaveAuction buy, PastFlip flip)
         {
             using var scope = scopeFactory.CreateScope();
@@ -475,6 +499,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             if (sendEvents.Count <= 1)
             {
                 logger.LogInformation($"Flip {flip.PurchaseAuctionId:n} ({buy.UId}) found for {flip.Profit} not sent to anybody");
+                MissedFlip(flip, "Flip not sent to anybody (blocked)");
                 return;
             }
             var user = await userTask;
@@ -502,6 +527,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 }
                 await flipStorageService.SaveOutspedFlip(buy.Tag, key, flip.PurchaseAuctionId);
                 logger.LogInformation($"Flip {flip.PurchaseAuctionId:n} ({buy.UId}) found for {flip.Profit} noew excempt");
+                MissedFlip(flip, "Excempted now");
             }
 
 
