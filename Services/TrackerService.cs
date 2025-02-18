@@ -469,13 +469,17 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             using var scope = scopeFactory.CreateScope();
             var configuration = scope.ServiceProvider.GetRequiredService<IConfiguration>();
             var webhook = configuration["UNFOUND_FLIP_WEBHOOK"];
-            if(webhook == null)
+            if (webhook == null)
                 return;
             var client = new System.Net.Http.HttpClient();
+            var text = $"Flipped for {flip.Profit:N0} coins within {flip.SellTime - flip.PurchaseTime}";
+            if (flip.SellTime - flip.PurchaseTime < TimeSpan.FromMinutes(10) && flip.Profit > 100_000_000 && flip.ItemTag.Contains("CRIMSON_"))
+                text += "\n(probably irl trading)";
+
             var body = JsonConvert.SerializeObject(new
             {
                 embeds = new[] { new {
-                    description = $"Flipped for {flip.Profit} coins within {flip.SellTime - flip.PurchaseTime}",
+                    description = text,
                     url = $"https://sky.coflnet.com/auction/{flip.PurchaseAuctionId:n}",
                     title = v,
                     footer = new { text = "SkyCofl", icon_url = "https://sky.coflnet.com/logo192.png" },
