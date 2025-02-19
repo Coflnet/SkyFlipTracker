@@ -239,7 +239,7 @@ public class ProfitChangeService
         List<string> GetGems(Core.SaveAuction buy)
         {
             // determine gem differences 
-            return buy.FlatenedNBT.Where(f => f.Value == "PERFECT" || f.Value == "FLAWLESS").Select(f =>
+            return buy.FlatenedNBT.Where(f => f.Value == "PERFECT" || f.Value == "FLAWLESS" || f.Value == "FINE").Select(f =>
                 this.mapper.GetItemKeyForGem(f, buy.FlatenedNBT)
             ).ToList();
         }
