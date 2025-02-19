@@ -442,12 +442,12 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     if (extraLog)
                         logger.LogInformation($"Saved flip {flip.Uid} {JsonConvert.SerializeObject(flip)}");
 
-                    if (flipFound == default && changes.Count <= 1 && profit > 3_000_000 && buy.End > DateTime.UtcNow - TimeSpan.FromDays(1))
+                    if (flipFound == default && changes.Count <= 1 && profit > 1_500_000 && buy.End > DateTime.UtcNow - TimeSpan.FromDays(1))
                     {
                         logger.LogInformation($"Flip {flip.PurchaseAuctionId:n} not found for {flip.Profit}");
                         MissedFlip(flip, "Flip not found at all", buy);
                     }
-                    if (flipFound != default && changes.Count <= 1 && profit > 1_000_000 && buy.End > DateTime.UtcNow - TimeSpan.FromDays(1))
+                    if (flipFound != default && changes.Count <= 1 && profit > 600_000 && buy.End > DateTime.UtcNow - TimeSpan.FromDays(1))
                     {
                         await LogFoundFlips(buy, flip);
                     }
@@ -474,7 +474,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             var client = new System.Net.Http.HttpClient();
             var text = $"Flipped for {flip.Profit:N0} coins within {flip.SellTime - flip.PurchaseTime}";
             if (flip.SellTime - flip.PurchaseTime < TimeSpan.FromMinutes(10) && flip.Profit > 100_000_000 && buy.FlatenedNBT.Any(n => Constants.AttributeKeys.Contains(n.Key)))
-                text += "\n(probably irl trading)";
+                return;
             if (buy.StartingBid == 0)
                 text += $"\nPageflipped";
 
