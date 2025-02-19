@@ -445,7 +445,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     if (flipFound == default && changes.Count <= 1 && profit > 3_000_000 && buy.End > DateTime.UtcNow - TimeSpan.FromDays(1))
                     {
                         logger.LogInformation($"Flip {flip.PurchaseAuctionId:n} not found for {flip.Profit}");
-                        MissedFlip(flip, "Flip not found at all");
+                        MissedFlip(flip, "Flip not found at all", buy);
                     }
                     if (flipFound != default && changes.Count <= 1 && profit > 1_000_000 && buy.End > DateTime.UtcNow - TimeSpan.FromDays(1))
                     {
@@ -464,7 +464,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             await noUidTask;
         }
 
-        private void MissedFlip(PastFlip flip, string v)
+        private void MissedFlip(PastFlip flip, string v, SaveAuction buy)
         {
             using var scope = scopeFactory.CreateScope();
             var configuration = scope.ServiceProvider.GetRequiredService<IConfiguration>();
@@ -473,8 +473,10 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 return;
             var client = new System.Net.Http.HttpClient();
             var text = $"Flipped for {flip.Profit:N0} coins within {flip.SellTime - flip.PurchaseTime}";
-            if (flip.SellTime - flip.PurchaseTime < TimeSpan.FromMinutes(10) && flip.Profit > 100_000_000 && flip.ItemTag.Contains("CRIMSON_"))
+            if (flip.SellTime - flip.PurchaseTime < TimeSpan.FromMinutes(10) && flip.Profit > 100_000_000 && buy.FlatenedNBT.Any(n => Constants.AttributeKeys.Contains(n.Key)))
                 text += "\n(probably irl trading)";
+            if (buy.StartingBid == 0)
+                text += $"\nPageflipped";
 
             var body = JsonConvert.SerializeObject(new
             {
@@ -503,7 +505,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             if (sendEvents.Count <= 1)
             {
                 logger.LogInformation($"Flip {flip.PurchaseAuctionId:n} ({buy.UId}) found for {flip.Profit} not sent to anybody");
-                MissedFlip(flip, "Flip not sent to anybody (blocked)");
+                MissedFlip(flip, "Flip not sent to anybody (blocked)", buy);
                 return;
             }
             var user = await userTask;
@@ -531,7 +533,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 }
                 await flipStorageService.SaveOutspedFlip(buy.Tag, key, flip.PurchaseAuctionId);
                 logger.LogInformation($"Flip {flip.PurchaseAuctionId:n} ({buy.UId}) found for {flip.Profit} noew excempt");
-                MissedFlip(flip, "Excempted now");
+                MissedFlip(flip, "Excempted now", buy);
             }
 
 
