@@ -473,7 +473,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 return;
             var client = new System.Net.Http.HttpClient();
             var text = $"Flipped for {flip.Profit:N0} coins within {flip.SellTime - flip.PurchaseTime}";
-            if (flip.SellTime - flip.PurchaseTime < TimeSpan.FromMinutes(10) && flip.Profit > 100_000_000 && buy.FlatenedNBT.Any(n => Constants.AttributeKeys.Contains(n.Key)))
+            if (flip.SellTime - flip.PurchaseTime < TimeSpan.FromMinutes(15) && flip.Profit > 100_000_000 && buy.FlatenedNBT.Any(n => Constants.AttributeKeys.Contains(n.Key)))
                 return;
             if (buy.StartingBid == 0)
                 text += $"\nPageflipped";
