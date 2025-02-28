@@ -478,6 +478,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 return;
             if (buy.StartingBid == 0)
                 text += $"\nPageflipped";
+            if(!buy.Bin)
+                text += $"\n**Auction**";
 
             var body = JsonConvert.SerializeObject(new
             {
