@@ -672,7 +672,7 @@ public class ProfitChangeService
             if (enchantAtBuy != default && (enchantAtBuy.Level != item.Level - 1 //&& item.Level < 7
                 || Constants.EnchantToAttribute.ContainsKey(item.Type)))
             {
-                buyValue = mapper.EnchantValue(enchantAtBuy, buy.FlatenedNBT, itemValues);
+                buyValue = mapper.EnchantValue(enchantAtBuy, buy.FlatenedNBT, itemValues, sell.Tag);
                 found = new PastFlip.ProfitChange()
                 {
                     Label = $"Enchant {item.Type} from {enchantAtBuy.Level} to {item.Level}",
@@ -728,8 +728,8 @@ public class ProfitChangeService
             Type = item.Type,
             Level = 1
         };
-        var lvl1Worth = mapper.EnchantValue(lvl1Dummy, buy.FlatenedNBT, itemValues);
-        var change = mapper.EnchantValue(enchantDummy, buy.FlatenedNBT, itemValues);
+        var lvl1Worth = mapper.EnchantValue(lvl1Dummy, buy.FlatenedNBT, itemValues, buy.Tag);
+        var change = mapper.EnchantValue(enchantDummy, buy.FlatenedNBT, itemValues, buy.Tag);
         if (change == -1)
             return -1; // no price available, ignore
         if (Constants.EnchantToAttribute.ContainsKey(item.Type))
