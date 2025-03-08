@@ -390,6 +390,20 @@ public class ProfitChangeService
                 };
             }
         }
+        if (item.Key.StartsWith("MASTER_CRYPT_TANK_ZOMBIE"))
+        {
+            var count = int.Parse(item.Value);
+            var previousCount = int.Parse(valueOnBuy.Value ?? "0");
+            var difference = Math.Min(count - previousCount, 10);
+            if (difference > 0)
+            {
+                yield return new()
+                {
+                    Amount = -difference * 100_000,
+                    Label = $"{difference} Crypt Tank Zombie captured"
+                };
+            }
+        }
         if (item.Key == "upgrade_level")
         {
             var baseLevel = int.Parse(valueOnBuy.Value ?? buy.FlatenedNBT.GetValueOrDefault("dungeon_item_level") ?? "0");

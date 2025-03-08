@@ -1551,6 +1551,17 @@ public class ProfitChangeTests
             Assert.That(result[1].Amount, Is.EqualTo(-1000000));
     }
 
+[Test]
+    public async Task CapturcedMasterCryptTankZombie()
+    {
+        var buy = CreateAuction("SWORD");
+        var sell = CreateAuction("SWORD");
+        sell.FlatenedNBT["MASTER_CRYPT_TANK_ZOMBIE_70"] = "5";
+        var result = await service.GetChanges(buy, sell);
+        Assert.That(result.Count, Is.EqualTo(2));
+        Assert.That(result[1].Amount, Is.EqualTo(-500000));
+    }
+
     [Test]
     public async Task MultiLevelCraftOriginal()
     {
