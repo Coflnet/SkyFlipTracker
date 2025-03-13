@@ -7,6 +7,7 @@ using NUnit.Framework;
 using Moq;
 using Newtonsoft.Json;
 using Coflnet.Sky.Core.Services;
+using FluentAssertions;
 
 namespace Coflnet.Sky.SkyAuctionTracker.Services;
 
@@ -1223,6 +1224,10 @@ public class ProfitChangeTests
         Assert.That(changes[1].Label, Is.EqualTo("CRIMSON essence x435 to add 8 stars"));
         Assert.That(changes[3].Label, Is.EqualTo("HEAVY_PEARLx3 for star"));
     }
+    /// <summary>
+    /// Hellfire rod doesn't use master stars to upgrade
+    /// </summary>
+    /// <returns></returns>
     [Test]
     public async Task AddedMasterStarsHellFireRod()
     {
