@@ -26,7 +26,7 @@
     <PackageReference Include="Coflnet.Sky.Proxy.Client" Version="1.0.0" />
     <PackageReference Include="Coflnet.Sky.Settings.Client" Version="0.2.3" />
     <PackageReference Include="Coflnet.Sky.Sniper.Client" Version="0.12.0" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.13">
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.14">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
