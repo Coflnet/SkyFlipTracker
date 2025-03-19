@@ -34,7 +34,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             "9b7f74f538f549baa1617ebd136c8305", "ee05104863684a0a85ec79c40e80f7f5", // delay bypass
             "50e3c3fbd4d746f7868652ed37e0a153", "e7b5ad30f6f94b3993db1d2fb37661b5", "326263423660400393310fcc9d0d826f", // more bypass :/
             "9b6cbecab4654b08b70d9817b885be24", "059056b17ea1467880f59350ad635589",
-            "40d45b6f6bf9412580383269416e0cf2", "855fa79c6f9441b19fb507d088bb2dd9",  // connected
+            "40d45b6f6bf9412580383269416e0cf2", // connected
             "c414a81db5104e1b9dc9e4b4fe5a7768",
             "c57f8d117f414a4099cc3fccef5a34e7",
             "d61b636f545243a4814e66f595524e96",
