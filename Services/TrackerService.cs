@@ -210,18 +210,28 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     logger.LogInformation($"user {playerUuid} disabled buy speed board: {disabled}");
                     continue;
                 }
-                var leaderboardSlug = $"sky-buyspeed-{DateTime.UtcNow.RoundDown(TimeSpan.FromDays(7)):yyyy-MM-dd}";
-                await scoresApi.ScoresLeaderboardSlugPostAsync(leaderboardSlug, new Leaderboard.Client.Model.ScoreCreate()
+                _ = Task.Run(async () =>
                 {
-                    UserId = playerUuid,
-                    Score = (long)(timeToBuy.TotalSeconds * -1000),
-                    HighScore = true,
-                    DaysToKeep = 20
+                    try
+                    {
+                        var leaderboardSlug = $"sky-buyspeed-{DateTime.UtcNow.RoundDown(TimeSpan.FromDays(7)):yyyy-MM-dd}";
+                        await scoresApi.ScoresLeaderboardSlugPostAsync(leaderboardSlug, new Leaderboard.Client.Model.ScoreCreate()
+                        {
+                            UserId = playerUuid,
+                            Score = (long)(timeToBuy.TotalSeconds * -1000),
+                            HighScore = true,
+                            DaysToKeep = 20
+                        });
+                        if (timeToBuy < TimeSpan.FromSeconds(5))
+                        {
+                            logger.LogInformation($"user {playerUuid} bought {item.Tag} in {timeToBuy.TotalSeconds} seconds posted toboard {leaderboardSlug}");
+                        }
+                    }
+                    catch (System.Exception e)
+                    {
+                        logger.LogError(e, $"Could not post buy speed {playerUuid} {timeToBuy.TotalSeconds}");
+                    }
                 });
-                if (timeToBuy < TimeSpan.FromSeconds(5))
-                {
-                    logger.LogInformation($"user {playerUuid} bought {item.Tag} in {timeToBuy.TotalSeconds} seconds posted toboard {leaderboardSlug}");
-                }
             }
         }
 
@@ -474,11 +484,11 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             var client = new System.Net.Http.HttpClient();
             var profitPercent = flip.Profit * 100 / (flip.PurchaseCost == 0 ? int.MaxValue : flip.PurchaseCost);
             var text = $"Flipped for {flip.Profit:N0} coins (`{profitPercent}%`) within {flip.SellTime - flip.PurchaseTime}";
-            if (flip.SellTime - flip.PurchaseTime < TimeSpan.FromMinutes(15) && (flip.Profit > 100_000_000 || profitPercent > 10_000)&& buy.FlatenedNBT.Any(n => Constants.AttributeKeys.Contains(n.Key)))
+            if (flip.SellTime - flip.PurchaseTime < TimeSpan.FromMinutes(15) && (flip.Profit > 100_000_000 || profitPercent > 10_000) && buy.FlatenedNBT.Any(n => Constants.AttributeKeys.Contains(n.Key)))
                 return;
             if (buy.StartingBid == 0)
                 text += $"\nPageflipped";
-            if(!buy.Bin)
+            if (!buy.Bin)
                 text += $"\n**Auction**";
 
             var body = JsonConvert.SerializeObject(new
