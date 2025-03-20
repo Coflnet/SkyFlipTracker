@@ -321,7 +321,10 @@ public class ProfitChangeService
             if (item.ItemId == tagOnPurchase)
                 count--;
             if (item.ItemId == "SKYBLOCK_COIN")
+            {
                 yield return new PastFlip.ProfitChange("Coins", -(long)item.Cost);
+                continue;
+            }
             if (item.ItemId == "SKYBLOCK_CHOCOLATE")
             {
                 var chocolateStickCost = await priceProvider.CostOf("NIBBLE_CHOCOLATE_STICK", "Chocolate stick");
