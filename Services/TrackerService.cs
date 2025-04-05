@@ -645,7 +645,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 var logMore = item.First().Tag == "PINK_DONUT_PERSONALITY";
                 var query = new Dictionary<string, string>() {
                     { "tag", item.Key.Tag },
-                    { "EndAfter", (DateTime.UtcNow - TimeSpan.FromDays(14)).ToUnix().ToString() } };
+                    { "EndAfter", (item.First().End - TimeSpan.FromDays(14)).ToUnix().ToString() } };
                 var purchases = await playerApi.ApiPlayerPlayerUuidBidsGetAsync(item.Key.AuctioneerId, 0, query);
                 if (logMore)
                     logger.LogInformation($"Found {purchases.Count} purchases for {item.Key.AuctioneerId} {item.Key.Tag}");
@@ -689,6 +689,9 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                         previousAuction = purchase;
                         continue;
                     }
+                    if (await IsRemovedDrillPart(purchase, sell))
+                        return;
+
                     if (sell.End - buyResp.End > TimeSpan.FromDays(14))
                         profit = 0; // no flip if it took more than 2 weeks
                     var flip = new PastFlip()
@@ -717,6 +720,49 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     return;
                 }
             });
+        }
+
+
+        HashSet<string> partIds = [
+            "goblin_omelette",
+            "goblin_omelette_sunny_side",
+            "goblin_omelette_pesto",
+            "goblin_omelette_spicy",
+            "starfall_seasoning",
+            "goblin_omelette_blue_cheese",
+            "tungsten_keychain",
+            "mithril_drill_engine",
+            "ruby_polished_drill_engine",
+            "amber_polished_drill_engine",
+            "titanium_drill_engine",
+            "sapphire_polished_drill_engine",
+            "mithril_fuel_tank",
+            "perfectly_cut_fuel_tank",
+            "gemstone_fuel_tank",
+            "titanium_fuel_tank"
+        ];
+        private async Task<bool> IsRemovedDrillPart(Api.Client.Model.BidResult item, SaveAuction sell)
+        {
+            if (!partIds.Contains(sell.Tag.ToLower()))
+                return false;
+            logger.LogInformation($"Checking if {sell.Tag} is removed for {sell.Uuid}");
+            if (sell.Tag.EndsWith("ENGINE"))
+            {
+                return await CheckPurchase(item, sell, "DrillPartEngine");
+            }
+            if (sell.Tag.EndsWith("FUEL_TANK"))
+            {
+                return await CheckPurchase(item, sell, "DrillPartFuelTank");
+            }
+            return await CheckPurchase(item, sell, "DrillPartUpgradeModule");
+
+            async Task<bool> CheckPurchase(Api.Client.Model.BidResult item, SaveAuction sell, string filterName)
+            {
+                var purchases = await playerApi.ApiPlayerPlayerUuidBidsGetAsync(sell.AuctioneerId, 0, new Dictionary<string, string>() {
+                    { "EndAfter", (item.End - TimeSpan.FromDays(14)).ToUnix().ToString() },
+                    {filterName, sell.Tag.ToLower()} });
+                return purchases.Any();
+            }
         }
 
         private async Task<ApiSaveAuction> GetAuction(string uuid, SaveAuction sell, CancellationToken token)
