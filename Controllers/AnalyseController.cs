@@ -294,7 +294,12 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
                 penaltiy /= 1.5;
             else if (flipworth > 2_000_000_000 && macroedTimeDif.Count() > 5)
                 penaltiy *= 1.5;
-            var recentFlipCount = timeDif.Where(t => t.age < TimeSpan.FromHours(10)).Count();
+            if(flipworth / relevantFlips.Count < 2_000_000)
+            {
+                penaltiy /= 2;
+            }
+
+            var recentFlipCount = timeDif.Where(t => t.age < TimeSpan.FromHours(5)).Count();
             if (recentFlipCount < 5)
                 penaltiy /= (5 - recentFlipCount);
             var purchaseCountSummary = CalculatePurchaseCountSummary(timeDif, flipVal, flipworth);
