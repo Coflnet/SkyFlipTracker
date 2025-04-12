@@ -294,7 +294,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
                 penaltiy /= 1.5;
             else if (flipworth > 2_000_000_000 && macroedTimeDif.Count() > 5)
                 penaltiy *= 1.5;
-            if(flipworth / relevantFlips.Count < 2_000_000)
+            if (flipworth / relevantFlips.Count < 2_000_000)
             {
                 penaltiy /= 2;
             }
@@ -401,9 +401,9 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
 
         private static double GetShortTermAntiMacroDelay(TimeSpan maxAge, IEnumerable<(double TotalSeconds, TimeSpan age)> timeDif, List<(double TotalSeconds, TimeSpan age)> macroedFlips)
         {
-            var antiMacro = GetSpeedPenalty(maxAge * shortMacroMultiplier, timeDif.Where(t => t.TotalSeconds > 3.57 && t.TotalSeconds < 4 && t.age < maxAge * shortMacroMultiplier), 0.2);
-            antiMacro += GetSpeedPenalty(maxAge * shortMacroMultiplier, macroedFlips, 0.2);
-            return antiMacro;
+            var antiMacro = GetSpeedPenalty(maxAge * shortMacroMultiplier, timeDif.Where(t => t.TotalSeconds > 3.57 && t.TotalSeconds < 4 && t.age < maxAge * shortMacroMultiplier), 0.1);
+            antiMacro += GetSpeedPenalty(maxAge * shortMacroMultiplier, macroedFlips, 0.1);
+            return Math.Min(antiMacro, 1);
         }
 
         private async Task<IEnumerable<MacroedFlip>> GetMacroedFlipsLongTerm(TimeSpan shadowTiming, DateTime maxTime, IEnumerable<long> numeric, List<(double TotalSeconds, TimeSpan age)> macroedFlips)
