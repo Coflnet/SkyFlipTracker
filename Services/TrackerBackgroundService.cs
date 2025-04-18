@@ -145,7 +145,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 var purchaseAble = item.Start + TimeSpan.FromSeconds(19) - DateTime.UtcNow;
                 if (purchaseAble > TimeSpan.FromSeconds(1))
                     await Task.Delay(purchaseAble);
-                for (int i = 0; i < 5; i++)
+                await Task.Delay(45_000);
+                for (int i = 0; i < 2; i++)
                 {
                     if (i == 2)
                     {
@@ -161,7 +162,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     {
                         logger.LogError(e, "could not rerequest player auctions");
                     }
-                    await Task.Delay(20_000);
+                    await Task.Delay(60_000);
                 }
             });
         }
@@ -309,7 +310,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
         {
             var rerequestService = scope.ServiceProvider.GetRequiredService<IBaseApi>();
             var events = new List<FlipEvent>();
-            foreach (var item in lps.Where(lp => lp.TargetPrice - lp.Auction.StartingBid > 1050_000)
+            foreach (var item in lps.Where(lp => lp.TargetPrice - lp.Auction.StartingBid > 8050_000)
                 .GroupBy(lp => lp.Auction.UId).Select(g => g.First()))
             {
                 if (item.Auction.Start > DateTime.UtcNow - TimeSpan.FromMinutes(1))
