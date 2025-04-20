@@ -290,7 +290,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             double penaltiy = CalculatePenalty(request, maxAge, timeDif, escrowedUserCount, ref avg, antiMacro, badIds);
             var flipVal = await GetBoughtFlipsWorth(maxAge * 16, maxTime, relevantFlips);
             var flipworth = flipVal.Sum(f => f.TargetPrice);
-            if (flipworth < 100_000_000)
+            if (flipworth < 150_000_000)
                 penaltiy /= 1.5;
             else if (flipworth > 2_000_000_000 && macroedTimeDif.Count() > 5)
                 penaltiy *= 1.5;
