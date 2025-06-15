@@ -56,7 +56,7 @@ public class ProfitChangeTests
             FlatenedNBT = new() { { "rarity_upgrades", "1" } },
             Tier = Core.Tier.MYTHIC
         };
-        craftsApi.Setup(c => c.CraftsAllGetAsync(0, default)).ReturnsAsync(() => new() {
+        craftsApi.Setup(c => c.GetAllAsync(0, default)).ReturnsAsync(() => new() {
             new() { ItemId = "ENDER_RELIC", Ingredients = new() {
                 new() { ItemId = "ENDER_ARTIFACT", Count = 1 },
                 new() { ItemId = "ENCHANTED_OBSIDIAN", Count = 128 },
@@ -90,7 +90,7 @@ public class ProfitChangeTests
             Tier = Core.Tier.MYTHIC
         };
 
-        katApi.Setup(k => k.KatAllGetAsync(0, default)).ReturnsAsync(KatResponse());
+        katApi.Setup(k => k.GetAllKatAsync(0, default)).ReturnsAsync(KatResponse());
         Console.WriteLine(JsonConvert.SerializeObject(KatResponse()));
         var changes = await service.GetChanges(buy, sell);
         Assert.That(changes.Count, Is.EqualTo(3 * 2 + 1), JsonConvert.SerializeObject(changes, Formatting.Indented));
@@ -127,7 +127,7 @@ public class ProfitChangeTests
             FlatenedNBT = new(),
             Tier = Core.Tier.LEGENDARY
         };
-        katApi.Setup(k => k.KatAllGetAsync(0, default)).ReturnsAsync(KatResponse("PET_ENDER_DRAGON"));
+        katApi.Setup(k => k.GetAllKatAsync(0, default)).ReturnsAsync(KatResponse("PET_ENDER_DRAGON"));
         var changes = await service.GetChanges(buy, sell);
         Assert.That(changes.Count, Is.EqualTo(3));
         Assert.That(changes[0].Amount, Is.EqualTo(-1220));
@@ -155,8 +155,8 @@ public class ProfitChangeTests
             FlatenedNBT = new(),
             Tier = Core.Tier.EPIC
         };
-        katApi.Setup(k => k.KatAllGetAsync(0, default)).ReturnsAsync(KatResponse("PET_ENDER_DRAGON"));
-        katApi.Setup(k => k.KatRawGetAsync(0, default)).ReturnsAsync(new List<Crafts.Client.Model.KatUpgradeCost>()
+        katApi.Setup(k => k.GetAllKatAsync(0, default)).ReturnsAsync(KatResponse("PET_ENDER_DRAGON"));
+        katApi.Setup(k => k.GetUpgradeDataAsync(0, default)).ReturnsAsync(new List<Crafts.Client.Model.KatUpgradeCost>()
         {
             new Crafts.Client.Model.KatUpgradeCost()
             {
@@ -198,8 +198,8 @@ public class ProfitChangeTests
             FlatenedNBT = new(),
             Tier = Core.Tier.MYTHIC
         };
-        katApi.Setup(k => k.KatAllGetAsync(0, default)).ReturnsAsync(KatResponse("PET_ENDER_DRAGON"));
-        katApi.Setup(k => k.KatRawGetAsync(0, default)).ReturnsAsync(new List<Crafts.Client.Model.KatUpgradeCost>()
+        katApi.Setup(k => k.GetAllKatAsync(0, default)).ReturnsAsync(KatResponse("PET_ENDER_DRAGON"));
+        katApi.Setup(k => k.GetUpgradeDataAsync(0, default)).ReturnsAsync(new List<Crafts.Client.Model.KatUpgradeCost>()
         {
             new Crafts.Client.Model.KatUpgradeCost()
             {
@@ -243,8 +243,8 @@ public class ProfitChangeTests
             FlatenedNBT = new() { { "exp", "2" } },
             Tier = Core.Tier.LEGENDARY
         };
-        katApi.Setup(k => k.KatAllGetAsync(0, default)).ReturnsAsync(KatResponse("PET_ENDER_DRAGON"));
-        katApi.Setup(k => k.KatRawGetAsync(0, default)).ReturnsAsync(new List<Crafts.Client.Model.KatUpgradeCost>()
+        katApi.Setup(k => k.GetAllKatAsync(0, default)).ReturnsAsync(KatResponse("PET_ENDER_DRAGON"));
+        katApi.Setup(k => k.GetUpgradeDataAsync(0, default)).ReturnsAsync(new List<Crafts.Client.Model.KatUpgradeCost>()
         {
             new Crafts.Client.Model.KatUpgradeCost()
             {
@@ -256,7 +256,7 @@ public class ProfitChangeTests
                 Amount = 64
             }
         });
-        craftsApi.Setup(c => c.CraftsAllGetAsync(0, default)).ReturnsAsync(() => new() {
+        craftsApi.Setup(c => c.GetAllAsync(0, default)).ReturnsAsync(() => new() {
             new() { ItemId = "UPGRADE_STONE_GLACIAL", CraftCost = 100_000_000},
             new() { ItemId = "UPGRADE_STONE_FROST", CraftCost = 11_500_000},
             new() { ItemId = "UPGRADE_STONE_SUBZERO", CraftCost = 270_000_000}});
@@ -288,7 +288,7 @@ public class ProfitChangeTests
         var buy = CreateAuction("PET_SCATHA", "", 1000, Core.Tier.RARE);
         var sell = CreateAuction("PET_SCATHA", "Scatha", 10000, Core.Tier.LEGENDARY);
         sell.FlatenedNBT.Add("heldItem", "PET_ITEM_TIER_BOOST");
-        katApi.Setup(k => k.KatAllGetAsync(0, default)).ReturnsAsync(KatResponse("PET_SCATHA"));
+        katApi.Setup(k => k.GetAllKatAsync(0, default)).ReturnsAsync(KatResponse("PET_SCATHA"));
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), null, 0, default))
                 .ReturnsAsync(() => new() { Median = 100_000_000 });
         var changes = await service.GetChanges(buy, sell);
@@ -304,7 +304,7 @@ public class ProfitChangeTests
         var sell = CreateAuction("PET_ENDER_DRAGON", "", 1000, Core.Tier.LEGENDARY);
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), null, 0, default))
                 .ReturnsAsync(() => new() { Median = 5_000_000 });
-        katApi.Setup(k => k.KatAllGetAsync(0, default)).ReturnsAsync(KatResponse("PET_ENDER_DRAGON"));
+        katApi.Setup(k => k.GetAllKatAsync(0, default)).ReturnsAsync(KatResponse("PET_ENDER_DRAGON"));
 
         var changes = await service.GetChanges(buy, sell);
         Assert.That(changes.Count, Is.EqualTo(3), JsonConvert.SerializeObject(changes));
@@ -530,7 +530,7 @@ public class ProfitChangeTests
                 },
             Tier = Core.Tier.LEGENDARY
         };
-        craftsApi.Setup(c => c.CraftsAllGetAsync(0, default)).ReturnsAsync(() => new() {
+        craftsApi.Setup(c => c.GetAllAsync(0, default)).ReturnsAsync(() => new() {
                 new() { ItemId = "HYPERION", Ingredients = new() { new() { ItemId = "NECRON_HANDLE", Count = 1 }
                 } } });
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), null, 0, default)).ReturnsAsync(() => new() { Median = 200_000_000 });
@@ -562,7 +562,7 @@ public class ProfitChangeTests
         };
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), null, 0, default))
             .ReturnsAsync(() => new() { Median = 5_000_000 });
-        craftsApi.Setup(p => p.CraftsAllGetAsync(0, default)).ReturnsAsync(() => new() {
+        craftsApi.Setup(p => p.GetAllAsync(0, default)).ReturnsAsync(() => new() {
                 new() { ItemId = "MASTER_SKULL_TIER_6", Ingredients = new() { new() { ItemId = "MASTER_SKULL_TIER_5", Count = 4 } } },
                 new() { ItemId = "MASTER_SKULL_TIER_5", Ingredients = new() { new() { ItemId = "MASTER_SKULL_TIER_4", Count = 4 } } },
                 new() { ItemId = "MASTER_SKULL_TIER_7", Ingredients = new() { new() { ItemId = "MASTER_SKULL_TIER_6", Count = 4 } } }
@@ -756,7 +756,7 @@ public class ProfitChangeTests
     [Test]
     public async Task AddAttributesToCraftFlip()
     {
-        craftsApi.Setup(c => c.CraftsAllGetAsync(0, default)).ReturnsAsync(() => new() {
+        craftsApi.Setup(c => c.GetAllAsync(0, default)).ReturnsAsync(() => new() {
                 new() { ItemId = "VANQUISHED_GHAST_CLOAK", Ingredients = new() { new() { ItemId = "GHAST_CLOAK", Count = 1 }, new(){ItemId="SILVER_FANG", Count=256} } }
             });
         var buy = CreateAuction("GHAST_CLOAK");
@@ -1035,7 +1035,7 @@ public class ProfitChangeTests
             Tier = Core.Tier.EPIC
         };
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), null, 0, default)).ReturnsAsync(() => new() { Median = 20_000_000 });
-        craftsApi.Setup(c => c.CraftsAllGetAsync(0, default)).ReturnsAsync(() => new() {
+        craftsApi.Setup(c => c.GetAllAsync(0, default)).ReturnsAsync(() => new() {
                 new() { ItemId = "FIERY_KUUDRA_CORE", Ingredients = new() {
                     new() { ItemId = "BURNING_KUUDRA_CORE", Count = 4 }
                     }}});
@@ -1078,7 +1078,7 @@ public class ProfitChangeTests
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("WARNING_FLARE", null, 0, default)).ReturnsAsync(() => new() { Median = 5_000_000 });
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("MANA_DISINTEGRATOR", null, 0, default)).ReturnsAsync(() => new() { Median = 100_000 });
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("JALAPENO_BOOK", null, 0, default)).ReturnsAsync(() => new() { Median = 3_000_000 });
-        craftsApi.Setup(c => c.CraftsAllGetAsync(0, default)).ReturnsAsync(() => new() {
+        craftsApi.Setup(c => c.GetAllAsync(0, default)).ReturnsAsync(() => new() {
                 new() { ItemId = "SOS_FLARE", Ingredients = new() {
                     new() { ItemId = "WARNING_FLARE", Count = 1 },
                     new(){ItemId = "INFERNO_APEX", Count = 1},
@@ -1495,7 +1495,7 @@ public class ProfitChangeTests
             FlatenedNBT = new(),
             Tier = Core.Tier.LEGENDARY
         };
-        craftsApi.Setup(c => c.CraftsAllGetAsync(0, default)).ReturnsAsync(() => new() {
+        craftsApi.Setup(c => c.GetAllAsync(0, default)).ReturnsAsync(() => new() {
                     new() { ItemId = "HYPERION", Ingredients = new() {
                         new() { ItemId = "MadeUpForDepth", Count = 1 },
                         new() { ItemId = "GIANT_FRAGMENT_LASER", Count = 8}}},
@@ -1526,7 +1526,7 @@ public class ProfitChangeTests
     {
         var buy = CreateAuction("GANACHE_CHOCOLATE_SLAB", "Slab", 20_000_000, Core.Tier.EPIC);
         var sell = CreateAuction("PRESTIGE_CHOCOLATE_REALM", "Realm", 80000000, Core.Tier.LEGENDARY);
-        craftsApi.Setup(c => c.CraftsAllGetAsync(0, default)).ReturnsAsync(() => new() {
+        craftsApi.Setup(c => c.GetAllAsync(0, default)).ReturnsAsync(() => new() {
                     new() { ItemId = "PRESTIGE_CHOCOLATE_REALM", Ingredients = new() {
                         new() { ItemId = "GANACHE_CHOCOLATE_SLAB", Count = 4 },
                         new() { ItemId = "SKYBLOCK_CHOCOLATE", Count = 4_500_000_000 }}}
@@ -1586,7 +1586,7 @@ public class ProfitChangeTests
             FlatenedNBT = new(),
             Tier = Core.Tier.LEGENDARY
         };
-        craftsApi.Setup(c => c.CraftsAllGetAsync(0, default)).ReturnsAsync(() => new() {
+        craftsApi.Setup(c => c.GetAllAsync(0, default)).ReturnsAsync(() => new() {
                     new() { ItemId = "HYPERION", Ingredients = new() {
                         new() { ItemId = "NECRON_BLADE", Count = 1 },
                         new() { ItemId = "WITHER_CATALYST", Count = 10 }}},
@@ -1605,7 +1605,7 @@ public class ProfitChangeTests
     {
         var buy = CreateAuction("INTIMIDATION_ARTIFACT", "Slab", 5_000_000, Core.Tier.EPIC);
         var sell = CreateAuction("INTIMIDATION_RELIC", "Realm", 45_000_000, Core.Tier.LEGENDARY);
-        craftsApi.Setup(c => c.CraftsAllGetAsync(0, default)).ReturnsAsync(() => new() {
+        craftsApi.Setup(c => c.GetAllAsync(0, default)).ReturnsAsync(() => new() {
                     new() { ItemId = "INTIMIDATION_RELIC", Ingredients = new() {
                         new() { ItemId = "INTIMIDATION_ARTIFACT", Count = 1 },
                         new() { ItemId = "SCARE_FRAGMENT", Count = 8 }}}

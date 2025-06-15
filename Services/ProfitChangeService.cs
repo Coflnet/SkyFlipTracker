@@ -306,7 +306,7 @@ public class ProfitChangeService
             yield return await priceProvider.CostOf(sell.Tag, $"{ItemReferences.RemoveReforgesAndLevel(sell.ItemName)} godroll", 1, filter);
             yield break;
         }
-        var allCrafts = await craftsApi.CraftsAllGetAsync();
+        var allCrafts = await craftsApi.GetAllAsync();
         var craft = allCrafts.Where(c => c.ItemId == sell.Tag).FirstOrDefault();
         if (craft == null)
         {
@@ -587,7 +587,7 @@ public class ProfitChangeService
         Console.WriteLine($"buy tier {(int)buy.Tier} {buy.Tier} sell tier {(int)sellTier} {sellTier}");
         for (int i = ((int)buy.Tier); i < (int)sellTier; i++)
         {
-            var allCosts = await katApi.KatAllGetAsync(0, default);
+            var allCosts = await katApi.GetAllKatAsync(0, default);
             if (allCosts == null)
                 throw new Exception("could not get kat costs from crafts api");
             var cost = allCosts.Where(c => ((int)c.TargetRarity) > i && c.CoreData.ItemTag == sell.Tag)
@@ -608,7 +608,7 @@ public class ProfitChangeService
             if (cost == null || cost.MaterialCost >= 1_000_000 || level > 2)
             {
                 // approximate cost with raw
-                var rawCost = await katApi.KatRawGetAsync();
+                var rawCost = await katApi.GetUpgradeDataAsync();
                 var rarityInt = i;
                 if (i > (int)Core.Tier.LEGENDARY)
                     break;
@@ -622,7 +622,7 @@ public class ProfitChangeService
                 // special pet upgrades 
                 if (sell.Tag.EndsWith("_WISP"))
                 {
-                    var allCrafts = await craftsApi.CraftsAllGetAsync();
+                    var allCrafts = await craftsApi.GetAllAsync();
                     Console.WriteLine($"wisp upgrade stone for {i}({(Core.Tier)rarityInt}) {sell.Tag}");
                     var kind = (Core.Tier)i switch
                     {

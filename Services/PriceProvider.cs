@@ -85,7 +85,7 @@ public class PriceProvider : IPriceProvider
         }
         else if (itemPrice.Median == 500_000_000)
         {
-            var allCrafts = await craftsApi.CraftsAllGetAsync();
+            var allCrafts = await craftsApi.GetAllAsync();
             median = (long)(allCrafts.Where(c => c.ItemId == item).FirstOrDefault()?.CraftCost ?? 500_000_000);
         }
 
