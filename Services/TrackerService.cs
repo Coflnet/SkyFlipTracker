@@ -522,7 +522,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 return;
             }
             var user = await userTask;
-            var userIds = user.Accounts.Select(a => GetId(a.AccountUuid)).ToHashSet();
+            var userIds = user?.Accounts?.Select(a => GetId(a.AccountUuid)).ToHashSet() ?? [];
             var sentToPurchaser = sendEvents.Where(e => e.Type == FlipEventType.FLIP_RECEIVE && userIds.Contains(e.PlayerId)).Any();
             var boughtAt = sendEvents.Where(e => e.Type == FlipEventType.AUCTION_SOLD).FirstOrDefault();
             var firstSend = sendEvents.Where(e => e.Type == FlipEventType.FLIP_RECEIVE).OrderBy(e => e.Timestamp).FirstOrDefault();
