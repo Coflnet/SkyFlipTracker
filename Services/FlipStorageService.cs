@@ -26,6 +26,7 @@ public class FlipStorageService
     private Table<OutspedFlip> outspedTable;
     private Table<FinderContext> finderContexts;
     private Table<ComplicatedFlip> complicatedFlips;
+    private Table<PastFlip> unknownFlips;
     private ISession session;
     public FlipStorageService(ILogger<FlipStorageService> logger, IConfiguration config, ISession session)
     {
@@ -73,7 +74,7 @@ public class FlipStorageService
 
         static void RemoveNulls(Dictionary<string, string> dict)
         {
-            if(dict == null)
+            if (dict == null)
                 return;
             foreach (var item in dict.Keys)
             {
@@ -172,19 +173,19 @@ public class FlipStorageService
             .Column(c => c.Context, cm => cm.WithDbType<Dictionary<string, string>>())
             .Column(c => c.FoundTime, cm => cm.WithDbType<DateTime>().WithName("found_time"))
             .Column(c => c.Finder, cm => cm.WithDbType<int>())
-            .Column(c=>c.AuctionId, cm=>cm.WithName("auction_id").WithDbType<Guid>())
+            .Column(c => c.AuctionId, cm => cm.WithName("auction_id").WithDbType<Guid>())
             ), "finder_context");
         // set the table to have a ttl of 14 days and time window compaction
         session.Execute("CREATE TABLE IF NOT EXISTS finder_context (auction_id uuid, finder int, auction_context map<text, text>, context map<text, text>, found_time timestamp, PRIMARY KEY (auction_id, finder))"
          + " WITH default_time_to_live = 1209600 AND compaction = { 'class' : 'TimeWindowCompactionStrategy', 'compaction_window_size' : 1, 'compaction_window_unit' : 'DAYS' }");
-        
+
         outspedTable = new Table<OutspedFlip>(session, new MappingConfiguration().Define(new Map<OutspedFlip>()
             .PartitionKey(c => c.ItemTag)
             .ClusteringKey(c => c.Key)
-            .Column(c=>c.TriggeredBy)
-            .Column(c=>c.ItemTag, cm=>cm.WithName("item_tag"))
-            .Column(c=>c.TriggeredBy, cm=>cm.WithName("triggered_by"))
-            .Column(c=>c.Time)), "outsped_flips");
+            .Column(c => c.TriggeredBy)
+            .Column(c => c.ItemTag, cm => cm.WithName("item_tag"))
+            .Column(c => c.TriggeredBy, cm => cm.WithName("triggered_by"))
+            .Column(c => c.Time)), "outsped_flips");
         // set ttl to 30 days and time window compaction
         session.Execute("CREATE TABLE IF NOT EXISTS outsped_flips (item_tag text, key text, triggered_by uuid, time timestamp, PRIMARY KEY (item_tag, key))"
          + " WITH default_time_to_live = 2592000 AND compaction = { 'class' : 'TimeWindowCompactionStrategy', 'compaction_window_size' : 1, 'compaction_window_unit' : 'DAYS' }");
@@ -192,15 +193,29 @@ public class FlipStorageService
         complicatedFlips = new Table<ComplicatedFlip>(session, new MappingConfiguration().Define(new Map<ComplicatedFlip>()
             .PartitionKey(c => c.ItemTag)
             .ClusteringKey(c => c.AuctionId)
-            .Column(c=>c.AttributeValues, cm=>cm.AsFrozen().WithName("attribute_values"))
-            .Column(c=>c.AuctionId, cm=>cm.WithDbType<Guid>().WithName("auction_id"))
-            .Column(c=>c.ItemTag, cm=>cm.WithName("item_tag"))
-            .Column(c=>c.EndedAt, cm=>cm.WithDbType<DateTime>().WithName("ended_at"))
-            .Column(c=>c.SoldFor, cm=>cm.WithDbType<long>().WithName("sold_for"))
+            .Column(c => c.AttributeValues, cm => cm.AsFrozen().WithName("attribute_values"))
+            .Column(c => c.AuctionId, cm => cm.WithDbType<Guid>().WithName("auction_id"))
+            .Column(c => c.ItemTag, cm => cm.WithName("item_tag"))
+            .Column(c => c.EndedAt, cm => cm.WithDbType<DateTime>().WithName("ended_at"))
+            .Column(c => c.SoldFor, cm => cm.WithDbType<long>().WithName("sold_for"))
             ), "complicated_flips");
         // set ttl to 30 days and time window compaction
         session.Execute("CREATE TABLE IF NOT EXISTS complicated_flips (item_tag text, auction_id uuid, attribute_values map<text, bigint>, ended_at timestamp, sold_for bigint, PRIMARY KEY (item_tag, auction_id))"
          + " WITH default_time_to_live = 2592000 AND compaction = { 'class' : 'TimeWindowCompactionStrategy', 'compaction_window_size' : 1, 'compaction_window_unit' : 'DAYS' }");
+
+        unknownFlips = new Table<PastFlip>(session, new MappingConfiguration().Define(new Map<PastFlip>()
+            .PartitionKey(c => c.FinderType)
+            .ClusteringKey(c => c.SellTime, SortOrder.Descending)
+            .ClusteringKey(c => c.Uid)
+            .Column(c => c.FinderType, cm => cm.WithDbType<int>())
+            .Column(c => c.ItemTier, cm => cm.WithDbType<int>())
+            .Column(c => c.ProfitChanges, cm => cm.Ignore())
+            .Column(o => o.Flags, c => c.WithName("flags").WithDbType<int>())
+            ), "unknown_flips2");
+        // set the table to have a ttl of 14 days and time window compaction
+        await unknownFlips.CreateIfNotExistsAsync();
+        session.Execute("ALTER TABLE unknown_flips2 WITH default_time_to_live = 1209600 AND compaction = { 'class' : 'TimeWindowCompactionStrategy', 'compaction_window_size' : 1, 'compaction_window_unit' : 'DAYS' }");
+        logger.LogInformation("Migration complete, all tables created and configured.");
     }
 
     public async Task StoreComplicated(ComplicatedFlip flip)
@@ -213,5 +228,15 @@ public class FlipStorageService
     public async Task<IEnumerable<ComplicatedFlip>> GetComplicatedFlips(string itemTag)
     {
         return await complicatedFlips.Where(f => f.ItemTag == itemTag).ExecuteAsync();
+    }
+
+    public async Task SaveUnknownFlip(PastFlip flip)
+    {
+        await unknownFlips.Insert(flip).ExecuteAsync();
+    }
+
+    public async Task<IEnumerable<PastFlip>> GetUnknownFlips(DateTime start, DateTime end)
+    {
+        return await unknownFlips.Where(f => f.FinderType == 0 && f.SellTime >= start && f.SellTime <= end).ExecuteAsync();
     }
 }

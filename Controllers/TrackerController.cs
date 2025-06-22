@@ -256,6 +256,13 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             return await flipStorageService.GetComplicatedFlips(tag);
         }
 
+        [HttpGet]
+        [Route("/flips/unknown")]
+        public async Task<IEnumerable<PastFlip>> GetUnknownFlips(DateTime start, DateTime end)
+        {
+            return await flipStorageService.GetUnknownFlips(start, end);
+        }
+
         private long GetId(string uuid)
         {
             return service.GetId(uuid);

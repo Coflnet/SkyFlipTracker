@@ -455,7 +455,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     if (flipFound == default && changes.Count <= 1 && profit > 1_500_000 && buy.End > DateTime.UtcNow - TimeSpan.FromDays(1))
                     {
                         logger.LogInformation($"Flip {flip.PurchaseAuctionId:n} not found for {flip.Profit}");
-                        MissedFlip(flip, "Flip not found at all", buy);
+                        await MissedFlip(flip, "Flip not found at all", buy);
                     }
                     if (flipFound != default && changes.Count <= 1 && profit > 600_000 && buy.End > DateTime.UtcNow - TimeSpan.FromDays(1))
                     {
@@ -474,7 +474,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             await noUidTask;
         }
 
-        private void MissedFlip(PastFlip flip, string v, SaveAuction buy)
+        private async Task MissedFlip(PastFlip flip, string v, SaveAuction buy)
         {
             using var scope = scopeFactory.CreateScope();
             var configuration = scope.ServiceProvider.GetRequiredService<IConfiguration>();
@@ -502,7 +502,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     avatar_url = "https://sky.coflnet.com/logo192.png",
                     } }
             });
-            client.PostAsync(webhook, new System.Net.Http.StringContent(body, System.Text.Encoding.UTF8, "application/json"));
+            await client.PostAsync(webhook, new System.Net.Http.StringContent(body, System.Text.Encoding.UTF8, "application/json"));
+            await flipStorageService.SaveUnknownFlip(flip);
         }
 
         private async Task LogFoundFlips(ApiSaveAuction buy, PastFlip flip)
@@ -518,7 +519,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             if (sendEvents.Count <= 1)
             {
                 logger.LogInformation($"Flip {flip.PurchaseAuctionId:n} ({buy.UId}) found for {flip.Profit} not sent to anybody");
-                MissedFlip(flip, "Flip not sent to anybody (blocked)", buy);
+                await MissedFlip(flip, "Flip not sent to anybody (blocked)", buy);
                 return;
             }
             var user = await userTask;
@@ -546,7 +547,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 }
                 await flipStorageService.SaveOutspedFlip(buy.Tag, key, flip.PurchaseAuctionId);
                 logger.LogInformation($"Flip {flip.PurchaseAuctionId:n} ({buy.UId}) found for {flip.Profit} noew excempt");
-                MissedFlip(flip, "Excempted now", buy);
+                await MissedFlip(flip, "Excempted now", buy);
             }
 
 
