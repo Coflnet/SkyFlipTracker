@@ -77,6 +77,11 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             this.representationConverter = representationConverter;
         }
 
+        /// <summary>
+        /// Store a flip
+        /// </summary>
+        /// <param name="flip">flip to store</param>
+        /// <returns></returns>
         public async Task<Flip> AddFlip(Flip flip)
         {
             if (flip.Timestamp < new DateTime(2020, 1, 1))
@@ -97,6 +102,11 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             return flip;
         }
 
+        /// <summary>
+        /// Adds multiple flips to the database.
+        /// </summary>
+        /// <param name="flipsToSave"></param>
+        /// <returns></returns>
         public async Task AddFlips(IEnumerable<Flip> flipsToSave)
         {
             DateTime minTime = new DateTime(2020, 1, 1);
