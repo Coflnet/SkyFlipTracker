@@ -47,8 +47,9 @@ public class RepresentationConverter
 
             if (auctions?.Count > 1)
             {
-                var prices = await sniperApi.GetPrices(auctions);
-                var estimationSum = prices.Sum(p => p.Median);
+                var prices = await sniperApi.GetPrices(auctions) ?? [];
+                var estimationSum = prices.Where(p=>p!=null).Select(p => p.Median).DefaultIfEmpty(0).Sum();
+                logger.LogInformation("Got {count} prices for {estimationSum} {coinAmount}", prices.Count, estimationSum, coinAmount);
                 // adjust each estimate based on the total estimation
                 var combined = auctions.Zip(prices, (a, p) =>
                 {
@@ -62,7 +63,7 @@ public class RepresentationConverter
         }
         catch (Exception e)
         {
-            logger.LogError(e, "failed to store trade sell");
+            logger.LogError(e, "failed to store trade sell: {item}", JsonConvert.SerializeObject(item));
             await Task.Delay(300_000);
             throw;
         }
