@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 
 namespace Coflnet.Sky.SkyAuctionTracker.Services;
+
 public class RepresentationConverter
 {
     private ILogger<RepresentationConverter> logger;
@@ -48,11 +49,17 @@ public class RepresentationConverter
             if (auctions?.Count > 1)
             {
                 var prices = await sniperApi.GetPrices(auctions) ?? [];
-                var estimationSum = prices.Where(p=>p!=null).Select(p => p.Median).DefaultIfEmpty(0).Sum();
+                var estimationSum = prices.Where(p => p != null).Select(p => p.Median).DefaultIfEmpty(0).Sum();
                 logger.LogInformation("Got {count} prices for {estimationSum} {coinAmount}", prices.Count, estimationSum, coinAmount);
                 // adjust each estimate based on the total estimation
-                var combined = auctions.Zip(prices, (a, p) =>
+                auctions.Zip(prices, (a, p) =>
                 {
+                    if (a == null || p == null)
+                    {
+                        // use average difference if no price is available
+                        a.HighestBidAmount = coinAmount / auctions.Count;
+                        return null;
+                    }
                     var percentageOfEstimation = (float)p.Median / estimationSum;
                     a.HighestBidAmount = (long)(coinAmount * percentageOfEstimation);
                     logger.LogInformation("Adjusted price to {price} {coinAmount} {median} {estSum} {key}", a.HighestBidAmount, coinAmount, p.Median, estimationSum, p.MedianKey);
