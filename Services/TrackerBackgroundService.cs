@@ -268,12 +268,6 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
 
                 using var scope = scopeFactory.CreateScope();
                 var service = scope.ServiceProvider.GetRequiredService<TrackerService>();
-                await service.AddFlips(lps.DistinctBy(lp => lp.UId + (int)lp.Finder + lp.TargetPrice).Select(lp => new Flip()
-                {
-                    AuctionId = lp.UId,
-                    FinderType = lp.Finder,
-                    TargetPrice = (int)(int.MaxValue > lp.TargetPrice ? lp.TargetPrice : int.MaxValue)
-                }));
                 consumeCounter.Inc(lps.Count());
                 if (lps.All(lp => lp.Auction.End < DateTime.UtcNow))
                     return;
@@ -286,6 +280,13 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     logger.LogError(e, "could not rerequest player auctions");
                 }
                 await StoreContext(lps, scope);
+                await Task.Delay(3000); // wait for db to store potential double sales in the same minute
+                await service.AddFlips(lps.DistinctBy(lp => lp.UId + (int)lp.Finder + lp.TargetPrice).Select(lp => new Flip()
+                {
+                    AuctionId = lp.UId,
+                    FinderType = lp.Finder,
+                    TargetPrice = (int)(int.MaxValue > lp.TargetPrice ? lp.TargetPrice : int.MaxValue)
+                }));
             }, stoppingToken, "sky-fliptracker", 50);
         }
 
