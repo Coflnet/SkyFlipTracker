@@ -219,6 +219,7 @@ public class ProfitChangeTests
         Assert.That(changes[0].Amount, Is.EqualTo(-7_001_200));
         Assert.That(changes[1].Amount, Is.EqualTo(-64000000), changes[1].Label);
         Assert.That(changes[2].Label, Is.EqualTo("Kat cost for MYTHIC"));
+        Assert.That(changes[2].Amount, Is.EqualTo(-125000000 * 0.997));
         Assert.That(changes.Sum(c => c.Amount), Is.EqualTo(-195626200));
     }
 

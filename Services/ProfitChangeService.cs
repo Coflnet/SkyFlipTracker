@@ -592,7 +592,7 @@ public class ProfitChangeService
                 throw new Exception("could not get kat costs from crafts api");
             var cost = allCosts.Where(c => ((int)c.TargetRarity) > i && c.CoreData.ItemTag == sell.Tag)
                         .OrderBy(c => c.TargetRarity).FirstOrDefault();
-            var upgradeCost = cost?.UpgradeCost;
+            var upgradeCost = (double?)cost?.CoreData?.Cost;
             var tierName = (i >= (int)Core.Tier.LEGENDARY) ? sell.Tier.ToString() : ((Core.Tier)i + 1).ToString();
             var materialTitle = $"Kat materials for {tierName}";
             var level = 1;
