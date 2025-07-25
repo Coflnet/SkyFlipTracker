@@ -651,6 +651,8 @@ public class ProfitChangeService
                     yield return await priceProvider.CostOf(raw.Material, materialTitle, raw.Amount);
                 }
             }
+            else
+                upgradeCost = cost.CoreData.Cost * (1.0 - 0.003 * level); // only adjust for level
             yield return new($"Kat cost for {tierName}", (long)-upgradeCost);
             if (cost?.MaterialCost > 0 && !costAdded)
                 yield return new(materialTitle, (long)-cost.MaterialCost);

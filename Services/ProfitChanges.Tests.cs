@@ -95,7 +95,7 @@ public class ProfitChangeTests
         var changes = await service.GetChanges(buy, sell);
         Assert.That(changes.Count, Is.EqualTo(3 * 2 + 1), JsonConvert.SerializeObject(changes, Formatting.Indented));
         Assert.That(changes[0].Amount, Is.EqualTo(-1210));
-        Assert.That(changes[1].Amount, Is.EqualTo(-100_000), changes[1].Label);
+        Assert.That(changes[1].Amount, Is.EqualTo(-100_000 * 0.997), changes[1].Label);
         Assert.That(changes[2].Label, Is.EqualTo("Kat materials for EPIC"));
         Assert.That(changes[2].Amount, Is.EqualTo(-50));
         var index = 1;
@@ -105,7 +105,7 @@ public class ProfitChangeTests
         }
         Assert.That(changes.Last().Label, Is.EqualTo("Kat materials for " + Core.Tier.MYTHIC));
         Console.WriteLine(JsonConvert.SerializeObject(changes, Formatting.Indented));
-        Assert.That(changes.Sum(c => c.Amount), Is.EqualTo(-41101360));
+        Assert.That(changes.Sum(c => c.Amount), Is.EqualTo(-40978060));
     }
 
     [Test]
@@ -132,7 +132,7 @@ public class ProfitChangeTests
         Assert.That(changes.Count, Is.EqualTo(3));
         Assert.That(changes[0].Amount, Is.EqualTo(-1220));
         Assert.That(changes[2].Label, Is.EqualTo("Kat materials for LEGENDARY"));
-        Assert.That(changes[1].Amount, Is.EqualTo(-40000000), changes[1].Label);
+        Assert.That(changes[1].Amount, Is.EqualTo(-40000000 * 0.997), changes[1].Label);
     }
 
 
@@ -310,7 +310,7 @@ public class ProfitChangeTests
         var changes = await service.GetChanges(buy, sell);
         Assert.That(changes.Count, Is.EqualTo(3), JsonConvert.SerializeObject(changes));
         Assert.That(changes[1].Label, Is.EqualTo("Kat cost for LEGENDARY"));
-        Assert.That(changes[1].Amount, Is.EqualTo(-40_000_000));
+        Assert.That(changes[1].Amount, Is.EqualTo(-40_000_000 * 0.997));
     }
 
     [Test]
