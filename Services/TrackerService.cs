@@ -612,8 +612,14 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 return (flags, null);
             }
             // TODO: maybe make sure to use best match to sell modifiers
-            var itemInfo = items.First();
-            var itemTrade = await transactionApi.TransactionItemItemIdGetAsync(itemInfo.Id ?? throw new Exception("no item id"), 0);
+            var itemInfo = items.Where(f=>!f.ItemName.StartsWith("§f§f")).Take(2); // probably auction listings create new wrong item ids
+            var itemTrade = new List<Transaction>();
+            foreach (var trade in itemInfo)
+            {
+                itemTrade = await transactionApi.TransactionItemItemIdGetAsync(trade.Id ?? throw new Exception("no item id"), 0);
+                if (itemTrade.Count > 0)
+                    break;
+            }
             if (itemTrade.Count > 0)
             {
                 (int itemCount, long tradeEstimate, _) = await GetTradeValue(itemTrade);
