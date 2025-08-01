@@ -1207,7 +1207,7 @@ public class ProfitChangeTests
         pricesApi.Verify(p => p.ApiItemPriceItemTagGetAsync("ESSENCE_WITHER", null, 0, default), Times.Exactly(1));
 
         Assert.That(changes[1].Label, Is.EqualTo("WITHER essence x3200 to add 4 stars"));
-        Assert.That(changes[4].Label, Is.EqualTo("Used SECOND_MASTER_STAR to upgraded upgrade_level to 9"));
+        Assert.That(changes[4].Label, Is.EqualTo("SECOND_MASTER_STARx1 for star"));
     }
     [Test]
     public async Task AddedMasterStarsCrimson()

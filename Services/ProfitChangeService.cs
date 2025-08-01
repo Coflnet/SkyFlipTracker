@@ -550,28 +550,30 @@ public class ProfitChangeService
         // missing nbt
         if (!mapper.TryGetIngredients(sell.Tag, item.Key, item.Value, valueOnBuy.Value, out var items))
             yield break;
+        if (item.Key == "upgrade_level")
+            yield break; // already handled
 
         foreach (var ingredient in items.GroupBy(i => i).Select(g => (g.Key, count: g.Count())))
-        {
-            if (item.Value == "PET_ITEM_TIER_BOOST")
-                continue; // already handled
-            if (item.Key.StartsWith("RUNE_") && item.Key != ingredient.Key)
-                continue; // rune mapping returns both without and with level and here we only handle without
-            if (item.Key == "ability_scroll")
             {
-                yield return await priceProvider.CostOf(ingredient.Key, $"Applied {ingredient.Key}");
-                continue;
+                if (item.Value == "PET_ITEM_TIER_BOOST")
+                    continue; // already handled
+                if (item.Key.StartsWith("RUNE_") && item.Key != ingredient.Key)
+                    continue; // rune mapping returns both without and with level and here we only handle without
+                if (item.Key == "ability_scroll")
+                {
+                    yield return await priceProvider.CostOf(ingredient.Key, $"Applied {ingredient.Key}");
+                    continue;
+                }
+                if (item.Key == "skin" && sell.Tag.StartsWith("PET_"))
+                {
+                    yield return await priceProvider.CostOf($"PET_SKIN_" + ingredient.Key, $"Applied {ingredient.Key}");
+                    continue;
+                }
+                if (ingredient.count == 1)
+                    yield return await priceProvider.CostOf(ingredient.Key, $"Used {ingredient.Key} to upgraded {item.Key} to {item.Value}", ingredient.count);
+                else
+                    yield return await priceProvider.CostOf(ingredient.Key, $"Used {ingredient.count}x {ingredient.Key} to upgraded {item.Key} to {item.Value}", ingredient.count);
             }
-            if (item.Key == "skin" && sell.Tag.StartsWith("PET_"))
-            {
-                yield return await priceProvider.CostOf($"PET_SKIN_" + ingredient.Key, $"Applied {ingredient.Key}");
-                continue;
-            }
-            if (ingredient.count == 1)
-                yield return await priceProvider.CostOf(ingredient.Key, $"Used {ingredient.Key} to upgraded {item.Key} to {item.Value}", ingredient.count);
-            else
-                yield return await priceProvider.CostOf(ingredient.Key, $"Used {ingredient.count}x {ingredient.Key} to upgraded {item.Key} to {item.Value}", ingredient.count);
-        }
     }
 
     private async IAsyncEnumerable<PastFlip.ProfitChange> GetPetRarityUpgrades(Core.SaveAuction buy, Core.SaveAuction sell, IPriceProvider priceProvider)
