@@ -612,19 +612,25 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 return (flags, null);
             }
             // TODO: maybe make sure to use best match to sell modifiers
-            var itemInfo = items.Where(f=>!f.ItemName.StartsWith("§f§f")).Take(2); // probably auction listings create new wrong item ids
+            var itemInfo = items.Where(f => !f.ItemName.StartsWith("§f§f")).Take(2); // probably auction listings create new wrong item ids
             var itemTrade = new List<Transaction>();
+            PlayerState.Client.Model.Item itemStateAtTrade = null;
             foreach (var trade in itemInfo)
             {
                 itemTrade = await transactionApi.TransactionItemItemIdGetAsync(trade.Id ?? throw new Exception("no item id"), 0);
                 if (itemTrade.Count > 0)
+                {
+                    itemStateAtTrade = trade;
                     break;
+                }
             }
             if (itemTrade.Count > 0)
             {
                 (int itemCount, long tradeEstimate, _) = await GetTradeValue(itemTrade);
                 flags |= FlipFlags.ViaTrade;
                 buy.HighestBidAmount = tradeEstimate;
+                // adjust buy state to match traded attributes
+                TryUpdatingBuyState(buy, itemStateAtTrade);
                 if (itemCount > 1)
                 {
                     flags |= FlipFlags.MultiItemTrade;
@@ -634,6 +640,23 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             }
 
             return (flags, null);
+        }
+
+        private void TryUpdatingBuyState(ApiSaveAuction buy, PlayerState.Client.Model.Item itemStateAtTrade)
+        {
+            try
+            {
+                buy.Enchantments = itemStateAtTrade.Enchantments.Select(e => new Enchantment()
+                {
+                    Level = (byte)e.Value,
+                    Type = Enum.TryParse<Enchantment.EnchantmentType>(e.Key, out var type) ? type : Enchantment.EnchantmentType.unknown
+                }).ToList();
+                buy.SetFlattenedNbt(NBT.FlattenNbtData(itemStateAtTrade.ExtraAttributes));
+            }
+            catch (System.Exception e)
+            {
+                logger.LogError(e, $"Could not adjust buy state for trade {buy.Uuid} {buy.Tag} {JsonConvert.SerializeObject(itemStateAtTrade)}");
+            }
         }
 
         private async Task<(int itemCount, long tradeEstimate, List<Transaction> items)> GetTradeValue(List<Transaction> itemTrade)
