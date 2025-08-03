@@ -78,6 +78,25 @@ public class RepresentationConverter
     }
 
 
+    public void TryUpdatingBuyState(ApiSaveAuction buy, PlayerState.Client.Model.Item itemStateAtTrade)
+    {
+        try
+        {
+            // reassign cause flattened nbt has to be copied
+            var converted = FromItemRepresent(itemStateAtTrade);
+            buy.FlatenedNBT = converted.FlatenedNBT;
+            buy.Enchantments = converted.Enchantments;
+            buy.Tier = converted.Tier;
+            buy.Reforge = converted.Reforge;
+            buy.ItemName = converted.ItemName;
+            logger.LogInformation($"Adjusted buy state for trade {buy.Uuid} {buy.Tag} {JsonConvert.SerializeObject(itemStateAtTrade)}");
+        }
+        catch (System.Exception e)
+        {
+            logger.LogError(e, $"Could not adjust buy state for trade {buy.Uuid} {buy.Tag} {JsonConvert.SerializeObject(itemStateAtTrade)}");
+        }
+    }
+
     public ApiSaveAuction FromItemRepresent(Coflnet.Sky.PlayerState.Client.Model.Item i)
     {
         var auction = new SaveAuction()
@@ -86,6 +105,12 @@ public class RepresentationConverter
             Tag = i.Tag,
             ItemName = i.ItemName,
         };
+        AssignProperties(i, auction);
+        return JsonConvert.DeserializeObject<ApiSaveAuction>(JsonConvert.SerializeObject(auction));
+    }
+
+    private static void AssignProperties(PlayerState.Client.Model.Item i, SaveAuction auction)
+    {
         auction.Enchantments = i.Enchantments?.Select(e => new Enchantment()
         {
             Type = Enum.TryParse<Enchantment.EnchantmentType>(e.Key, out var type) ? type : Enchantment.EnchantmentType.unknown,
@@ -95,6 +120,5 @@ public class RepresentationConverter
         auction.Reforge = Enum.TryParse<ItemReferences.Reforge>(i.ExtraAttributes.FirstOrDefault(a => a.Key == "modifier").Value?.ToString() ?? "", out var reforge) ? reforge : ItemReferences.Reforge.Unknown;
         i.ExtraAttributes.Remove("modifier");
         auction.SetFlattenedNbt(NBT.FlattenNbtData(NBT.FromDeserializedJson(i.ExtraAttributes)));
-        return JsonConvert.DeserializeObject<ApiSaveAuction>(JsonConvert.SerializeObject(auction));
     }
 }

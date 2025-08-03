@@ -630,7 +630,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 flags |= FlipFlags.ViaTrade;
                 buy.HighestBidAmount = tradeEstimate;
                 // adjust buy state to match traded attributes
-                TryUpdatingBuyState(buy, itemStateAtTrade);
+                representationConverter.TryUpdatingBuyState(buy, itemStateAtTrade);
                 if (itemCount > 1)
                 {
                     flags |= FlipFlags.MultiItemTrade;
@@ -642,23 +642,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             return (flags, null);
         }
 
-        private void TryUpdatingBuyState(ApiSaveAuction buy, PlayerState.Client.Model.Item itemStateAtTrade)
-        {
-            try
-            {
-                buy.Enchantments = itemStateAtTrade.Enchantments.Select(e => new Enchantment()
-                {
-                    Level = (byte)e.Value,
-                    Type = Enum.TryParse<Enchantment.EnchantmentType>(e.Key, out var type) ? type : Enchantment.EnchantmentType.unknown
-                }).ToList();
-                buy.SetFlattenedNbt(NBT.FlattenNbtData(itemStateAtTrade.ExtraAttributes));
-                logger.LogInformation($"Adjusted buy state for trade {buy.Uuid} {buy.Tag} {JsonConvert.SerializeObject(itemStateAtTrade)}");
-            }
-            catch (System.Exception e)
-            {
-                logger.LogError(e, $"Could not adjust buy state for trade {buy.Uuid} {buy.Tag} {JsonConvert.SerializeObject(itemStateAtTrade)}");
-            }
-        }
+        
 
         private async Task<(int itemCount, long tradeEstimate, List<Transaction> items)> GetTradeValue(List<Transaction> itemTrade)
         {
