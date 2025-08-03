@@ -652,6 +652,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     Type = Enum.TryParse<Enchantment.EnchantmentType>(e.Key, out var type) ? type : Enchantment.EnchantmentType.unknown
                 }).ToList();
                 buy.SetFlattenedNbt(NBT.FlattenNbtData(itemStateAtTrade.ExtraAttributes));
+                logger.LogInformation($"Adjusted buy state for trade {buy.Uuid} {buy.Tag} {JsonConvert.SerializeObject(itemStateAtTrade)}");
             }
             catch (System.Exception e)
             {
