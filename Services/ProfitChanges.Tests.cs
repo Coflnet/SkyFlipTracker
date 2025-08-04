@@ -1225,6 +1225,19 @@ public class ProfitChangeTests
         Assert.That(changes[1].Label, Is.EqualTo("CRIMSON essence x435 to add 8 stars"));
         Assert.That(changes[3].Label, Is.EqualTo("HEAVY_PEARLx3 for star"));
     }
+
+
+    [Test]
+    public async Task KuudraTransferTypeChange()
+    {
+        Mock<IPricesApi> pricesApi = SetupItemPrice(200_000);
+        var buy = CreateAuction("HOT_TERROR_LEGGINGS", "Ancient Hot Terror Leggings ✪✪✪✪✪", 15_000_000);
+        var sell = CreateAuction("HOT_CRIMSON_LEGGINGS", "Ancient Hot Crimson Leggings ✪✪✪✪✪", 20_000_000);
+        var changes = await service.GetChanges(buy, sell);
+        changes.Count.Should().Be(3, "ah fees and transfer cost");
+        changes[1].Amount.Should().Be(-100000, "transfer cost");
+        changes[2].Amount.Should().Be(-200000, "piece cost");
+    }
     /// <summary>
     /// Hellfire rod doesn't use master stars to upgrade
     /// </summary>

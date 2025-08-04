@@ -284,6 +284,9 @@ public class ProfitChangeService
 
     private async IAsyncEnumerable<PastFlip.ProfitChange> GetCraftCosts(Core.SaveAuction buy, Core.SaveAuction sell, IPriceProvider priceProvider)
     {
+
+        string[] armorPieces = ["HELMET", "CHESTPLATE", "LEGGINGS", "BOOTS"];
+        string[] tiers = ["HOT_", "BURNING_", "FIERY_", "INFERNAL_"];
         var tagOnPurchase = buy.Tag;
         if (tagOnPurchase.Contains("_WITHER_"))
         {
@@ -304,6 +307,20 @@ public class ProfitChangeService
                 filter.Add(item.Key, $"1-{item.Value}");
             }
             yield return await priceProvider.CostOf(sell.Tag, $"{ItemReferences.RemoveReforgesAndLevel(sell.ItemName)} godroll", 1, filter);
+            yield break;
+        }
+        if (tiers.Any(t => tagOnPurchase.StartsWith(t))
+            && tiers.Any(t => sell.Tag.StartsWith(t))
+            && armorPieces.Any(p => tagOnPurchase.EndsWith(p)))
+        {
+            yield return new("/kuudratransfer cost", -100_000);
+            var clearedTag = sell.Tag;
+            foreach (var item in tiers)
+            {
+                if (item.StartsWith(tagOnPurchase.Substring(0, item.Length)))
+                    clearedTag = clearedTag.Substring(item.Length);
+            }
+            yield return await priceProvider.CostOf(clearedTag, $"Conversion Armor piece");
             yield break;
         }
         var allCrafts = await craftsApi.GetAllAsync();
@@ -554,26 +571,26 @@ public class ProfitChangeService
             yield break; // already handled
 
         foreach (var ingredient in items.GroupBy(i => i).Select(g => (g.Key, count: g.Count())))
+        {
+            if (item.Value == "PET_ITEM_TIER_BOOST")
+                continue; // already handled
+            if (item.Key.StartsWith("RUNE_") && item.Key != ingredient.Key)
+                continue; // rune mapping returns both without and with level and here we only handle without
+            if (item.Key == "ability_scroll")
             {
-                if (item.Value == "PET_ITEM_TIER_BOOST")
-                    continue; // already handled
-                if (item.Key.StartsWith("RUNE_") && item.Key != ingredient.Key)
-                    continue; // rune mapping returns both without and with level and here we only handle without
-                if (item.Key == "ability_scroll")
-                {
-                    yield return await priceProvider.CostOf(ingredient.Key, $"Applied {ingredient.Key}");
-                    continue;
-                }
-                if (item.Key == "skin" && sell.Tag.StartsWith("PET_"))
-                {
-                    yield return await priceProvider.CostOf($"PET_SKIN_" + ingredient.Key, $"Applied {ingredient.Key}");
-                    continue;
-                }
-                if (ingredient.count == 1)
-                    yield return await priceProvider.CostOf(ingredient.Key, $"Used {ingredient.Key} to upgraded {item.Key} to {item.Value}", ingredient.count);
-                else
-                    yield return await priceProvider.CostOf(ingredient.Key, $"Used {ingredient.count}x {ingredient.Key} to upgraded {item.Key} to {item.Value}", ingredient.count);
+                yield return await priceProvider.CostOf(ingredient.Key, $"Applied {ingredient.Key}");
+                continue;
             }
+            if (item.Key == "skin" && sell.Tag.StartsWith("PET_"))
+            {
+                yield return await priceProvider.CostOf($"PET_SKIN_" + ingredient.Key, $"Applied {ingredient.Key}");
+                continue;
+            }
+            if (ingredient.count == 1)
+                yield return await priceProvider.CostOf(ingredient.Key, $"Used {ingredient.Key} to upgraded {item.Key} to {item.Value}", ingredient.count);
+            else
+                yield return await priceProvider.CostOf(ingredient.Key, $"Used {ingredient.count}x {ingredient.Key} to upgraded {item.Key} to {item.Value}", ingredient.count);
+        }
     }
 
     private async IAsyncEnumerable<PastFlip.ProfitChange> GetPetRarityUpgrades(Core.SaveAuction buy, Core.SaveAuction sell, IPriceProvider priceProvider)
