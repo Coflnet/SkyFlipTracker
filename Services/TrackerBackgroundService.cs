@@ -326,16 +326,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                                 await Task.Delay(purchaseableIn);
                             try
                             {
-                                if (profit > 3_000_000)
+                                if (profit > 300_000)
                                     await rerequestService.BaseAhPlayerIdPostAsync(item.Auction.AuctioneerId, "recheck");
-                                await Task.Delay(40_000);
-                                await rerequestService.BaseAhPlayerIdPostAsync(item.Auction.AuctioneerId, "recheck40");
-                                await Task.Delay(60_000);
-                                if (profit > 3_000_000)
-                                    await rerequestService.BaseAhPlayerIdPostAsync(item.Auction.AuctioneerId, "recheck100");
-                                await Task.Delay(60_000);
-                                if (profit > 6_000_000)
-                                    await rerequestService.BaseAhPlayerIdPostAsync(item.Auction.AuctioneerId, "recheck160");
                             }
                             catch (Exception)
                             {
