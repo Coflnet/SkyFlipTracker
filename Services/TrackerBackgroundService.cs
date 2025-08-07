@@ -120,7 +120,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             {
                 foreach (var item in toUpdate)
                 {
-                    if (item.StartingBid > 80_000_000 && item.Start > DateTime.UtcNow - TimeSpan.FromMinutes(1))
+                    if (item.StartingBid > 5_000_000 && item.Start > DateTime.UtcNow - TimeSpan.FromMinutes(1))
                         CheckLister(item); // expensive items may be underlisted
                     if (!item.Coop.Any(c => AnalyseController.BadPlayersList.Contains(c)))
                     {
@@ -145,24 +145,15 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 var purchaseAble = item.Start + TimeSpan.FromSeconds(19) - DateTime.UtcNow;
                 if (purchaseAble > TimeSpan.FromSeconds(1))
                     await Task.Delay(purchaseAble);
-                await Task.Delay(45_000);
-                for (int i = 0; i < 2; i++)
+                await Task.Delay(35_000);
+                try
                 {
-                    if (i == 2)
-                    {
-                        await Task.Delay(10000);
-                        continue; // normal update
-                    }
-                    try
-                    {
-                        logger.LogInformation("requesting ah update for {auctioneedr} because of {uuid}", item.AuctioneerId, item.Uuid);
-                        await rerequestService.BaseAhPlayerIdPostAsync(item.AuctioneerId, "checkLister" + i);
-                    }
-                    catch (Exception e)
-                    {
-                        logger.LogError(e, "could not rerequest player auctions");
-                    }
-                    await Task.Delay(60_000);
+                    logger.LogInformation("requesting ah update for {auctioneedr} because of {uuid}", item.AuctioneerId, item.Uuid);
+                    await rerequestService.BaseAhPlayerIdPostAsync(item.AuctioneerId, "checkLister");
+                }
+                catch (Exception e)
+                {
+                    logger.LogError(e, "could not rerequest player auctions");
                 }
             });
         }
