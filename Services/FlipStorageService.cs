@@ -234,7 +234,7 @@ public class FlipStorageService
             .ClusteringKey(c => c.AuctionStart, SortOrder.Descending)
             .Column(c => c.AuctionStart, cm => cm.WithDbType<DateTime>().WithName("auction_start"))
             .Column(c => c.Slot, cm => cm.WithDbType<int>())
-            .Column(c=>c.Uid, cm=>cm.WithDbType<long>().WithSecondaryIndex())
+            .Column(c => c.Uid, cm => cm.WithDbType<long>().WithSecondaryIndex())
             .Column(c => c.SerializedAuction, cm => cm.WithDbType<byte[]>().WithName("serialized_auction"))
             .Column(c => c.Flip, cm => cm.Ignore())
             ), "unsold_flips");
@@ -273,6 +273,9 @@ public class FlipStorageService
 
     public async Task SaveUnsoldFlip(UnsoldFlip flip)
     {
+        var profitPerHour = (flip.Flip.TargetPrice - flip.Flip.Auction.StartingBid) * flip.Flip.DailyVolume / 24;
+        if (profitPerHour < 50_000 || profitPerHour < 500_000 && flip.Flip.Finder == LowPricedAuction.FinderType.STONKS)
+            return;// uninteresting
         var insert = unsoldFlips.Insert(flip);
         insert.SetTTL(7200); // 2 hours
         await insert.ExecuteAsync();
@@ -283,7 +286,7 @@ public class FlipStorageService
         var toDelete = await unsoldFlips.Where(f => f.Uid == uid).ExecuteAsync();
         foreach (var item in toDelete)
         {
-            unsoldFlips.Where(u=>u.Slot == 0 && u.AuctionStart == item.AuctionStart).Execute();
+            unsoldFlips.Where(u => u.Slot == 0 && u.AuctionStart == item.AuctionStart).Execute();
         }
     }
 
