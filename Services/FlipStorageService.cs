@@ -27,6 +27,7 @@ public class FlipStorageService
     private Table<FinderContext> finderContexts;
     private Table<ComplicatedFlip> complicatedFlips;
     private Table<PastFlip> unknownFlips;
+    private Table<UnsoldFlip> unsoldFlips;
     private ISession session;
     public FlipStorageService(ILogger<FlipStorageService> logger, IConfiguration config, ISession session)
     {
@@ -166,6 +167,18 @@ public class FlipStorageService
         var session = await GetSession();
         var table = GetFlipsTable(session);
         await table.CreateIfNotExistsAsync();
+
+        var tableName = "unsold_flips";
+        var checkQuery = new SimpleStatement($"SELECT default_time_to_live FROM system_schema.tables WHERE keyspace_name = '{session.Keyspace}' AND table_name = '{tableName.ToLower()}'");
+        var result = await session.ExecuteAsync(checkQuery);
+        var row = result.FirstOrDefault();
+
+        if (row != null && row.GetValue<int>("default_time_to_live") != 7200)
+        {
+            logger.LogInformation("Table {table} already exists in correct configuration, skipping creation.", tableName);
+            return;
+        }
+
         finderContexts = new Table<FinderContext>(session, new MappingConfiguration().Define(new Map<FinderContext>()
             .PartitionKey(c => c.AuctionId)
             .ClusteringKey(c => c.Finder)
@@ -215,6 +228,19 @@ public class FlipStorageService
         // set the table to have a ttl of 14 days and time window compaction
         await unknownFlips.CreateIfNotExistsAsync();
         session.Execute("ALTER TABLE unknown_flips2 WITH default_time_to_live = 1209600 AND compaction = { 'class' : 'TimeWindowCompactionStrategy', 'compaction_window_size' : 1, 'compaction_window_unit' : 'DAYS' }");
+
+        unsoldFlips = new Table<UnsoldFlip>(session, new MappingConfiguration().Define(new Map<UnsoldFlip>()
+            .PartitionKey(c => c.Slot)
+            .ClusteringKey(c => c.AuctionStart, SortOrder.Descending)
+            .Column(c => c.AuctionStart, cm => cm.WithDbType<DateTime>().WithName("auction_start"))
+            .Column(c => c.Slot, cm => cm.WithDbType<int>())
+            .Column(c=>c.Uid, cm=>cm.WithDbType<long>().WithSecondaryIndex())
+            .Column(c => c.SerializedAuction, cm => cm.WithDbType<byte[]>().WithName("serialized_auction"))
+            .Column(c => c.Flip, cm => cm.Ignore())
+            ), "unsold_flips");
+        // set the table to have a ttl of 2 hours and compact every 30 minutes as it has high insert and delete rate
+        await unsoldFlips.CreateIfNotExistsAsync();
+        session.Execute("ALTER TABLE unsold_flips WITH default_time_to_live = 7200 AND compaction = { 'class' : 'TimeWindowCompactionStrategy', 'compaction_window_size' : 30, 'compaction_window_unit' : 'MINUTES' }");
         logger.LogInformation("Migration complete, all tables created and configured.");
     }
 
@@ -238,5 +264,39 @@ public class FlipStorageService
     public async Task<IEnumerable<PastFlip>> GetUnknownFlips(DateTime start, DateTime end)
     {
         return await unknownFlips.Where(f => f.FinderType == 0 && f.SellTime >= start && f.SellTime <= end).ExecuteAsync();
+    }
+
+    public async Task<IEnumerable<UnsoldFlip>> GetUnsoldFlips(DateTime olderThan, int amount)
+    {
+        return await unsoldFlips.Where(f => f.Slot == 0 && f.AuctionStart < olderThan).Take(amount).ExecuteAsync();
+    }
+
+    public async Task SaveUnsoldFlip(UnsoldFlip flip)
+    {
+        var insert = unsoldFlips.Insert(flip);
+        insert.SetTTL(7200); // 2 hours
+        await insert.ExecuteAsync();
+    }
+
+    public async Task SoldFlipUid(long uid)
+    {
+        var toDelete = await unsoldFlips.Where(f => f.Uid == uid).ExecuteAsync();
+        foreach (var item in toDelete)
+        {
+            unsoldFlips.Where(u=>u.Slot == 0 && u.AuctionStart == item.AuctionStart).Execute();
+        }
+    }
+
+    internal async Task DeleteActiveBasedOnStartTime(IEnumerable<DateTime> enumerable)
+    {
+        var list = enumerable.ToList();
+        var batchUpdate = session.CreateBatch();
+
+        foreach (var item in list)
+        {
+            batchUpdate.Append(unsoldFlips.Where(u => u.Slot == 0 && u.AuctionStart == item).Delete());
+        }
+        await batchUpdate.ExecuteAsync();
+        logger.LogInformation("Deleted {count} unsold flips", list.Count());
     }
 }

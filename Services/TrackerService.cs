@@ -196,6 +196,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             var count = await db.SaveChangesAsync();
             if (count > 0)
                 Console.WriteLine($"Saved sells {count}");
+            await flipStorageService.DeleteActiveBasedOnStartTime(sells.Where(s => s.Bin && s.Bids.Count > 0).Select(s => s.Start));
         }
 
         public async Task PutBuySpeedOnBoard(IEnumerable<SaveAuction> sells)
@@ -642,7 +643,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             return (flags, null);
         }
 
-        
+
 
         private async Task<(int itemCount, long tradeEstimate, List<Transaction> items)> GetTradeValue(List<Transaction> itemTrade)
         {

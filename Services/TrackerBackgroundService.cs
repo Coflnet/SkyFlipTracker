@@ -289,7 +289,9 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             {
                 try
                 {
+                    var unsoldTask = storageService.SaveUnsoldFlip(new(lp));
                     await storageService.SaveFinderContext(lp);
+                    await unsoldTask;
                 }
                 catch (Exception e)
                 {
