@@ -269,15 +269,25 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
         public async Task<IEnumerable<UnsoldFlip>> GetUnsoldFlips(DateTime olderThan, [FromServices] IAuctionsApi auctionsApi, int amount = 20)
         {
             var list = (await flipStorageService.GetUnsoldFlips(olderThan, amount)).ToList();
-            foreach (var item in list.OrderBy(i => Random.Shared.Next()).Take(2))
+            _ = Task.Run(async () =>
             {
-                // sample check if auction is already sold
-                var data = await auctionsApi.ApiAuctionAuctionUuidGetAsync(item.Flip.Auction.Uuid);
-                if (data?.End < DateTime.UtcNow)
+                try
                 {
-                    await flipStorageService.DeleteActiveBasedOnStartTime([item.AuctionStart]);
+                    foreach (var item in list.OrderBy(i => Random.Shared.Next()).Take(2))
+                    {
+                        // sample check if auction is already sold
+                        var data = await auctionsApi.ApiAuctionAuctionUuidGetAsync(item.Flip.Auction.Uuid);
+                        if (data?.End < DateTime.UtcNow)
+                        {
+                            await flipStorageService.DeleteActiveBasedOnStartTime([item.AuctionStart]);
+                        }
+                    }
                 }
-            }
+                catch (System.Exception e)
+                {
+                    logger.LogError(e, "Error checking unsold flips");
+                }
+            });
             return list;
         }
 
