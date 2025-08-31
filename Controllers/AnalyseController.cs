@@ -288,6 +288,13 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             double antiMacro = GetShortTermAntiMacroDelay(maxAge, timeDif, macroedFlips.Where(t => t.age < maxAge * shortMacroMultiplier).ToList());
 
             double penaltiy = CalculatePenalty(request, maxAge, timeDif, escrowedUserCount, ref avg, antiMacro, badIds);
+            
+            // Add penalty for users who don't sell flips often enough
+            double sellRatioPenalty = await CalculateSellRatioPenalty(maxAge, maxTime, numeric);
+            //penaltiy += sellRatioPenalty;
+            logger.LogInformation("Would give sell ratio penalty of {0} to {user}", sellRatioPenalty, string.Join(',', request.PlayerIds));
+
+
             var flipVal = await GetBoughtFlipsWorth(maxAge * 16, maxTime, relevantFlips);
             var flipworth = flipVal.Sum(f => f.TargetPrice);
             if (flipworth < 150_000_000)
@@ -323,7 +330,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
                 BoughtWorth = flipworth,
                 ReceivedCount = receivedCount,
                 TopBuySpeed = timeDif.Any() ? timeDif.Max(d => d.TotalSeconds) : 0,
-                AntiMacro = antiMacro
+                AntiMacro = antiMacro,
+                SellRatioPenalty = sellRatioPenalty
             };
         }
 
@@ -508,6 +516,45 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             return tooFast.Where(f => f.age * shrink < maxAge).Select(f => (maxAge - f.age * shrink) / (maxAge) * v).Where(d => d > 0).Sum();
         }
 
+        /// <summary>
+        /// Calculates penalty for users who buy flips but don't sell them often enough
+        /// </summary>
+        private async Task<double> CalculateSellRatioPenalty(TimeSpan maxAge, DateTime maxTime, IEnumerable<long> numeric)
+        {
+            var minTime = maxTime.Subtract(maxAge * 4); // Look at a longer timeframe for sell ratio
+            
+            // Count purchases (AUCTION_SOLD events by the user)
+            var purchaseCount = await db.FlipEvents.Where(flipEvent =>
+                flipEvent.Type == FlipEventType.AUCTION_SOLD
+                && numeric.Contains(flipEvent.PlayerId)
+                && flipEvent.Timestamp > minTime
+                && flipEvent.Timestamp <= maxTime)
+                .CountAsync();
+
+            // Count sales (START events for auctions by the user)
+            var saleCount = await db.FlipEvents.Where(flipEvent =>
+                flipEvent.Type == FlipEventType.START
+                && numeric.Contains(flipEvent.PlayerId)
+                && flipEvent.Timestamp > minTime
+                && flipEvent.Timestamp <= maxTime)
+                .CountAsync();
+
+            if (purchaseCount == 0)
+                return 0;
+
+            var sellRatio = (double)saleCount / purchaseCount;
+            
+            // Apply penalty if sell ratio is too low
+            // Expect at least 30% sell ratio, penalty increases as ratio drops
+            if (sellRatio < 0.3 && purchaseCount > 5)
+            {
+                var penalty = (0.3 - sellRatio) * 2.0; // Scale penalty
+                return Math.Min(penalty, 1.0); // Cap at 1.0
+            }
+
+            return 0;
+        }
+
         public class SpeedCompResult
         {
             public int ReceivedCount { get; set; }
@@ -524,6 +571,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             public long BoughtWorth { get; set; }
             public double TopBuySpeed { get; set; }
             public double AntiMacro { get; internal set; }
+            public double SellRatioPenalty { get; set; }
         }
 
         public class Timing
