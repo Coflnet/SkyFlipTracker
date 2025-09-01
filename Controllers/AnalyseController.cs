@@ -291,8 +291,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             
             // Add penalty for users who don't sell flips often enough
             double sellRatioPenalty = await CalculateSellRatioPenalty(maxAge, maxTime, numeric);
-            //penaltiy += sellRatioPenalty;
-            logger.LogInformation("Would give sell ratio penalty of {0} to {user}", sellRatioPenalty, string.Join(',', request.PlayerIds));
+            penaltiy += sellRatioPenalty;
+            logger.LogInformation("Gave sell ratio penalty of {0} to {user}", sellRatioPenalty, string.Join(',', request.PlayerIds));
 
 
             var flipVal = await GetBoughtFlipsWorth(maxAge * 16, maxTime, relevantFlips);
@@ -521,7 +521,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
         /// </summary>
         private async Task<double> CalculateSellRatioPenalty(TimeSpan maxAge, DateTime maxTime, IEnumerable<long> numeric)
         {
-            var minTime = maxTime.Subtract(maxAge * 4); // Look at a longer timeframe for sell ratio
+            var minTime = maxTime.Subtract(maxAge * 8); // Look at a longer timeframe for sell ratio
             
             // Count purchases (AUCTION_SOLD events by the user)
             var purchaseCount = await db.FlipEvents.Where(flipEvent =>
