@@ -217,7 +217,7 @@ public class ProfitChangeService
             // special case for alias
             reforgeName = "aotestone";
         }
-        if (buy.Reforge != sell.Reforge)
+        if (buy.Reforge != sell.Reforge && buy.Reforge != ItemReferences.Reforge.Unknown)
         {
             var reforgeItem = mapper.GetReforgeCost(sell.Reforge, sell.Tier);
             if (reforgeItem.Item1 != string.Empty)
