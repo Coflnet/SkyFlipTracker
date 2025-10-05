@@ -4,6 +4,14 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Newtonsoft.Json;
 using NUnit.Framework;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Coflnet.Sky.SkyAuctionTracker.Models;
+using Coflnet.Sky.Core;
+using System.Collections.Generic;
+using System.Linq;
+using System;
+using System.Diagnostics;
 
 namespace Coflnet.Sky.SkyAuctionTracker.Services;
 
@@ -307,6 +315,246 @@ public class TrackerServiceTests
     ],
     "OtherSide": "Lexingtoni",
     "TimeStamp": "2024-09-16T10:09:20.5472495Z"
+    }
+    """;
+
+    [Test]
+    public async Task MultiItemTradeSellEachItemStoredAsSeparateFlip()
+    {
+        // Arrange
+        var trade = JsonConvert.DeserializeObject<Models.TradeModel>(ThreeItemTrade);
+        var savedFlips = new List<PastFlip>();
+        
+        // Mock all required services
+        var mockSniperClient = new Mock<ISniperClient>();
+        mockSniperClient.Setup(s => s.GetPrices(It.IsAny<IEnumerable<SaveAuction>>()))
+            .ReturnsAsync(new List<Sniper.Client.Model.PriceEstimate>
+            {
+                new (){Median = 55951748}, 
+                new (){Median = 52680000}, 
+                new (){Median = 57628256}  
+            });
+        
+        var mockRepresentationConverter = new RepresentationConverter(
+            NullLogger<RepresentationConverter>.Instance, 
+            mockSniperClient.Object);
+        
+        var mockFlipStorageService = new Mock<FlipStorageService>(null, null, null);
+        mockFlipStorageService.Setup(x => x.SaveFlip(It.IsAny<PastFlip>()))
+            .Callback<PastFlip>(flip => savedFlips.Add(flip))
+            .Returns(Task.CompletedTask);
+        mockFlipStorageService.Setup(x => x.GetFlips(It.IsAny<Guid>(), It.IsAny<DateTime>(), It.IsAny<DateTime>()))
+            .ReturnsAsync(new List<PastFlip>());
+        
+        var mockProfitChangeService = new Mock<ProfitChangeService>(null, null, null, null, null, null, null, null);
+        mockProfitChangeService.Setup(x => x.GetChanges(It.IsAny<SaveAuction>(), It.IsAny<SaveAuction>()))
+            .ReturnsAsync(new List<PastFlip.ProfitChange>());
+        
+        var mockTransactionApi = new Mock<PlayerState.Client.Api.ITransactionApi>();
+        mockTransactionApi.Setup(x => x.TransactionUuidItemIdPostAsync(It.IsAny<List<Guid>>(), It.IsAny<int>(), It.IsAny<System.Threading.CancellationToken>()))
+            .ReturnsAsync(new Dictionary<string, List<long>>());
+        
+        var mockAuctionsApi = new Mock<Api.Client.Api.IAuctionsApi>();
+        // Map UIDs from trade items to purchase UUIDs (without dashes for GetId compatibility)
+        var uidToPurchaseUuid = new Dictionary<string, string>
+        {
+            {"6c637a2f2348", "1267927d5ab34def93416c637a2f2348"}, // Leggings
+            {"cdfb42282c37", "a61dcf9372ac47aa98e8cdfb42282c37"}, // Boots
+            {"56620299aee5", "d13b0ccf615c4d9093db56620299aee5"}  // Helmet
+        };
+        
+        mockAuctionsApi.Setup(x => x.ApiAuctionsUidsSoldPostWithHttpInfoAsync(It.IsAny<Api.Client.Model.InventoryBatchLookup>(), It.IsAny<int>(), It.IsAny<System.Threading.CancellationToken>()))
+            .ReturnsAsync((Api.Client.Model.InventoryBatchLookup lookup, int operationIndex, System.Threading.CancellationToken ct) =>
+            {
+                var data = new Dictionary<string, List<Api.Client.Model.ItemSell>>();
+                foreach (var uid in lookup.Uuids)
+                {
+                    if (uidToPurchaseUuid.TryGetValue(uid, out var purchaseUuid))
+                    {
+                        data[uid] = new List<Api.Client.Model.ItemSell>
+                        {
+                            new Api.Client.Model.ItemSell
+                            {
+                                Uuid = purchaseUuid,
+                                Buyer = "8fb6da3fe4ba4530bcf58c1c10740b49",
+                                Timestamp = DateTime.UtcNow.AddDays(-10)
+                            }
+                        };
+                    }
+                }
+                
+                return new Api.Client.Client.ApiResponse<Dictionary<string, List<Api.Client.Model.ItemSell>>>(
+                    System.Net.HttpStatusCode.OK,
+                    null,
+                    data);
+            });
+        
+        // Mock GetAuction call for each purchase
+        mockAuctionsApi.Setup(x => x.ApiAuctionAuctionUuidGetWithHttpInfoAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<System.Threading.CancellationToken>()))
+            .Returns((string uuid, int operationIndex, System.Threading.CancellationToken ct) =>
+            {
+                // Return different auction based on which UUID is requested
+                var (tag, itemName) = uuid switch
+                {
+                    "1267927d5ab34def93416c637a2f2348" => ("DIVAN_LEGGINGS", "§dJaded Leggings of Divan"),
+                    "a61dcf9372ac47aa98e8cdfb42282c37" => ("DIVAN_BOOTS", "§dJaded Boots of Divan"),
+                    "d13b0ccf615c4d9093db56620299aee5" => ("DIVAN_HELMET", "§dJaded Helmet of Divan"),
+                    _ => ("TEST_ITEM", "§fTest Item")
+                };
+                
+                var auction = new SaveAuction
+                {
+                    Uuid = uuid,
+                    Tag = tag,
+                    ItemName = itemName,
+                    HighestBidAmount = 45000000, // Each bought for ~45M
+                    End = DateTime.UtcNow.AddDays(-15),
+                    AuctioneerId = "somesellerid",
+                    FlatenedNBT = new() { { "uid", "testuid" } },
+                    Bids = new() { new() { Bidder = "8fb6da3fe4ba4530bcf58c1c10740b49", Amount = 45000000 } }
+                };
+                var json = JsonConvert.SerializeObject(auction);
+                
+                var response = new Api.Client.Client.ApiResponse<Api.Client.Model.ColorSaveAuction>(
+                    System.Net.HttpStatusCode.OK,
+                    new Api.Client.Client.Multimap<string, string>(),
+                    null,
+                    json
+                );
+                return Task.FromResult(response);
+            });
+        
+        
+        var mockSettingsApi = new Mock<Settings.Client.Api.ISettingsApi>();
+        
+        var trackerService = new TrackerService(
+            null,
+            NullLogger<TrackerService>.Instance,
+            mockAuctionsApi.Object,
+            null, // FlipSumaryEventProducer can be null
+            null, // scopeFactory can be null, will just skip database finder lookup
+            mockProfitChangeService.Object,
+            mockFlipStorageService.Object,
+            new ActivitySource("test"),
+            null,
+            null,
+            mockSettingsApi.Object,
+            null,
+            mockTransactionApi.Object,
+            mockRepresentationConverter
+        );
+        
+        // Act
+        await trackerService.AddTrades(new[] { trade });
+        
+        // Assert
+        savedFlips.Should().HaveCount(3, "each item in the multi-item trade should be stored as a separate flip");
+        
+        savedFlips.Should().Contain(f => f.ItemTag == "DIVAN_LEGGINGS", "leggings should be saved");
+        savedFlips.Should().Contain(f => f.ItemTag == "DIVAN_BOOTS", "boots should be saved");
+        savedFlips.Should().Contain(f => f.ItemTag == "DIVAN_HELMET", "helmet should be saved");
+        
+        savedFlips.Should().OnlyContain(f => f.Flipper == Guid.Parse("8fb6da3fe4ba4530bcf58c1c10740b49"));
+        
+        var totalSellPrice = savedFlips.Sum(f => f.SellPrice);
+        totalSellPrice.Should().BeInRange(140999990, 141000010);
+    }
+
+    private static string ThreeItemTrade = """
+    {
+        "UserId": "140536",
+        "MinecraftUuid": "8fb6da3f-e4ba-4530-bcf5-8c1c10740b49",
+        "Spent": [
+            {
+                "Id": 1186389063216261,
+                "ItemName": "§dJaded Leggings of Divan",
+                "Tag": "DIVAN_LEGGINGS",
+                "ExtraAttributes": {
+                    "rarity_upgrades": 1,
+                    "uid": "6c637a2f2348",
+                    "uuid": "1267927d-5ab3-4def-9341-6c637a2f2348",
+                    "timestamp": 1759236287546,
+                    "tier": 8
+                },
+                "Enchantments": null,
+                "Color": null,
+                "Description": "§7Health: §c+130\n§7Defense: §a+170\n§7Mining Speed: §6+140 §9(+60)\n§7Mining Fortune: §6+60 §9(+30)\n§7Heat Resistance: §c+10\n §8[§8⸕§8] §8[§8☘§8] §8[§8⸕§8] §8[§8☘§8] §8[§8✧§8]\n\n§d§l§ka§r §d§lMYTHIC LEGGINGS §d§l§ka",
+                "Count": 1
+            },
+            {
+                "Id": 1186590488451261,
+                "ItemName": "§dJaded Boots of Divan",
+                "Tag": "DIVAN_BOOTS",
+                "ExtraAttributes": {
+                    "rarity_upgrades": 1,
+                    "gems": {
+                        "JADE_1": "ROUGH",
+                        "JADE_0": "ROUGH",
+                        "unlocked_slots": ["AMBER_0", "AMBER_1", "JADE_0", "JADE_1", "TOPAZ_0"],
+                        "AMBER_0": "ROUGH",
+                        "AMBER_1": "ROUGH",
+                        "TOPAZ_0": "ROUGH"
+                    },
+                    "uid": "cdfb42282c37",
+                    "uuid": "a61dcf93-72ac-47aa-98e8-cdfb42282c37",
+                    "timestamp": 1750765097654,
+                    "tier": 8
+                },
+                "Enchantments": {
+                    "depth_strider": 3,
+                    "feather_falling": 5,
+                    "growth": 5
+                },
+                "Color": null,
+                "Description": "§7Health: §c+155\n§7Defense: §a+110\n§7Mining Speed: §6+188 §9(+60) §d(+48)\n§7Pristine: §5+0.4 §d(+0.4)\n§7Mining Fortune: §6+84 §9(+30) §d(+24)\n§7Heat Resistance: §c+10\n §f[§6⸕§f] §f[§a☘§f] §f[§6⸕§f] §f[§a☘§f] §f[§e✧§f]\n\n§9Depth Strider III\n§7Reduces how much you are slowed in\n§7the water by §a100%§7.\n§9Feather Falling V\n§7Increases how high you can fall\n§7before taking fall damage by §a5§7 and\n§7reduces fall damage by §a25%§7.\n§9Growth V\n§7Grants §a+75 §c❤ Health§7.\n\n§d§l§ka§r §d§lMYTHIC BOOTS §d§l§ka",
+                "Count": 1
+            },
+            {
+                "Id": 1186590570989261,
+                "ItemName": "§dJaded Helmet of Divan",
+                "Tag": "DIVAN_HELMET",
+                "ExtraAttributes": {
+                    "rarity_upgrades": 1,
+                    "hot_potato_count": 10,
+                    "gems": {
+                        "JADE_1": "ROUGH",
+                        "JADE_0": "ROUGH",
+                        "unlocked_slots": ["AMBER_0", "AMBER_1", "JADE_0", "JADE_1", "TOPAZ_0"],
+                        "AMBER_0": "ROUGH",
+                        "AMBER_1": "ROUGH",
+                        "TOPAZ_0": "ROUGH"
+                    },
+                    "uid": "56620299aee5",
+                    "uuid": "d13b0ccf-615c-4d90-93db-56620299aee5",
+                    "timestamp": 1629573420000,
+                    "tier": 8
+                },
+                "Enchantments": {
+                    "ultimate_last_stand": 5,
+                    "protection": 5,
+                    "growth": 5,
+                    "respiration": 3,
+                    "aqua_affinity": 1
+                },
+                "Color": null,
+                "Description": "§7Health: §c+215 §e(+40)\n§7Defense: §a+170 §e(+20)\n§7Mining Speed: §6+188 §9(+60) §d(+48)\n§7Pristine: §5+0.4 §d(+0.4)\n§7Mining Fortune: §6+84 §9(+30) §d(+24)\n§7Heat Resistance: §c+10\n§7Respiration: §3+45\n §f[§6⸕§f] §f[§a☘§f] §f[§6⸕§f] §f[§a☘§f] §f[§e✧§f]\n\n§9§d§lLast Stand V\n§7Gain §a+25% §a❈ Defense §7when hit while\n§7below §c40%❤§7.\n§9Aqua Affinity I\n§7Increases your underwater mining\n§7rate.\n§9Growth V\n§7Grants §a+75 §c❤ Health§7.\n§9Protection V\n§7Grants §a+20 §a❈ Defense§7.\n§9Respiration III\n§7Grants §3+45⚶ Respiration§7, which\n§7increases the amount of time you\n§7can stay under water.\n\n§d§l§ka§r §d§lMYTHIC HELMET §d§l§ka",
+                "Count": 1
+            }
+        ],
+        "Received": [
+            {
+                "Id": null,
+                "ItemName": "§6141M coins",
+                "Tag": null,
+                "ExtraAttributes": null,
+                "Enchantments": null,
+                "Color": null,
+                "Description": "§7Lump-sum amount\n\n§6Total Coins Offered:\n§7141M\n§8(141,000,000)",
+                "Count": 2
+            }
+        ],
+        "OtherSide": "imjustcake",
+        "TimeStamp": "2025-10-05T09:58:38.4644449Z"
     }
     """;
 }

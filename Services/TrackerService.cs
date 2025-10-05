@@ -369,10 +369,13 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             }
 
             List<Flip> finders = new();
-            using (var scope = scopeFactory.CreateScope())
-            using (var dbScoped = scope.ServiceProvider.GetRequiredService<TrackerDbContext>())
+            if (scopeFactory != null)
             {
-                finders = await dbScoped.Flips.Where(f => purchaseUid.Contains(f.AuctionId)).ToListAsync();
+                using (var scope = scopeFactory.CreateScope())
+                using (var dbScoped = scope.ServiceProvider.GetRequiredService<TrackerDbContext>())
+                {
+                    finders = await dbScoped.Flips.Where(f => purchaseUid.Contains(f.AuctionId)).ToListAsync();
+                }
             }
             var parallelOptions = new ParallelOptions()
             {
@@ -404,7 +407,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     (FlipFlags flags, var change) = await CheckTrade(buy, sell);
                     var purchaseId = GetId(buy.Uuid);
                     var flipFound = finders.Where(f => f != null && f.AuctionId == purchaseId).OrderBy(f => f.Timestamp).FirstOrDefault();
-                    flipSumaryEventProducer.Produce(new FlipSumaryEvent()
+                    flipSumaryEventProducer?.Produce(new FlipSumaryEvent()
                     {
                         Flipper = item.sell.AuctioneerId,
                         Buy = buy,

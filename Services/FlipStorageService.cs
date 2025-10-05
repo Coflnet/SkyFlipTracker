@@ -41,7 +41,7 @@ public class FlipStorageService
         return session;
     }
 
-    public async Task SaveFlip(PastFlip flip)
+    public virtual async Task SaveFlip(PastFlip flip)
     {
         var session = await GetSession();
         var table = GetFlipsTable(session);
@@ -109,7 +109,7 @@ public class FlipStorageService
         await Task.WhenAll(flips.Select(f => table.Insert(f).ExecuteAsync()));
     }
 
-    public async Task<IEnumerable<PastFlip>> GetFlips(Guid flipper, DateTime start, DateTime end)
+    public virtual async Task<IEnumerable<PastFlip>> GetFlips(Guid flipper, DateTime start, DateTime end)
     {
         var session = await GetSession();
         var table = GetFlipsTable(session);
