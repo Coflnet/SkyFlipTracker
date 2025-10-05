@@ -42,7 +42,8 @@ public class RepresentationConverter
                 auction.HighestBidAmount = coinAmount;
                 auction.End = item.TimeStamp;
                 auction.AuctioneerId = item.MinecraftUuid.ToString("N");
-                auction.Uuid = Guid.Empty.ToString("N");
+                // assign a unique uuid for each dummy auction so they map to distinct UId values
+                auction.Uuid = Guid.NewGuid().ToString("N");
                 return (SaveAuction)auction;
             }).Where(a => a != null).ToList();
 

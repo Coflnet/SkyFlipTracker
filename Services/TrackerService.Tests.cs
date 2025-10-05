@@ -390,6 +390,8 @@ public class TrackerServiceTests
             });
         
         // Mock GetAuction call for each purchase
+        // create inverse mapping purchaseUuid -> uid so GetAuction mock can include the correct uid
+        var purchaseToUid = uidToPurchaseUuid.ToDictionary(kv => kv.Value, kv => kv.Key);
         mockAuctionsApi.Setup(x => x.ApiAuctionAuctionUuidGetWithHttpInfoAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<System.Threading.CancellationToken>()))
             .Returns((string uuid, int operationIndex, System.Threading.CancellationToken ct) =>
             {
@@ -401,7 +403,8 @@ public class TrackerServiceTests
                     "d13b0ccf615c4d9093db56620299aee5" => ("DIVAN_HELMET", "§dJaded Helmet of Divan"),
                     _ => ("TEST_ITEM", "§fTest Item")
                 };
-                
+
+                var uidValue = purchaseToUid.TryGetValue(uuid, out var v) ? v : "testuid-" + uuid.Substring(0, 6);
                 var auction = new SaveAuction
                 {
                     Uuid = uuid,
@@ -410,11 +413,11 @@ public class TrackerServiceTests
                     HighestBidAmount = 45000000, // Each bought for ~45M
                     End = DateTime.UtcNow.AddDays(-15),
                     AuctioneerId = "somesellerid",
-                    FlatenedNBT = new() { { "uid", "testuid" } },
+                    FlatenedNBT = new() { { "uid", uidValue } },
                     Bids = new() { new() { Bidder = "8fb6da3fe4ba4530bcf58c1c10740b49", Amount = 45000000 } }
                 };
                 var json = JsonConvert.SerializeObject(auction);
-                
+
                 var response = new Api.Client.Client.ApiResponse<Api.Client.Model.ColorSaveAuction>(
                     System.Net.HttpStatusCode.OK,
                     new Api.Client.Client.Multimap<string, string>(),
@@ -455,7 +458,15 @@ public class TrackerServiceTests
         savedFlips.Should().Contain(f => f.ItemTag == "DIVAN_HELMET", "helmet should be saved");
         
         savedFlips.Should().OnlyContain(f => f.Flipper == Guid.Parse("8fb6da3fe4ba4530bcf58c1c10740b49"));
-        
+        // Ensure each saved flip has a distinct item uid so Cassandra clustering key won't overwrite entries
+        var uidCounts = savedFlips.GroupBy(f => f.Uid).ToDictionary(g => g.Key, g => g.Count());
+        var duplicates = uidCounts.Where(kv => kv.Value > 1).ToList();
+        if (duplicates.Any())
+        {
+            var msg = "Duplicate UIDs found: " + string.Join(", ", duplicates.Select(d => $"{d.Key} (count={d.Value})"));
+            Assert.Fail(msg);
+        }
+
         var totalSellPrice = savedFlips.Sum(f => f.SellPrice);
         totalSellPrice.Should().BeInRange(140999990, 141000010);
     }
