@@ -1726,4 +1726,70 @@ public class ProfitChangeTests
         }
         return all;
     }
+
+    /// <summary>
+    /// Test for crimson armor tier upgrade (e.g., FIERY -> INFERNAL)
+    /// Reproduces the error where invalid item tag "AL_CRIMSON_CHESTPLATE" was generated
+    /// </summary>
+    [Test]
+    public async Task CrimsonArmorTierUpgrade_ShouldNotThrowApiException()
+    {
+        var buy = new Core.SaveAuction()
+        {
+            Uuid = "d4e5e5157e7d428c90e82f88b32ff64e",
+            Tag = "FIERY_CRIMSON_CHESTPLATE",
+            ItemName = "Renowned Fiery Crimson Chestplate ✪✪✪✪✪",
+            HighestBidAmount = 100_000_000,
+            FlatenedNBT = new()
+            {
+                { "rarity_upgrades", "1" },
+                { "hpc", "15" },
+                { "unlocked_slots", "COMBAT_0,COMBAT_1" },
+                { "upgrade_level", "10" },
+                { "uid", "a5ed78627503" },
+                { "boss_tier", "3" },
+                { "uuid", "27d3b95a-14cb-4bf5-b356-a5ed78627503" },
+                { "color", "255:111:12" },
+                { "cc", "1" }
+            },
+            Tier = Core.Tier.MYTHIC
+        };
+
+        var sell = new Core.SaveAuction()
+        {
+            Uuid = "3693dbdce7e449bea132f08c202a1548",
+            Tag = "INFERNAL_CRIMSON_CHESTPLATE",
+            ItemName = "§dRenowned Infernal Crimson Chestplate",
+            HighestBidAmount = 299_999_999,
+            FlatenedNBT = new()
+            {
+                { "rarity_upgrades", "1" },
+                { "hpc", "15" },
+                { "unlocked_slots", "COMBAT_0,COMBAT_1" },
+                { "COMBAT_1_gem", "JASPER" },
+                { "COMBAT_0_gem", "JASPER" },
+                { "uid", "a5ed78627503" },
+                { "boss_tier", "3" },
+                { "uuid", "27d3b95a-14cb-4bf5-b356-a5ed78627503" },
+                { "color", "255:111:12" },
+                { "cc", "1" },
+                { "COMBAT_0", "FLAWLESS" },
+                { "COMBAT_0.uuid", "a414e08d-ac39-4f41-9ae2-c2975cf48ad9" },
+                { "COMBAT_1", "FLAWLESS" },
+                { "COMBAT_1.uuid", "2e58b7ce-346f-4538-bfa6-d6b83d9aa60c" }
+            },
+            Tier = Core.Tier.MYTHIC
+        };
+
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("CRIMSON_CHESTPLATE", null, 0, default))
+            .ReturnsAsync(() => new() { Median = 5_000_000 });
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("FLAWLESS_JASPER_GEM", null, 0, default))
+            .ReturnsAsync(() => new() { Median = 1_000_000 });
+
+        var result = await service.GetChanges(buy, sell);
+
+        result.Should().NotBeNull();
+        result.Should().Contain(c => c.Label.Contains("Conversion Armor piece"));
+        result.Should().Contain(c => c.Label == "/kuudratransfer cost");
+    }
 }

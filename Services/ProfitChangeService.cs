@@ -318,8 +318,11 @@ public class ProfitChangeService
             var clearedTag = sell.Tag;
             foreach (var item in tiers)
             {
-                if (item.StartsWith(tagOnPurchase.Substring(0, item.Length)))
-                    clearedTag = clearedTag.Substring(item.Length);
+                if (sell.Tag.StartsWith(item))
+                {
+                    clearedTag = sell.Tag.Substring(item.Length);
+                    break;
+                }
             }
             yield return await priceProvider.CostOf(clearedTag, $"Conversion Armor piece");
             yield break;
