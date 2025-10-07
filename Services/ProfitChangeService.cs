@@ -99,7 +99,7 @@ public class ProfitChangeService
 
     private async IAsyncEnumerable<PastFlip.ProfitChange> GetChangesAsync(Coflnet.Sky.Core.SaveAuction buy, Coflnet.Sky.Core.SaveAuction sell)
     {
-        if (IsTrade(sell)) // no fees on trades
+        if (IsAuction(sell)) // no fees on trades
             yield return GetAhTax(sell.HighestBidAmount, sell.StartingBid);
         var priceProvider = priceProviderFactory.Create(sell);
         if (IsNotcaluclateable(sell))
@@ -257,7 +257,7 @@ public class ProfitChangeService
         }
     }
 
-    private static bool IsTrade(Core.SaveAuction sell)
+    private static bool IsAuction(Core.SaveAuction sell)
     {
         return sell.Uuid != Guid.Empty.ToString("n");
     }

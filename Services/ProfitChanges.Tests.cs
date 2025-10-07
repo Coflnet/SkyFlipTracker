@@ -1792,4 +1792,83 @@ public class ProfitChangeTests
         result.Should().Contain(c => c.Label.Contains("Conversion Armor piece"));
         result.Should().Contain(c => c.Label == "/kuudratransfer cost");
     }
+
+    /// <summary>
+    /// Test that trade sells do not include AH tax
+    /// Trades are direct player-to-player exchanges with no auction house fees
+    /// Trade sells have an EMPTY UUID to distinguish them from auction sells
+    /// </summary>
+    [Test]
+    public async Task TradeSell_ShouldNotIncludeAhTax()
+    {
+        // Arrange: A flip where the sell was via trade (has an EMPTY UUID)
+        var buy = new Core.SaveAuction()
+        {
+            Uuid = Guid.NewGuid().ToString("N"),
+            Tag = "ASPECT_OF_THE_END",
+            ItemName = "Aspect of the End",
+            HighestBidAmount = 1_000_000,
+            FlatenedNBT = new(),
+            Tier = Core.Tier.RARE
+        };
+
+        var sell = new Core.SaveAuction()
+        {
+            Uuid = Guid.Empty.ToString("N"), // Trade sells have an EMPTY UUID
+            Tag = "ASPECT_OF_THE_END",
+            ItemName = "Aspect of the End",
+            HighestBidAmount = 2_000_000,
+            FlatenedNBT = new(),
+            Tier = Core.Tier.RARE
+        };
+
+        // Act
+        var result = await service.GetChanges(buy, sell);
+
+        // Assert
+        result.Should().NotBeNull();
+        result.Should().NotContain(c => c.Label == "ah tax", 
+            "trade sells should not include auction house tax as they are direct player-to-player exchanges");
+    }
+
+    /// <summary>
+    /// Test that auction sells DO include AH tax
+    /// Auction sells have a non-empty UUID
+    /// </summary>
+    [Test]
+    public async Task AuctionSell_ShouldIncludeAhTax()
+    {
+        // Arrange: A flip where the sell was via auction house (non-empty UUID)
+        var buy = new Core.SaveAuction()
+        {
+            Uuid = Guid.NewGuid().ToString("N"),
+            Tag = "ASPECT_OF_THE_END",
+            ItemName = "Aspect of the End",
+            HighestBidAmount = 1_000_000,
+            FlatenedNBT = new(),
+            Tier = Core.Tier.RARE
+        };
+
+        var sell = new Core.SaveAuction()
+        {
+            Uuid = Guid.NewGuid().ToString("N"), // Auction sells have a non-empty UUID
+            Tag = "ASPECT_OF_THE_END",
+            ItemName = "Aspect of the End",
+            HighestBidAmount = 2_000_000,
+            StartingBid = 1_800_000,
+            FlatenedNBT = new(),
+            Tier = Core.Tier.RARE
+        };
+
+        // Act
+        var result = await service.GetChanges(buy, sell);
+
+        // Assert
+        result.Should().NotBeNull();
+        result.Should().Contain(c => c.Label == "ah tax", 
+            "auction house sells should include auction house tax");
+        
+        var ahTax = result.First(c => c.Label == "ah tax");
+        ahTax.Amount.Should().BeNegative("AH tax is a cost");
+    }
 }

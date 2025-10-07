@@ -33,7 +33,7 @@ public class RepresentationConverter
         var coinAmount = parser.GetInventoryCoinSum(item.Received);
         try
         {
-            auctions = item.Spent.Select(sentItem =>
+            auctions = item.Spent.Select((sentItem,i) =>
             {
                 if (sentItem.ExtraAttributes == null)
                     return null;
@@ -42,8 +42,8 @@ public class RepresentationConverter
                 auction.HighestBidAmount = coinAmount;
                 auction.End = item.TimeStamp;
                 auction.AuctioneerId = item.MinecraftUuid.ToString("N");
-                // assign a unique uuid for each dummy auction so they map to distinct UId values
-                auction.Uuid = Guid.NewGuid().ToString("N");
+                auction.UId = DateTime.UtcNow.Ticks / 10_000 + i; // ensure unique uid for each item in trade
+                auction.Uuid = Guid.Empty.ToString("N");
                 return (SaveAuction)auction;
             }).Where(a => a != null).ToList();
 

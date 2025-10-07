@@ -575,15 +575,90 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
 
         private async Task AddListingAttempts(SaveAuction sell, List<PastFlip.ProfitChange> changes)
         {
-            var uid = sell.FlatenedNBT.Where(n => n.Key == "uid").FirstOrDefault().Value;
-            var listings = await playerApi.ApiPlayerPlayerUuidAuctionsGetAsync(sell.AuctioneerId, 0, new Dictionary<string, string>() { { "UId", uid }, { "HighestBid", "0" } });
-            foreach (var listing in listings.Where(l => l.AuctionId != sell.Uuid))
+            try
             {
-                var change = profitChangeService.GetAhTax(listing.HighestBid, listing.StartingBid);
-                change.ContextItemId = AuctionService.Instance.GetId(listing.AuctionId);
-                change.Label = $"Listing attempt {listing.StartingBid}";
-                changes.Add(change);
-                Console.WriteLine($"Found listing attempt {listing.StartingBid} {listing.HighestBid} {listing.AuctionId} for {sell.Uuid}");
+                var uidKv = sell.FlatenedNBT.FirstOrDefault(n => n.Key == "uid");
+                var uid = uidKv.Value;
+                if (string.IsNullOrEmpty(uid))
+                {
+                    // nothing we can query
+                    return;
+                }
+                if (playerApi == null)
+                {
+                    logger.LogWarning("playerApi is not available, skipping listing attempts lookup");
+                    return;
+                }
+
+                object listings;
+                try
+                {
+                    // We don't have a stable compile-time type for the playerApi return value here
+                    // (it comes from an external client package). Load it as object and use
+                    // reflection below to read the properties we need. This avoids compile
+                    // errors when the model type differs between packages/versions.
+                    listings = await playerApi.ApiPlayerPlayerUuidAuctionsGetAsync(sell.AuctioneerId, 0, new Dictionary<string, string>() { { "UId", uid }, { "HighestBid", "0" } });
+                }
+                catch (Exception e)
+                {
+                    logger.LogError(e, "Could not load listings for {auctioneer} uid {uid}", sell.AuctioneerId, uid);
+                    return;
+                }
+                if (listings == null)
+                    return;
+
+                // listingObj is some enumerable (likely List<T>). Try to enumerate it safely.
+                if (listings is System.Collections.IEnumerable enumListings)
+                {
+                    foreach (var listingObj in enumListings)
+                    {
+                        if (listingObj == null)
+                            continue;
+
+                        try
+                        {
+                            var t = listingObj.GetType();
+
+                            // Auction id can be named AuctionId or Uuid depending on model
+                            var auctionIdProp = t.GetProperty("AuctionId") ?? t.GetProperty("Uuid") ?? t.GetProperty("Uuid");
+                            var auctionIdVal = auctionIdProp?.GetValue(listingObj)?.ToString();
+                            if (auctionIdVal == null)
+                                continue;
+                            if (auctionIdVal == sell.Uuid)
+                                continue;
+
+                            // Highest bid amount: try common property names
+                            var highestProp = t.GetProperty("HighestBidAmount") ?? t.GetProperty("HighestBid") ?? t.GetProperty("HighestBidAmount");
+                            var startingProp = t.GetProperty("StartingBid") ?? t.GetProperty("StartingBid");
+
+                            long highest = 0;
+                            long starting = 0;
+
+                            if (highestProp != null && highestProp.GetValue(listingObj) != null)
+                                highest = Convert.ToInt64(highestProp.GetValue(listingObj));
+                            if (startingProp != null && startingProp.GetValue(listingObj) != null)
+                                starting = Convert.ToInt64(startingProp.GetValue(listingObj));
+
+                            var change = profitChangeService.GetAhTax(highest, starting);
+                            change.ContextItemId = AuctionService.Instance.GetId(auctionIdVal);
+                            change.Label = $"Listing attempt {starting}";
+                            changes.Add(change);
+
+                            // Try to read HighestBid for logging as well
+                            var highestBidProp = t.GetProperty("HighestBid");
+                            var highestBidVal = highestBidProp != null ? highestBidProp.GetValue(listingObj)?.ToString() : null;
+                            Console.WriteLine($"Found listing attempt {starting} {highestBidVal ?? highest.ToString()} {auctionIdVal} for {sell.Uuid}");
+                        }
+                        catch (Exception ex)
+                        {
+                            logger.LogWarning(ex, "Could not parse listing object for {sell}", sell?.Uuid);
+                        }
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                logger.LogError(e, "Error while checking listing attempts for {sell}", sell?.Uuid);
             }
         }
 
