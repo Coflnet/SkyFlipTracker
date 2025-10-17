@@ -870,8 +870,8 @@ public class ProfitChangeTests
                     new(){Type = Core.Enchantment.EnchantmentType.ultimate_wisdom, Level = 5} },
             Tier = Core.Tier.LEGENDARY
         };
-        bazaarApi.Setup(p => p.ApiBazaarPricesGetAsync(0, default))
-            .ReturnsAsync(() => new() { new("ENCHANTMENT_SHARPNESS_6", 3_000_000, 2_000_000) });
+        bazaarApi.Setup(p => p.GetAllPricesAsync(0, default))
+            .ReturnsAsync(() => new() { new("ENCHANTMENT_SHARPNESS_6", 3_000_000, sellPrice: 2_000_000) });
         var changes = await service.GetChanges(buy, sell);
         Assert.That(changes.Count, Is.EqualTo(2), JsonConvert.SerializeObject(changes, Formatting.Indented));
         Assert.That(changes.Sum(c => c.Amount), Is.EqualTo(-2_201_200));
@@ -885,12 +885,12 @@ public class ProfitChangeTests
         buy.Enchantments = new() { new() { Type = Core.Enchantment.EnchantmentType.ultimate_chimera, Level = startLevel } };
         var sell = CreateAuction("HYPERION");
         sell.Enchantments = new() { new() { Type = Core.Enchantment.EnchantmentType.ultimate_chimera, Level = 5 } };
-        bazaarApi.Setup(p => p.ApiBazaarPricesGetAsync(0, default)).ReturnsAsync(() => new() {
-                new("ENCHANTMENT_ULTIMATE_CHIMERA_1", 130_000_000, 132900000),
-                new("ENCHANTMENT_ULTIMATE_CHIMERA_2", 0, 141_000_000),
-                new("ENCHANTMENT_ULTIMATE_CHIMERA_3", 0, 44_000_000),
-                new("ENCHANTMENT_ULTIMATE_CHIMERA_4", 0, 190_000_000),
-                new("ENCHANTMENT_ULTIMATE_CHIMERA_5", 0, 330_000_000),
+        bazaarApi.Setup(p => p.GetAllPricesAsync(0, default)).ReturnsAsync(() => new() {
+                new("ENCHANTMENT_ULTIMATE_CHIMERA_1", 130_000_000, sellPrice:132900000),
+                new("ENCHANTMENT_ULTIMATE_CHIMERA_2", 0, sellPrice:141_000_000),
+                new("ENCHANTMENT_ULTIMATE_CHIMERA_3", 0, sellPrice:44_000_000),
+                new("ENCHANTMENT_ULTIMATE_CHIMERA_4", 0, sellPrice:190_000_000),
+                new("ENCHANTMENT_ULTIMATE_CHIMERA_5", 0, sellPrice:330_000_000),
                 });
         var result = await service.GetChanges(buy, sell);
         Assert.That(result.Count, Is.EqualTo(2));
@@ -907,8 +907,8 @@ public class ProfitChangeTests
         var sell = CreateAuction("HYPERION", highestBidAmount: 10_000_000);
         sell.Enchantments = new() { new() { Type = type, Level = end },
                 new() { Type = Core.Enchantment.EnchantmentType.fire_aspect, Level = 3 } };
-        bazaarApi.Setup(p => p.ApiBazaarPricesGetAsync(0, default))
-            .ReturnsAsync(() => new() { new(bazaarItem, 30_000_000, 20_000_000) });
+        bazaarApi.Setup(p => p.GetAllPricesAsync(0, default))
+            .ReturnsAsync(() => new() { new(bazaarItem, 30_000_000, sellPrice: 20_000_000) });
 
         var changes = await service.GetChanges(buy, sell);
 
@@ -923,9 +923,9 @@ public class ProfitChangeTests
         buy.Enchantments = new() { new() { Type = Core.Enchantment.EnchantmentType.dedication, Level = 3 } };
         var sell = CreateAuction("HYPERION", highestBidAmount: 170_000_000);
         sell.Enchantments = new() { new() { Type = Core.Enchantment.EnchantmentType.dedication, Level = 4 } };
-        bazaarApi.Setup(p => p.ApiBazaarPricesGetAsync(0, default))
-            .ReturnsAsync(() => new() { new("ENCHANTMENT_DEDICATION_3", 3_900_000, 3_000_000),
-                    new("ENCHANTMENT_DEDICATION_4", 100_000_000, 100_000_000) });
+    bazaarApi.Setup(p => p.GetAllPricesAsync(0, default))
+        .ReturnsAsync(() => new() { new("ENCHANTMENT_DEDICATION_3", 3_900_000, sellPrice: 3_000_000),
+            new("ENCHANTMENT_DEDICATION_4", 100_000_000, sellPrice: 100_000_000) });
         var changes = await service.GetChanges(buy, sell);
         Assert.That(changes.Count, Is.EqualTo(2), JsonConvert.SerializeObject(changes, Formatting.Indented));
         Assert.That(changes[1].Amount, Is.EqualTo(-100_000_000));
@@ -937,10 +937,10 @@ public class ProfitChangeTests
         var buy = CreateAuction("HYPERION");
         var sell = CreateAuction("HYPERION", highestBidAmount: 10_000_000);
         sell.Enchantments = new() { new() { Type = Core.Enchantment.EnchantmentType.ultimate_chimera, Level = 5 } };
-        bazaarApi.Setup(p => p.ApiBazaarPricesGetAsync(0, default))
+        bazaarApi.Setup(p => p.GetAllPricesAsync(0, default))
             .ReturnsAsync(() => new() {
-                    new("ENCHANTMENT_ULTIMATE_CHIMERA_1", 103_000_000, 102_000_000),
-                    new("ENCHANTMENT_ULTIMATE_CHIMERA_5", 500_000_000, 500_000_000) });
+                    new("ENCHANTMENT_ULTIMATE_CHIMERA_1", 103_000_000, sellPrice:102_000_000),
+                    new("ENCHANTMENT_ULTIMATE_CHIMERA_5", 500_000_000, sellPrice:500_000_000) });
 
         var changes = await service.GetChanges(buy, sell);
 
@@ -970,7 +970,7 @@ public class ProfitChangeTests
                     new(){Type = Core.Enchantment.EnchantmentType.sharpness, Level = 7} },
             Tier = Core.Tier.LEGENDARY
         };
-        bazaarApi.Setup(p => p.ApiBazaarPricesGetAsync(0, default)).ReturnsAsync(() => new() { new("ENCHANTMENT_SHARPNESS_7", 20_000_000, 20_000_000) });
+    bazaarApi.Setup(p => p.GetAllPricesAsync(0, default)).ReturnsAsync(() => new() { new("ENCHANTMENT_SHARPNESS_7", 20_000_000, sellPrice: 20_000_000) });
         var changes = await service.GetChanges(buy, sell);
         Assert.That(changes.Count, Is.EqualTo(2), JsonConvert.SerializeObject(changes, Formatting.Indented));
         Assert.That(changes.Sum(c => c.Amount), Is.EqualTo(-20_201_200));
@@ -1007,8 +1007,8 @@ public class ProfitChangeTests
                 },
             Tier = Core.Tier.LEGENDARY
         };
-        bazaarApi.Setup(p => p.ApiBazaarPricesGetAsync(0, default))
-            .ReturnsAsync(() => new() { new($"ENCHANTMENT_{ench.ToString().ToUpper()}_1", bazaarPrice, bazaarPrice) });
+        bazaarApi.Setup(p => p.GetAllPricesAsync(0, default))
+            .ReturnsAsync(() => new() { new($"ENCHANTMENT_{ench.ToString().ToUpper()}_1", bazaarPrice, sellPrice: bazaarPrice) });
         var changes = await service.GetChanges(buy, sell);
         Assert.That(changes.Count, Is.EqualTo(2), JsonConvert.SerializeObject(changes, Formatting.Indented));
         Assert.That(changes.Skip(1).First().Amount, Is.EqualTo(expectedDiff));
@@ -1139,8 +1139,8 @@ public class ProfitChangeTests
                     new() { Type = Core.Enchantment.EnchantmentType.efficiency, Level = 10  }};
         if (startingLevel > 0)
             buy.Enchantments = new() { new() { Type = Core.Enchantment.EnchantmentType.efficiency, Level = startingLevel } };
-        bazaarApi.Setup(p => p.ApiBazaarPricesGetAsync(0, default))
-            .ReturnsAsync(() => new() { new("SIL_EX", 17_000_000, 16_000_000) });
+        bazaarApi.Setup(p => p.GetAllPricesAsync(0, default))
+            .ReturnsAsync(() => new() { new("SIL_EX", 17_000_000, sellPrice: 16_000_000) });
         var changes = await service.GetChanges(buy, sell);
         Assert.That(changes.Count, Is.EqualTo(2), JsonConvert.SerializeObject(changes, Formatting.Indented));
         Assert.That(changes.Sum(c => c.Amount), Is.EqualTo(cost));
@@ -1154,8 +1154,8 @@ public class ProfitChangeTests
         sell.Enchantments = new(){
                     new() { Type = Core.Enchantment.EnchantmentType.scavenger, Level = 6  }};
         buy.Enchantments = new() { new() { Type = Core.Enchantment.EnchantmentType.scavenger, Level = 5 } };
-        bazaarApi.Setup(p => p.ApiBazaarPricesGetAsync(0, default))
-            .ReturnsAsync(() => new() { new("GOLDEN_BOUNTY", 27_000_000, 26_000_000) });
+        bazaarApi.Setup(p => p.GetAllPricesAsync(0, default))
+            .ReturnsAsync(() => new() { new("GOLDEN_BOUNTY", 27_000_000, sellPrice: 26_000_000) });
         var changes = await service.GetChanges(buy, sell);
         Assert.That(changes.Count, Is.EqualTo(2), JsonConvert.SerializeObject(changes, Formatting.Indented));
         Assert.That(changes.Sum(c => c.Amount), Is.EqualTo(-29501200));
@@ -1168,8 +1168,8 @@ public class ProfitChangeTests
         var buy = CreateAuction("STARRED_MIDAS_STAFF", "staff", 100_000_000);
         var sell = CreateAuction("STARRED_MIDAS_STAFF", "staff", 500_000_000);
         sell.FlatenedNBT["additional_coins"] = "206660000";
-        bazaarApi.Setup(p => p.ApiBazaarPricesGetAsync(0, default))
-            .ReturnsAsync(() => new() { new("STOCK_OF_STONKS", 3_000_000, 3_000_000) });
+        bazaarApi.Setup(p => p.GetAllPricesAsync(0, default))
+            .ReturnsAsync(() => new() { new("STOCK_OF_STONKS", 3_000_000, sellPrice: 3_000_000) });
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("STOCK_OF_STONKS", null, 0, default)).ReturnsAsync(() => new() { Median = 3_000_000 });
         var changes = await service.GetChanges(buy, sell);
         Assert.That(changes.Count, Is.EqualTo(3), JsonConvert.SerializeObject(changes, Formatting.Indented));

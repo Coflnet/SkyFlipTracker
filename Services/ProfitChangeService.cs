@@ -708,7 +708,7 @@ public class ProfitChangeService
         PastFlip.ProfitChange found = null;
         try
         {
-            var allBazaar = await bazaarApi.ApiBazaarPricesGetAsync();
+            var allBazaar = await bazaarApi.GetAllPricesAsync();
             var itemValues = allBazaar.GroupBy(a => a.ProductId).ToDictionary(b => b.Key, b => b.Max(x => x.SellPrice));
             var sellValue = GetCostForEnchant(item, sell, itemValues, item); //mapper.EnchantValue(item, sell.FlatenedNBT, itemValues);
             var buyValue = 0L;

@@ -58,7 +58,7 @@ public class PriceProviderFactory : IPriceProviderFactory
                 if (DateTime.Now.AddMinutes(-10) > lastRefresh)
                 {
                     lastRefresh = DateTime.Now;
-                    var priceList = await bazaarApi.ApiBazaarPricesGetAsync();
+                    var priceList = await bazaarApi.GetAllPricesAsync();
                     foreach (var item in priceList)
                     {
                         if (!priceHistory.ContainsKey(item.ProductId))

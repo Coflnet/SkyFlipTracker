@@ -323,6 +323,7 @@ public class TrackerServiceTests
     {
         // Arrange
         var trade = JsonConvert.DeserializeObject<Models.TradeModel>(ThreeItemTrade);
+        trade.TimeStamp = DateTime.UtcNow;
         var savedFlips = new List<PastFlip>();
         
         // Mock all required services
