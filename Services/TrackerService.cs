@@ -709,7 +709,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 flags |= FlipFlags.ViaTrade;
                 buy.HighestBidAmount = tradeEstimate;
                 // adjust buy state to match traded attributes
-                representationConverter.TryUpdatingBuyState(buy, itemStateAtTrade);
+                representationConverter.TryUpdatingBuyState(buy, itemStateAtTrade, itemTrade);
                 if (itemCount > 1)
                 {
                     flags |= FlipFlags.MultiItemTrade;

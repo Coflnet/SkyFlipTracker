@@ -71,7 +71,7 @@ public class TrackerServiceTests
         {"id":1130753106226150,"itemName":"§dPitchin' Rod of the Sea","tag":"ROD_OF_THE_SEA","extraAttributes":{"rarity_upgrades":1,"hook.uuid":"b27abe52-53d8-455b-ba93-7345c4cf13c1","modifier":"pitchin","line.uuid":"951e2044-187b-4df0-b61e-4ef1e6c31280","uid":"0e9fe2583dd2","uuid":"837cad89-874e-4ede-9a16-0e9fe2583dd2","timestamp":1753905816274,"tier":1,"sinker.uuid":"2de65430-0769-4ac6-a26a-7e3a645e0ff6","sinker.part":"junk_sinker","line.part":"speedy_line","hook.part":"common_hook"},"enchantments":{"angler":5,"blessing":5,"caster":5,"frail":5,"impaling":3,"looting":3,"luck_of_the_sea":5,"lure":5,"magnet":5,"piscary":5,"spiked_hook":5},"color":null,"description":null,"count":1}
         """);
         var service = new RepresentationConverter(NullLogger<RepresentationConverter>.Instance, null);
-        service.TryUpdatingBuyState(buy, tradeState);
+        service.TryUpdatingBuyState(buy, tradeState, new(){new(){TimeStamp = DateTime.UtcNow.AddMinutes(-20)}});
         buy.ItemName.Should().Be("§dPitchin' Rod of the Sea");
         buy.FlatenedNBT.Should().Contain(new KeyValuePair<string, string>("sinker.part", "junk_sinker"));
         buy.FlatenedNBT.Should().Contain(new KeyValuePair<string, string>("line.part", "speedy_line"));

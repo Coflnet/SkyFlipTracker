@@ -79,7 +79,7 @@ public class RepresentationConverter
     }
 
 
-    public void TryUpdatingBuyState(ApiSaveAuction buy, PlayerState.Client.Model.Item itemStateAtTrade)
+    public void TryUpdatingBuyState(ApiSaveAuction buy, PlayerState.Client.Model.Item itemStateAtTrade, List<PlayerState.Client.Model.Transaction> itemTrade)
     {
         try
         {
@@ -90,6 +90,11 @@ public class RepresentationConverter
             buy.Tier = converted.Tier;
             buy.Reforge = converted.Reforge;
             buy.ItemName = converted.ItemName;
+            if(itemTrade != null && itemTrade.Count > 0)
+            {
+                var tradeTime = itemTrade.First().TimeStamp;
+                buy.End = tradeTime;
+            }
             logger.LogInformation($"Adjusted buy state for trade {buy.Uuid} {buy.Tag} {JsonConvert.SerializeObject(itemStateAtTrade)}");
         }
         catch (System.Exception e)
