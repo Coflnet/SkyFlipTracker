@@ -366,6 +366,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     sell = sell,
                     buy = new Api.Client.Model.ItemSell() { Buyer = null, Uuid = tradeSource.Value.OrderByDescending(t => t).First().ToString() }
                 });
+                if(extraLog)
+                    logger.LogInformation($"Added trade source {JsonConvert.SerializeObject(tradeSource)} for sell {JsonConvert.SerializeObject(sell)}");
             }
 
             List<Flip> finders = new();
