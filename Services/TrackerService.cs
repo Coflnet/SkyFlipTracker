@@ -358,7 +358,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             foreach (var tradeSource in tradeUuidLookup)
             {
                 var uid = tradeSource.Key.Split("-").Last();
-                if (exists.TryGetValue(uid, out var existing))
+                if (exists.TryGetValue(uid, out var existing) && soldAuctions.Count > 0)
                     continue; // know buy properties
                 var sell = sellLookup.GetValueOrDefault(uid) ?? throw new Exception($"Could not find sell for trade item {uid} {tradeSource.Key}");
                 soldAuctions.Add(new
@@ -366,7 +366,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     sell = sell,
                     buy = new Api.Client.Model.ItemSell() { Buyer = null, Uuid = tradeSource.Value.OrderByDescending(t => t).First().ToString() }
                 });
-                if(extraLog)
+                if (extraLog)
                     logger.LogInformation($"Added trade source {JsonConvert.SerializeObject(tradeSource)} for sell {JsonConvert.SerializeObject(sell)}");
             }
 
