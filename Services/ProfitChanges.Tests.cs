@@ -232,7 +232,7 @@ public class ProfitChangeTests
             Uuid = Guid.NewGuid().ToString("N"),
             Tag = "PET_DROPLET_WISP",
             HighestBidAmount = 1000,
-            FlatenedNBT  = new() { { "exp", "1" } },
+            FlatenedNBT = new() { { "exp", "1" } },
             Tier = Core.Tier.UNCOMMON
         };
         // {"enchantments":[],"uuid":"0d328f25303f49e189805d9507a73ced","count":1,"startingBid":200000000,"tag":"PET_FROST_WISP","itemName":"[Lvl 100] Frost Wisp","start":"2023-07-28T10:53:18","end":"2023-07-28T10:53:54","auctioneerId":"e93dc3450d1f428a9acd60ee768ad750","profileId":null,"coop":null,"coopMembers":null,"highestBidAmount":200000000,"bids":[{"bidder":"75eaf1d0664f49e69d1b61857b864393","profileId":"5fa85f9232b3405f93780fa5e7a0bf31","amount":200000000,"timestamp":"2023-07-28T10:53:58"}],"anvilUses":0,"nbtData":{"data":{"petInfo":"{\"type\":\"FROST_WISP\",\"active\":false,\"exp\":1.2773376E7,\"tier\":\"RARE\",\"hideInfo\":false,\"heldItem\":\"CROCHET_TIGER_PLUSHIE\",\"candyUsed\":0,\"uuid\":\"94b9855c-72d6-4cc0-b046-345863b9ee51\",\"hideRightClick\":false,\"extraData\":{\"blaze_kills\":205712.0}}","uid":"345863b9ee51"}},"itemCreatedAt":"2023-07-27T22:45:00","reforge":"None","category":"MISC","tier":"RARE","bin":true,"flatNbt":{"type":"FROST_WISP","active":"False","exp":"12773376","tier":"RARE","hideInfo":"False","heldItem":"CROCHET_TIGER_PLUSHIE","candyUsed":"0","uuid":"94b9855c-72d6-4cc0-b046-345863b9ee51","hideRightClick":"False","uid":"345863b9ee51","blaze_kills":"205712"}}
@@ -923,8 +923,8 @@ public class ProfitChangeTests
         buy.Enchantments = new() { new() { Type = Core.Enchantment.EnchantmentType.dedication, Level = 3 } };
         var sell = CreateAuction("HYPERION", highestBidAmount: 170_000_000);
         sell.Enchantments = new() { new() { Type = Core.Enchantment.EnchantmentType.dedication, Level = 4 } };
-    bazaarApi.Setup(p => p.GetAllPricesAsync(0, default))
-        .ReturnsAsync(() => new() { new("ENCHANTMENT_DEDICATION_3", 3_900_000, sellPrice: 3_000_000),
+        bazaarApi.Setup(p => p.GetAllPricesAsync(0, default))
+            .ReturnsAsync(() => new() { new("ENCHANTMENT_DEDICATION_3", 3_900_000, sellPrice: 3_000_000),
             new("ENCHANTMENT_DEDICATION_4", 100_000_000, sellPrice: 100_000_000) });
         var changes = await service.GetChanges(buy, sell);
         Assert.That(changes.Count, Is.EqualTo(2), JsonConvert.SerializeObject(changes, Formatting.Indented));
@@ -970,7 +970,7 @@ public class ProfitChangeTests
                     new(){Type = Core.Enchantment.EnchantmentType.sharpness, Level = 7} },
             Tier = Core.Tier.LEGENDARY
         };
-    bazaarApi.Setup(p => p.GetAllPricesAsync(0, default)).ReturnsAsync(() => new() { new("ENCHANTMENT_SHARPNESS_7", 20_000_000, sellPrice: 20_000_000) });
+        bazaarApi.Setup(p => p.GetAllPricesAsync(0, default)).ReturnsAsync(() => new() { new("ENCHANTMENT_SHARPNESS_7", 20_000_000, sellPrice: 20_000_000) });
         var changes = await service.GetChanges(buy, sell);
         Assert.That(changes.Count, Is.EqualTo(2), JsonConvert.SerializeObject(changes, Formatting.Indented));
         Assert.That(changes.Sum(c => c.Amount), Is.EqualTo(-20_201_200));
@@ -1570,7 +1570,7 @@ public class ProfitChangeTests
             Assert.That(result[1].Amount, Is.EqualTo(-1000000));
     }
 
-[Test]
+    [Test]
     public async Task CapturcedMasterCryptTankZombie()
     {
         var buy = CreateAuction("SWORD");
@@ -1827,7 +1827,7 @@ public class ProfitChangeTests
 
         // Assert
         result.Should().NotBeNull();
-        result.Should().NotContain(c => c.Label == "ah tax", 
+        result.Should().NotContain(c => c.Label == "ah tax",
             "trade sells should not include auction house tax as they are direct player-to-player exchanges");
     }
 
@@ -1865,10 +1865,38 @@ public class ProfitChangeTests
 
         // Assert
         result.Should().NotBeNull();
-        result.Should().Contain(c => c.Label == "ah tax", 
+        result.Should().Contain(c => c.Label == "ah tax",
             "auction house sells should include auction house tax");
-        
+
         var ahTax = result.First(c => c.Label == "ah tax");
         ahTax.Amount.Should().BeNegative("AH tax is a cost");
+    }
+
+    /// <summary>
+    /// Test that upgrading to Venomous 7 requires Venomous 6 + FATEFUL_STINGER
+    /// </summary>
+    [Test]
+    public async Task VenomousLevel7RequiresVenomous6AndFatefulStinger()
+    {
+        // Arrange: A weapon with Venomous 6 being upgraded to Venomous 7
+        var buy = CreateAuction("ASPECT_OF_THE_END", "weapon", 1_000_000);
+        buy.Enchantments = new() { new() { Type = Core.Enchantment.EnchantmentType.venomous, Level = 6 } };
+
+        var sell = CreateAuction("ASPECT_OF_THE_END", "weapon", 100_000_000);
+        sell.Enchantments = new() { new() { Type = Core.Enchantment.EnchantmentType.venomous, Level = 7 } };
+
+        // Setup price for FATEFUL_STINGER
+        bazaarApi.Setup(p => p.GetAllPricesAsync(0, default))
+            .ReturnsAsync(() => new() { new("FATEFUL_STINGER", 27_000_000, sellPrice: 26_000_000),
+            new("ENCHANTMENT_VENOMOUS_6", 20_000_000, sellPrice: 19_000_000) });
+
+        // Act
+        var changes = await service.GetChanges(buy, sell);
+
+        // Assert
+        changes.Should().NotBeNull();
+        var venomousChange = changes.FirstOrDefault(c => c.Label.Contains("venomous", StringComparison.OrdinalIgnoreCase));
+        venomousChange.Should().NotBeNull("should have a change for Venomous 7 enchantment");
+        venomousChange.Label.Should().Contain("Enchant venomous 7", "Venomous 7 cost");
     }
 }
