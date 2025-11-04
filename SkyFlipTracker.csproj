@@ -17,7 +17,7 @@
   <ItemGroup>
     <PackageReference Include="AutoMapper" Version="13.0.1" />
     <PackageReference Include="CassandraCSharpDriver" Version="3.22.0" />
-    <PackageReference Include="Coflnet.Core" Version="0.5.1" />
+    <PackageReference Include="Coflnet.Core" Version="0.6.0" />
     <PackageReference Include="Coflnet.Leaderboard.Client" Version="0.3.1" />
     <PackageReference Include="Coflnet.Sky.Bazaar.Client" Version="0.7.0" />
     <PackageReference Include="Coflnet.Sky.Crafts.Client" Version="0.9.0" />
@@ -25,7 +25,7 @@
     <PackageReference Include="Coflnet.Sky.PlayerState.Client" Version="0.11.0" />
     <PackageReference Include="Coflnet.Sky.Proxy.Client" Version="1.0.0" />
     <PackageReference Include="Coflnet.Sky.Settings.Client" Version="0.2.3" />
-    <PackageReference Include="Coflnet.Sky.Sniper.Client" Version="0.12.2" />
+    <PackageReference Include="Coflnet.Sky.Sniper.Client" Version="0.13.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.21">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
