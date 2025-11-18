@@ -293,6 +293,8 @@ public class FlipStorageService
     internal async Task DeleteActiveBasedOnStartTime(IEnumerable<DateTime> enumerable)
     {
         var list = enumerable.ToList();
+        if(list.Count == 0)
+            return;
         var batchUpdate = session.CreateBatch();
 
         foreach (var item in list)
