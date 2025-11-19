@@ -266,6 +266,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
 
         [HttpGet]
         [Route("/flips/unsold")]
+        [ResponseCache(Duration = 10, Location = ResponseCacheLocation.Any)]
         public async Task<IEnumerable<UnsoldFlip>> GetUnsoldFlips(DateTime olderThan, [FromServices] IAuctionsApi auctionsApi, int amount = 20)
         {
             var list = (await flipStorageService.GetUnsoldFlips(olderThan, amount)).ToList();
@@ -273,7 +274,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             {
                 try
                 {
-                    foreach (var item in list.OrderBy(i => Random.Shared.Next()).Take(2))
+                    foreach (var item in list.OrderBy(i => i.Flip.TargetPrice-i.Flip.Auction.StartingBid).Take(100).OrderBy(i=>Random.Shared.Next()).Take(10))
                     {
                         // sample check if auction is already sold
                         var data = await auctionsApi.ApiAuctionAuctionUuidGetAsync(item.Flip.Auction.Uuid);
