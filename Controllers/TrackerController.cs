@@ -274,7 +274,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             {
                 try
                 {
-                    foreach (var item in list.OrderBy(i => i.Flip.TargetPrice-i.Flip.Auction.StartingBid).Take(100).OrderBy(i=>Random.Shared.Next()).Take(10))
+                    foreach (var item in list.OrderByDescending(i => i.Flip.TargetPrice-i.Flip.Auction.StartingBid).Take(100).OrderBy(i=>Random.Shared.Next()).Take(10))
                     {
                         // sample check if auction is already sold
                         var data = await auctionsApi.ApiAuctionAuctionUuidGetAsync(item.Flip.Auction.Uuid);
