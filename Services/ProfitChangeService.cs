@@ -262,6 +262,11 @@ public class ProfitChangeService
         return sell.Uuid != Guid.Empty.ToString("n");
     }
 
+    /// <summary>
+    /// Whether to apply temporary event fees (can be set to false for testing)
+    /// </summary>
+    public virtual bool ApplyTemporaryEventFees => true;
+
     public PastFlip.ProfitChange GetAhTax(long highestBid, long startingBid = 0)
     {
         var listCostFactor = 1f;
@@ -271,6 +276,11 @@ public class ProfitChangeService
             listCostFactor = 2;
         if (startingBid >= 100_000_000)
             listCostFactor = 2.5f;
+        if(ApplyTemporaryEventFees && DateTime.UtcNow < new DateTime(2025, 12, 15) && startingBid >= 1_000_000)
+        {
+            // aurora extra fees
+            listCostFactor += 1;
+        }
         var ahTax = new PastFlip.ProfitChange()
         {
             Amount = (long)-(

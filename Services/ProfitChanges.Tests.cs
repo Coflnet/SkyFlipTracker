@@ -8,8 +8,30 @@ using Moq;
 using Newtonsoft.Json;
 using Coflnet.Sky.Core.Services;
 using FluentAssertions;
+using Microsoft.Extensions.Logging;
 
 namespace Coflnet.Sky.SkyAuctionTracker.Services;
+
+/// <summary>
+/// Test subclass that disables temporary event fees for consistent test results
+/// </summary>
+public class TestProfitChangeService : ProfitChangeService
+{
+    public TestProfitChangeService(
+        Coflnet.Sky.Api.Client.Api.IPricesApi pricesApi,
+        Crafts.Client.Api.IKatApi katApi,
+        Crafts.Client.Api.ICraftsApi craftsApi,
+        ILogger<ProfitChangeService> logger,
+        Items.Client.Api.IItemsApi itemApi,
+        HypixelItemService hypixelItemService,
+        Bazaar.Client.Api.IBazaarApi bazaarApi,
+        IPriceProviderFactory priceProviderFactory)
+        : base(pricesApi, katApi, craftsApi, logger, itemApi, hypixelItemService, bazaarApi, priceProviderFactory)
+    {
+    }
+
+    public override bool ApplyTemporaryEventFees => false;
+}
 
 public class ProfitChangeTests
 {
@@ -34,7 +56,7 @@ public class ProfitChangeTests
         var itemService = new HypixelItemService(new System.Net.Http.HttpClient(), NullLogger<HypixelItemService>.Instance);
         var priveProviderFactory = new PriceProviderFactory(playerapi.Object, pricesApi.Object, craftsApi.Object, auctionsApi.Object, bazaarApi.Object, NullLogger<PriceProviderFactory>.Instance);
         playerapi.Setup(p => p.ApiPlayerPlayerUuidBidsGetAsync(It.IsAny<string>(), 0, It.IsAny<Dictionary<string, string>>(), 0, default)).ReturnsAsync(() => new List<BidResult>());
-        service = new ProfitChangeService(pricesApi.Object, katApi.Object, craftsApi.Object, NullLogger<ProfitChangeService>.Instance, itemsApi.Object, itemService, bazaarApi.Object, priveProviderFactory);
+        service = new TestProfitChangeService(pricesApi.Object, katApi.Object, craftsApi.Object, NullLogger<ProfitChangeService>.Instance, itemsApi.Object, itemService, bazaarApi.Object, priveProviderFactory);
     }
 
     [Test]
