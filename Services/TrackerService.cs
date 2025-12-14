@@ -701,9 +701,11 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 itemTrade = await transactionApi.TransactionItemItemIdGetAsync(trade.Id ?? throw new Exception("no item id"), 0);
                 if (itemTrade.Count > 0)
                 {
+                    logger.LogInformation("Found trade info for item {item}", JsonConvert.SerializeObject(trade));
                     itemStateAtTrade = trade;
                     break;
                 }
+                logger.LogInformation("No trade info for item {item}", JsonConvert.SerializeObject(trade));
             }
             if (itemTrade.Count > 0)
             {
