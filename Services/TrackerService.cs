@@ -710,6 +710,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 (int itemCount, long tradeEstimate, _) = await GetTradeValue(itemTrade);
                 flags |= FlipFlags.ViaTrade;
                 buy.HighestBidAmount = tradeEstimate;
+                logger.LogInformation("From trade parts {parts} got {itemCount} {estimate}", JsonConvert.SerializeObject(itemTrade), itemCount, tradeEstimate);
                 // adjust buy state to match traded attributes
                 representationConverter.TryUpdatingBuyState(buy, itemStateAtTrade, itemTrade);
                 if (itemCount > 1)
