@@ -90,6 +90,7 @@ public class RepresentationConverter
             buy.Tier = converted.Tier;
             buy.Reforge = converted.Reforge;
             buy.ItemName = converted.ItemName;
+            buy.Tag = converted.Tag;
             if(itemTrade != null && itemTrade.Count > 0)
             {
                 var tradeTime = itemTrade.First().TimeStamp;
