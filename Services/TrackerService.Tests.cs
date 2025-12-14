@@ -65,10 +65,10 @@ public class TrackerServiceTests
     public async Task UpdateBuyWithTradeState()
     {
         var buy = JsonConvert.DeserializeObject<ApiSaveAuction>("""
-        {"enchantments":[],"uuid":"e308e8ec5b2e422ca8f0d829e7dbfdea","count":1,"startingBid":7150000,"tag":"ROD_OF_LEGENDS","itemName":"Rod of the Sea","start":"2025-07-30T20:10:22","end":"2025-07-31T16:56:16","auctioneerId":"6cbe27748b7745d2ac5be0e1e2d9f775","profileId":null,"coop":null,"coopMembers":null,"highestBidAmount":7150000,"bids":[{"bidder":"ae39c3216c764de9983e0bedaeb32781","profileId":"unknown","amount":7150000,"timestamp":"2025-07-31T16:56:16"}],"anvilUses":0,"nbtData":{"data":{"uid":"0e9fe2583dd2","uuid":"837cad89-874e-4ede-9a16-0e9fe2583dd2"}},"itemCreatedAt":"2025-07-30T20:03:36","reforge":"None","category":"MISC","tier":"LEGENDARY","bin":true,"flatNbt":{"uid":"0e9fe2583dd2","uuid":"837cad89-874e-4ede-9a16-0e9fe2583dd2"}}
+        {"enchantments":[],"uuid":"e308e8ec5b2e422ca8f0d829e7dbfdea","count":1,"startingBid":7150000,"tag":"ROD_OF_LEGENDS","itemName":"Rod of the Sea","start":"2025-07-30T20:10:22","end":"2025-07-31T16:56:16","auctioneerId":"6cbe27748b7745d2ac5be0e1e2d9f775","profileId":null,"coop":null,"coopMembers":null,"highestBidAmount":7150000,"bids":[{"bidder":"ae39c3216c764de9983e0bedaeb32781","profileId":"unknown","amount":7150000,"timestamp":"2025-07-31T16:56:16"}],"anvilUses":0,"nbtData":{"data":{"uid":"0e9fe2583dd2","uuid":"837cad89-874e-4ede-9a16-0e9fe2583dd2"}},"itemCreatedAt":"2025-07-30T20:03:36","reforge":"None","category":"MISC","tier":"EPIC","bin":true,"flatNbt":{"uid":"0e9fe2583dd2","uuid":"837cad89-874e-4ede-9a16-0e9fe2583dd2"}}
         """);
         var tradeState = JsonConvert.DeserializeObject<PlayerState.Client.Model.Item>("""
-        {"id":1130753106226150,"itemName":"§dPitchin' Rod of the Sea","tag":"ROD_OF_THE_SEA","extraAttributes":{"rarity_upgrades":1,"hook.uuid":"b27abe52-53d8-455b-ba93-7345c4cf13c1","modifier":"pitchin","line.uuid":"951e2044-187b-4df0-b61e-4ef1e6c31280","uid":"0e9fe2583dd2","uuid":"837cad89-874e-4ede-9a16-0e9fe2583dd2","timestamp":1753905816274,"tier":1,"sinker.uuid":"2de65430-0769-4ac6-a26a-7e3a645e0ff6","sinker.part":"junk_sinker","line.part":"speedy_line","hook.part":"common_hook"},"enchantments":{"angler":5,"blessing":5,"caster":5,"frail":5,"impaling":3,"looting":3,"luck_of_the_sea":5,"lure":5,"magnet":5,"piscary":5,"spiked_hook":5},"color":null,"description":null,"count":1}
+        {"id":1130753106226150,"itemName":"§dPitchin' Rod of the Sea","tag":"ROD_OF_THE_SEA","extraAttributes":{"rarity_upgrades":1,"hook.uuid":"b27abe52-53d8-455b-ba93-7345c4cf13c1","modifier":"pitchin","line.uuid":"951e2044-187b-4df0-b61e-4ef1e6c31280","uid":"0e9fe2583dd2","uuid":"837cad89-874e-4ede-9a16-0e9fe2583dd2","timestamp":1753905816274,"tier":5,"sinker.uuid":"2de65430-0769-4ac6-a26a-7e3a645e0ff6","sinker.part":"junk_sinker","line.part":"speedy_line","hook.part":"common_hook"},"enchantments":{"angler":5,"blessing":5,"caster":5,"frail":5,"impaling":3,"looting":3,"luck_of_the_sea":5,"lure":5,"magnet":5,"piscary":5,"spiked_hook":5},"color":null,"description":null,"count":1}
         """);
         var service = new RepresentationConverter(NullLogger<RepresentationConverter>.Instance, null);
         service.TryUpdatingBuyState(buy, tradeState, new(){new(){TimeStamp = DateTime.UtcNow.AddMinutes(-20)}});
@@ -77,6 +77,7 @@ public class TrackerServiceTests
         buy.FlatenedNBT.Should().Contain(new KeyValuePair<string, string>("line.part", "speedy_line"));
         buy.FlatenedNBT.Should().Contain(new KeyValuePair<string, string>("hook.part", "common_hook"));
         buy.Tag.Should().Be("ROD_OF_THE_SEA");
+        buy.Tier.Should().Be(Tier.LEGENDARY);
     }
 
     [Test]

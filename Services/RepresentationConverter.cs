@@ -96,7 +96,7 @@ public class RepresentationConverter
                 var tradeTime = itemTrade.First().TimeStamp;
                 buy.End = tradeTime;
             }
-            logger.LogInformation($"Adjusted buy state for trade {buy.Uuid} {buy.Tag} {JsonConvert.SerializeObject(itemStateAtTrade)}");
+            logger.LogInformation($"Adjusted buy state for trade {buy.Uuid} {buy.Tag} {JsonConvert.SerializeObject(itemStateAtTrade)} to {JsonConvert.SerializeObject(buy)}");
         }
         catch (System.Exception e)
         {
