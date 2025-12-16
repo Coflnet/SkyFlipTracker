@@ -546,8 +546,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             var sellRatio = (double)saleCount / purchaseCount;
 
             // Apply penalty if sell ratio is too low
-            // Expect at least 30% sell ratio, penalty increases as ratio drops
-            if (sellRatio < 0.3 && purchaseCount > 5)
+            // Expect at least 35% sell ratio, penalty increases as ratio drops
+            if (sellRatio < 0.35 && purchaseCount > 5)
             {
                 var penalty = (0.3 - sellRatio) * 2.0; // Scale penalty
                 return Math.Min(penalty, 1.0); // Cap at 1.0
