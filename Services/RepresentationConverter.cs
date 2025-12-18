@@ -86,6 +86,10 @@ public class RepresentationConverter
             // reassign cause flattened nbt has to be copied
             var converted = FromItemRepresent(itemStateAtTrade);
             buy.FlatenedNBT = converted.FlatenedNBT;
+            if(buy.FlatenedNBT.TryGetValue("hot_potato_count", out var hpc))
+            {
+                buy.FlatenedNBT["hpc"] = hpc;
+            }
             buy.Enchantments = converted.Enchantments;
             buy.Tier = converted.Tier;
             buy.Reforge = converted.Reforge;
