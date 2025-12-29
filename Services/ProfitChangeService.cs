@@ -276,9 +276,9 @@ public class ProfitChangeService
             listCostFactor = 2;
         if (startingBid >= 100_000_000)
             listCostFactor = 2.5f;
-        if(ApplyTemporaryEventFees && DateTime.UtcNow < new DateTime(2025, 12, 26) && startingBid >= 1_000_000)
+        if(ApplyTemporaryEventFees && DateTime.UtcNow < new DateTime(2026, 1, 31) && startingBid >= 1_000_000)
         {
-            // aurora extra fees
+            // aura extra fees
             listCostFactor += 1;
         }
         var ahTax = new PastFlip.ProfitChange()
