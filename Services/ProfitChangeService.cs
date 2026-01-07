@@ -81,7 +81,11 @@ public class ProfitChangeService
     /// <returns></returns>
     public virtual async Task<List<PastFlip.ProfitChange>> GetChanges(Coflnet.Sky.Core.SaveAuction buy, Coflnet.Sky.Core.SaveAuction sell)
     {
-        var list = await GetChangesAsync(buy, sell).ToListAsync();
+        var list = new List<PastFlip.ProfitChange>();
+        await foreach (var item in GetChangesAsync(buy, sell))
+        {
+            list.Add(item);
+        }
         return list.GroupBy(l => l.Label).Select(g =>
         {
             var label = g.Key;
