@@ -104,7 +104,7 @@ public class ProfitChangeService
     private async IAsyncEnumerable<PastFlip.ProfitChange> GetChangesAsync(Coflnet.Sky.Core.SaveAuction buy, Coflnet.Sky.Core.SaveAuction sell)
     {
         if (IsAuction(sell)) // no fees on trades
-            yield return GetAhTax(sell.HighestBidAmount, sell.StartingBid);
+            yield return GetAhTax(sell.HighestBidAmount, sell.StartingBid, sell.End);
         var priceProvider = priceProviderFactory.Create(sell);
         if (IsNotcaluclateable(sell))
             yield break;
@@ -270,8 +270,10 @@ public class ProfitChangeService
     /// Whether to apply temporary event fees (can be set to false for testing)
     /// </summary>
     public virtual bool ApplyTemporaryEventFees => true;
+    private readonly static DateTime AuraStart = new DateTime(2025, 11, 22);
+    private readonly static DateTime AuraEnd = new DateTime(2026, 1, 19, 19, 15, 0);
 
-    public PastFlip.ProfitChange GetAhTax(long highestBid, long startingBid = 0)
+    public PastFlip.ProfitChange GetAhTax(long highestBid, long startingBid = 0, DateTime? timeOfSale = null)
     {
         var listCostFactor = 1f;
         if (startingBid == 0)
@@ -280,7 +282,8 @@ public class ProfitChangeService
             listCostFactor = 2;
         if (startingBid >= 100_000_000)
             listCostFactor = 2.5f;
-        if(ApplyTemporaryEventFees && DateTime.UtcNow < new DateTime(2026, 1, 31) && startingBid >= 1_000_000)
+        timeOfSale ??= DateTime.UtcNow;
+        if (ApplyTemporaryEventFees && timeOfSale > AuraStart && timeOfSale < AuraEnd && startingBid >= 1_000_000)
         {
             // aura extra fees
             listCostFactor += 1;
@@ -690,7 +693,7 @@ public class ProfitChangeService
             }
             else
                 upgradeCost = cost.CoreData.Cost * (1.0 - 0.003 * level); // only adjust for level
-            if(upgradeCost > 2_000_000)
+            if (upgradeCost > 2_000_000)
                 Console.WriteLine($"kat upgrade cost for {tierName} {sell.Tag} {sell.Uuid} is {upgradeCost} at level {level} {JsonConvert.SerializeObject(cost?.CoreData)}");
             yield return new($"Kat cost for {tierName}", (long)-upgradeCost);
             if (cost?.MaterialCost > 0 && !costAdded)

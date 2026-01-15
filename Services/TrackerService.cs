@@ -641,7 +641,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                             if (startingProp != null && startingProp.GetValue(listingObj) != null)
                                 starting = Convert.ToInt64(startingProp.GetValue(listingObj));
 
-                            var change = profitChangeService.GetAhTax(highest, starting);
+                            var change = profitChangeService.GetAhTax(highest, starting, sell.End);
                             change.ContextItemId = AuctionService.Instance.GetId(auctionIdVal);
                             change.Label = $"Listing attempt {starting}";
                             changes.Add(change);
@@ -773,7 +773,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                         continue;
                     sell = item.First();
                     var buyPrice = buyResp.HighestBidAmount;
-                    var tax = profitChangeService.GetAhTax(sell.HighestBidAmount, sell.StartingBid);
+                    var tax = profitChangeService.GetAhTax(sell.HighestBidAmount, sell.StartingBid, sell.End);
                     var changes = new List<PastFlip.ProfitChange>() { tax };
                     if (sell.Count < buyResp.Count)
                     {
