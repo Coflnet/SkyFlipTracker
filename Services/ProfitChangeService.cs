@@ -331,17 +331,33 @@ public class ProfitChangeService
             && tiers.Any(t => sell.Tag.StartsWith(t))
             && armorPieces.Any(p => tagOnPurchase.EndsWith(p)))
         {
-            yield return new("/kuudratransfer cost", -100_000);
-            var clearedTag = sell.Tag;
-            foreach (var item in tiers)
+            var buyTierPrefix = tiers.First(t => tagOnPurchase.StartsWith(t));
+            var sellTierPrefix = tiers.First(t => sell.Tag.StartsWith(t));
+            var buyBase = tagOnPurchase.Substring(buyTierPrefix.Length);
+            var sellBase = sell.Tag.Substring(sellTierPrefix.Length);
+
+            if (buyBase != sellBase)
             {
-                if (sell.Tag.StartsWith(item))
+                // Type changed (e.g., CRIMSON_HELMET → AURORA_HELMET) - kuudra transfer
+                yield return new("/kuudratransfer cost", -100_000);
+                yield return await priceProvider.CostOf(sellBase, "Conversion Armor piece");
+            }
+
+            if (Array.IndexOf(tiers, buyTierPrefix) < Array.IndexOf(tiers, sellTierPrefix))
+            {
+                // Tier upgraded (e.g., FIERY → INFERNAL) - prestige
+                var items = await hypixelItemService.GetItemsAsync();
+                if (items.TryGetValue(buy.Tag, out var itemData) && itemData.prestige != null)
                 {
-                    clearedTag = sell.Tag.Substring(item.Length);
-                    break;
+                    foreach (var cost in itemData.prestige.costs)
+                    {
+                        if (cost.Type == "ESSENCE")
+                            yield return await priceProvider.CostOf($"ESSENCE_{cost.EssenceType}", $"{cost.EssenceType} essence x{cost.Amount} for prestige", cost.Amount);
+                        else if (cost.Type == "ITEM")
+                            yield return await priceProvider.CostOf(cost.ItemId, $"{cost.ItemId} x{cost.Amount} for prestige", cost.Amount);
+                    }
                 }
             }
-            yield return await priceProvider.CostOf(clearedTag, $"Conversion Armor piece");
             yield break;
         }
         var allCrafts = await craftsApi.GetAllAsync();

@@ -1803,16 +1803,101 @@ public class ProfitChangeTests
             Tier = Core.Tier.MYTHIC
         };
 
-        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("CRIMSON_CHESTPLATE", null, 0, default))
-            .ReturnsAsync(() => new() { Median = 5_000_000 });
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("ESSENCE_CRIMSON", null, 0, default))
+            .ReturnsAsync(() => new() { Median = 800 });
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("KUUDRA_TEETH", null, 0, default))
+            .ReturnsAsync(() => new() { Median = 1_000_000 });
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("FLAWLESS_JASPER_GEM", null, 0, default))
             .ReturnsAsync(() => new() { Median = 1_000_000 });
 
         var result = await service.GetChanges(buy, sell);
 
         result.Should().NotBeNull();
-        result.Should().Contain(c => c.Label.Contains("Conversion Armor piece"));
-        result.Should().Contain(c => c.Label == "/kuudratransfer cost");
+        result.Should().Contain(c => c.Label.Contains("prestige") && c.Label.Contains("essence"),
+            "prestige upgrade should include essence cost");
+        result.Should().Contain(c => c.Label.Contains("prestige") && c.Label.Contains("KUUDRA_TEETH"),
+            "prestige upgrade should include Kuudra Teeth cost");
+        result.Should().NotContain(c => c.Label == "/kuudratransfer cost",
+            "same-type prestige should not have kuudra transfer cost");
+    }
+
+    /// <summary>
+    /// Test for combined prestige + kuudra transfer
+    /// FIERY_CRIMSON_HELMET → INFERNAL_AURORA_HELMET involves both a tier upgrade (prestige)
+    /// and a type change (kuudra transfer)
+    /// </summary>
+    [Test]
+    public async Task CrimsonToAuroraPrestigeAndTransfer_ShouldIncludeBothCosts()
+    {
+        var buy = new Core.SaveAuction()
+        {
+            Uuid = "3808ceb1d2ec41a6845c6ed98e3add29",
+            Tag = "FIERY_CRIMSON_HELMET",
+            ItemName = "Renowned Fiery Crimson Helmet ✪✪✪✪✪",
+            HighestBidAmount = 175_000_000,
+            FlatenedNBT = new()
+            {
+                { "rarity_upgrades", "1" },
+                { "hpc", "15" },
+                { "COMBAT_0", "FINE" },
+                { "unlocked_slots", "COMBAT_0,COMBAT_1" },
+                { "COMBAT_1_gem", "ONYX" },
+                { "COMBAT_0_gem", "ONYX" },
+                { "COMBAT_1", "FINE" },
+                { "upgrade_level", "10" },
+                { "uid", "b63b4b253b9a" },
+                { "boss_tier", "1" },
+                { "uuid", "b11c7477-b5e8-4a69-83b1-b63b4b253b9a" }
+            },
+            Tier = Core.Tier.MYTHIC
+        };
+
+        var sell = new Core.SaveAuction()
+        {
+            Uuid = "a7cfe98c730f462089997958bd390b26",
+            Tag = "INFERNAL_AURORA_HELMET",
+            ItemName = "Renowned Infernal Aurora Helmet",
+            HighestBidAmount = 333_333_333,
+            FlatenedNBT = new()
+            {
+                { "rarity_upgrades", "1" },
+                { "hpc", "15" },
+                { "COMBAT_0", "PERFECT" },
+                { "unlocked_slots", "COMBAT_0,COMBAT_1" },
+                { "COMBAT_1_gem", "SAPPHIRE" },
+                { "COMBAT_0_gem", "SAPPHIRE" },
+                { "COMBAT_1", "PERFECT" },
+                { "uid", "b63b4b253b9a" },
+                { "boss_tier", "1" },
+                { "uuid", "b11c7477-b5e8-4a69-83b1-b63b4b253b9a" }
+            },
+            Tier = Core.Tier.MYTHIC
+        };
+
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("AURORA_HELMET", null, 0, default))
+            .ReturnsAsync(() => new() { Median = 5_000_000 });
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("ESSENCE_CRIMSON", null, 0, default))
+            .ReturnsAsync(() => new() { Median = 800 });
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("KUUDRA_TEETH", null, 0, default))
+            .ReturnsAsync(() => new() { Median = 1_000_000 });
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("PERFECT_SAPPHIRE_GEM", null, 0, default))
+            .ReturnsAsync(() => new() { Median = 2_000_000 });
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("FINE_ONYX_GEM", null, 0, default))
+            .ReturnsAsync(() => new() { Median = 500_000 });
+
+        var result = await service.GetChanges(buy, sell);
+
+        result.Should().NotBeNull();
+        // Should have kuudra transfer cost (type changed CRIMSON → AURORA)
+        result.Should().Contain(c => c.Label == "/kuudratransfer cost",
+            "type change should include kuudra transfer cost");
+        result.Should().Contain(c => c.Label.Contains("Conversion Armor piece"),
+            "type change should include armor piece cost");
+        // Should have prestige costs (tier changed FIERY → INFERNAL)
+        result.Should().Contain(c => c.Label.Contains("prestige") && c.Label.Contains("essence"),
+            "prestige upgrade should include essence cost");
+        result.Should().Contain(c => c.Label.Contains("prestige") && c.Label.Contains("KUUDRA_TEETH"),
+            "prestige upgrade should include Kuudra Teeth cost");
     }
 
     /// <summary>
