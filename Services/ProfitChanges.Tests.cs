@@ -336,6 +336,27 @@ public class ProfitChangeTests
     }
 
     [Test]
+    public async Task PetItemRemoved()
+    {
+        var buy = CreateAuction("PET_OCELOT", "[Lvl 85] Ocelot", 7000000, Core.Tier.EPIC);
+        buy.FlatenedNBT.Add("heldItem", "PET_ITEM_FORAGING_SKILL_BOOST_EPIC");
+        buy.FlatenedNBT.Add("exp", "6454188.694268968");
+        
+        var sell = CreateAuction("PET_OCELOT", "[Lvl 85] Ocelot", 2560000, Core.Tier.EPIC);
+        sell.FlatenedNBT.Add("exp", "6454188.694268968");
+
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("PET_ITEM_FORAGING_SKILL_BOOST_EPIC", null, 0, default))
+            .ReturnsAsync(() => new() { Median = 7_000_000 });
+
+        var changes = await service.GetChanges(buy, sell);
+        
+        var itemChange = changes.FirstOrDefault(c => c.Label.Contains("Removed PET_ITEM_FORAGING_SKILL_BOOST_EPIC"));
+        Assert.That(itemChange, Is.Not.Null, "Expected a change for removing the pet item.");
+        var removalCost = 50_000;
+        Assert.That(itemChange.Amount, Is.EqualTo(7_000_000 - removalCost));
+    }
+
+    [Test]
     public async Task GemRemoved()
     {
         var buy = CreateAuction("DIVAN_CHESTPLATE");

@@ -139,6 +139,18 @@ public class ProfitChangeService
         {
             buy.Tier--;
         }
+
+        var buyHeldItem = buy.FlatenedNBT.FirstOrDefault(f => f.Key == "heldItem").Value;
+        var sellHeldItem = sell.FlatenedNBT.FirstOrDefault(f => f.Key == "heldItem").Value;
+
+        if (buy.Tag.StartsWith("PET_") && buyHeldItem != null && buyHeldItem != sellHeldItem && buyHeldItem != "PET_ITEM_TIER_BOOST")
+        {
+            var change = await priceProvider.CostOf(buyHeldItem, $"Removed {buyHeldItem}", 1);
+            var cost = hypixelItemService.GetPetItemRemovalCost(buyHeldItem);
+            change.Amount = -change.Amount-cost; // Invert because keeping/removing the item gives it to the player
+            yield return change;
+        }
+
         if ((int)buy.Tier < (int)sell.Tier)
             if (sell.Tag.StartsWith("PET_"))
             {
