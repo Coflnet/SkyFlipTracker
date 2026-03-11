@@ -339,38 +339,31 @@ public class ProfitChangeService
             yield return await priceProvider.CostOf(sell.Tag, $"{ItemReferences.RemoveReforgesAndLevel(sell.ItemName)} godroll", 1, filter);
             yield break;
         }
-        if (tiers.Any(t => tagOnPurchase.StartsWith(t))
-            && tiers.Any(t => sell.Tag.StartsWith(t))
-            && armorPieces.Any(p => tagOnPurchase.EndsWith(p)))
+        string[] kuudraTiers = ["INFERNAL_", "FIERY_", "BURNING_", "HOT_", ""];
+        string GetKuudraBase(string tag)
         {
-            var buyTierPrefix = tiers.First(t => tagOnPurchase.StartsWith(t));
-            var sellTierPrefix = tiers.First(t => sell.Tag.StartsWith(t));
-            var buyBase = tagOnPurchase.Substring(buyTierPrefix.Length);
-            var sellBase = sell.Tag.Substring(sellTierPrefix.Length);
+            var prefixMatch = kuudraTiers.FirstOrDefault(t => tag.StartsWith(t));
+            if (prefixMatch == null) return null;
+            var b = tag.Substring(prefixMatch.Length);
+            if (armorPieces.Any(p => b.EndsWith(p)) && CrisonArmor.Any(c => b.StartsWith(c))) return b;
+            return null;
+        }
 
+        var buyBase = GetKuudraBase(tagOnPurchase);
+        var sellBase = GetKuudraBase(sell.Tag);
+
+        if (buyBase != null && sellBase != null)
+        {
             if (buyBase != sellBase)
             {
-                // Type changed (e.g., CRIMSON_HELMET → AURORA_HELMET) - kuudra transfer
-                yield return new("/kuudratransfer cost", -100_000);
+                // Type changed (e.g., TERROR_CHESTPLATE → CRIMSON_CHESTPLATE) - kuudra transfer, since crafting service mocks prestige upgrade as craft we can depend on that
+                yield return new PastFlip.ProfitChange("/kuudratransfer cost", -100_000);
                 yield return await priceProvider.CostOf(sellBase, "Conversion Armor piece");
-            }
 
-            if (Array.IndexOf(tiers, buyTierPrefix) < Array.IndexOf(tiers, sellTierPrefix))
-            {
-                // Tier upgraded (e.g., FIERY → INFERNAL) - prestige
-                var items = await hypixelItemService.GetItemsAsync();
-                if (items.TryGetValue(buy.Tag, out var itemData) && itemData.prestige != null)
-                {
-                    foreach (var cost in itemData.prestige.costs)
-                    {
-                        if (cost.Type == "ESSENCE")
-                            yield return await priceProvider.CostOf($"ESSENCE_{cost.EssenceType}", $"{cost.EssenceType} essence x{cost.Amount} for prestige", cost.Amount);
-                        else if (cost.Type == "ITEM")
-                            yield return await priceProvider.CostOf(cost.ItemId, $"{cost.ItemId} x{cost.Amount} for prestige", cost.Amount);
-                    }
-                }
+                var buyTierPrefix = kuudraTiers.First(t => tagOnPurchase.StartsWith(t));
+                tagOnPurchase = buyTierPrefix + sellBase;
             }
-            yield break;
+            if (tagOnPurchase == sell.Tag) yield break;
         }
         var allCrafts = await craftsApi.GetAllAsync();
         var craft = allCrafts.Where(c => c.ItemId == sell.Tag).FirstOrDefault();

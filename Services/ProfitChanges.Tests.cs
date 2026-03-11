@@ -1824,20 +1824,32 @@ public class ProfitChangeTests
             Tier = Core.Tier.MYTHIC
         };
 
+        craftsApi.Setup(c => c.GetAllAsync(0, default)).ReturnsAsync(() => new()
+        {
+            new() { ItemId = "INFERNAL_CRIMSON_CHESTPLATE", Ingredients = new()
+            {
+                new() { ItemId = "FIERY_CRIMSON_CHESTPLATE", Count = 1 },
+                new() { ItemId = "ESSENCE_CRIMSON", Count = 4000 },
+                new() { ItemId = "KUUDRA_TEETH", Count = 100 }
+            }}
+        });
+
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("ESSENCE_CRIMSON", null, 0, default))
             .ReturnsAsync(() => new() { Median = 800 });
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("KUUDRA_TEETH", null, 0, default))
             .ReturnsAsync(() => new() { Median = 1_000_000 });
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("FLAWLESS_JASPER_GEM", null, 0, default))
             .ReturnsAsync(() => new() { Median = 1_000_000 });
+        itemsApi.Setup(i => i.ItemItemTagGetAsync("INFERNAL_CRIMSON_CHESTPLATE", It.IsAny<bool?>(), It.IsAny<int>(), default))
+            .ReturnsAsync(() => new() { Tag = "INFERNAL_CRIMSON_CHESTPLATE", Tier = Items.Client.Model.Tier.MYTHIC });
 
         var result = await service.GetChanges(buy, sell);
 
         result.Should().NotBeNull();
-        result.Should().Contain(c => c.Label.Contains("prestige") && c.Label.Contains("essence"),
-            "prestige upgrade should include essence cost");
-        result.Should().Contain(c => c.Label.Contains("prestige") && c.Label.Contains("KUUDRA_TEETH"),
-            "prestige upgrade should include Kuudra Teeth cost");
+        result.Should().Contain(c => c.Label.Contains("crafting material ESSENCE_CRIMSON"),
+            "prestige upgrade should include essence cost via craft");
+        result.Should().Contain(c => c.Label.Contains("crafting material KUUDRA_TEETH"),
+            "prestige upgrade should include Kuudra Teeth cost via craft");
         result.Should().NotContain(c => c.Label == "/kuudratransfer cost",
             "same-type prestige should not have kuudra transfer cost");
     }
@@ -1906,6 +1918,18 @@ public class ProfitChangeTests
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("FINE_ONYX_GEM", null, 0, default))
             .ReturnsAsync(() => new() { Median = 500_000 });
 
+        craftsApi.Setup(c => c.GetAllAsync(0, default)).ReturnsAsync(() => new()
+        {
+            new() { ItemId = "INFERNAL_AURORA_HELMET", Ingredients = new()
+            {
+                new() { ItemId = "FIERY_AURORA_HELMET", Count = 1 },
+                new() { ItemId = "ESSENCE_CRIMSON", Count = 4000 },
+                new() { ItemId = "KUUDRA_TEETH", Count = 100 }
+            }}
+        });
+        itemsApi.Setup(i => i.ItemItemTagGetAsync("INFERNAL_AURORA_HELMET", It.IsAny<bool?>(), It.IsAny<int>(), default))
+            .ReturnsAsync(() => new() { Tag = "INFERNAL_AURORA_HELMET", Tier = Items.Client.Model.Tier.MYTHIC });
+
         var result = await service.GetChanges(buy, sell);
 
         result.Should().NotBeNull();
@@ -1915,10 +1939,10 @@ public class ProfitChangeTests
         result.Should().Contain(c => c.Label.Contains("Conversion Armor piece"),
             "type change should include armor piece cost");
         // Should have prestige costs (tier changed FIERY → INFERNAL)
-        result.Should().Contain(c => c.Label.Contains("prestige") && c.Label.Contains("essence"),
-            "prestige upgrade should include essence cost");
-        result.Should().Contain(c => c.Label.Contains("prestige") && c.Label.Contains("KUUDRA_TEETH"),
-            "prestige upgrade should include Kuudra Teeth cost");
+        result.Should().Contain(c => c.Label.Contains("crafting material ESSENCE_CRIMSON"),
+            "prestige upgrade should include essence cost via craft");
+        result.Should().Contain(c => c.Label.Contains("crafting material KUUDRA_TEETH"),
+            "prestige upgrade should include Kuudra Teeth cost via craft");
     }
 
     /// <summary>
@@ -2026,5 +2050,88 @@ public class ProfitChangeTests
         var venomousChange = changes.FirstOrDefault(c => c.Label.Contains("venomous", StringComparison.OrdinalIgnoreCase));
         venomousChange.Should().NotBeNull("should have a change for Venomous 7 enchantment");
         venomousChange.Label.Should().Contain("Enchant venomous 7", "Venomous 7 cost");
+    }
+
+    /// <summary>
+    /// A TERROR_CHESTPLATE flipped to FIERY_CRIMSON_CHESTPLATE via crafting.
+    /// The intermediate BURNING_CRIMSON_CHESTPLATE is an internal craft step — it should
+    /// NOT appear as a separate crafting material cost because the upgrade path is fully
+    /// resolved through ESSENCE_CRIMSON etc. all the way back to the purchased TERROR_CHESTPLATE.
+    /// Expected 6 profit changes: ah tax, ESSENCE_CRIMSON, HEAVY_PEARL, KUUDRA_TEETH, Coins, Reforge ancient.
+    /// </summary>
+    [Test]
+    public async Task TerrorToFieryCrimsonChestplateNoBurningCrimsonCost()
+    {
+        // Arrange
+        var buy = new Core.SaveAuction()
+        {
+            Uuid = Guid.NewGuid().ToString("N"),
+            Tag = "TERROR_CHESTPLATE",
+            ItemName = "Loving Terror Chestplate",
+            HighestBidAmount = 21_000_000,
+            StartingBid = 21_000_000,
+            Reforge = Core.ItemReferences.Reforge.Loving,
+            FlatenedNBT = new() { { "rarity_upgrades", "1" }, { "boss_tier", "4" } },
+            Enchantments = new(),
+            Tier = Core.Tier.MYTHIC
+        };
+        var sell = new Core.SaveAuction()
+        {
+            Uuid = Guid.NewGuid().ToString("N"),
+            Tag = "FIERY_CRIMSON_CHESTPLATE",
+            ItemName = "Ancient Fiery Crimson Chestplate",
+            HighestBidAmount = 99_999_000,
+            StartingBid = 99_999_000,
+            Reforge = Core.ItemReferences.Reforge.ancient,
+            FlatenedNBT = new() { { "rarity_upgrades", "1" }, { "boss_tier", "4" } },
+            Enchantments = new(),
+            Tier = Core.Tier.MYTHIC
+        };
+
+        // Craft chain: FIERY_CRIMSON_CHESTPLATE needs BURNING_CRIMSON_CHESTPLATE (intermediate)
+        // plus essences/pearls/teeth/coins. BURNING_CRIMSON_CHESTPLATE correctly upgrades from
+        // HOT_CRIMSON_CHESTPLATE, which stems from CRIMSON_CHESTPLATE.
+        craftsApi.Setup(c => c.GetAllAsync(0, default)).ReturnsAsync(() => new()
+        {
+            new() { ItemId = "FIERY_CRIMSON_CHESTPLATE", Ingredients = new()
+            {
+                new() { ItemId = "BURNING_CRIMSON_CHESTPLATE", Count = 1 },
+                new() { ItemId = "ESSENCE_CRIMSON", Count = 20845 },
+                new() { ItemId = "HEAVY_PEARL",     Count = 12 },
+                new() { ItemId = "KUUDRA_TEETH",    Count = 50 },
+                new() { ItemId = "SKYBLOCK_COIN",   Count = 1, Cost = 15_740_000 },
+            }},
+            new() { ItemId = "BURNING_CRIMSON_CHESTPLATE", Ingredients = new()
+            {
+                new() { ItemId = "HOT_CRIMSON_CHESTPLATE", Count = 1 },
+            }},
+            new() { ItemId = "HOT_CRIMSON_CHESTPLATE", Ingredients = new()
+            {
+                new() { ItemId = "CRIMSON_CHESTPLATE", Count = 1 },
+            }},
+        });
+
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("ESSENCE_CRIMSON", null, 0, default))
+            .ReturnsAsync(() => new() { Median = 1_162 });
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("HEAVY_PEARL", null, 0, default))
+            .ReturnsAsync(() => new() { Median = 333_493 });
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("KUUDRA_TEETH", null, 0, default))
+            .ReturnsAsync(() => new() { Median = 10_390 });
+        // ancient reforge stone — give it a small price so the reforge change is included
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.Is<string>(s => s != "ESSENCE_CRIMSON" && s != "HEAVY_PEARL" && s != "KUUDRA_TEETH"), null, 0, default))
+            .ReturnsAsync(() => new() { Median = 700_000 });
+
+        itemsApi.Setup(i => i.ItemItemTagGetAsync("FIERY_CRIMSON_CHESTPLATE", It.IsAny<bool?>(), It.IsAny<int>(), default))
+            .ReturnsAsync(() => new() { Tag = "FIERY_CRIMSON_CHESTPLATE", Tier = Items.Client.Model.Tier.MYTHIC });
+
+        // Act
+        var result = await service.GetChanges(buy, sell);
+
+        // Assert
+        result.Should().NotContain(c => c.Label.Contains("BURNING_CRIMSON_CHESTPLATE"),
+            "BURNING_CRIMSON_CHESTPLATE is an internal crafting step resolved by CRIMSON_CHESTPLATE — it must not appear as a separate cost");
+        result.Count.Should().Be(8, JsonConvert.SerializeObject(result, Formatting.Indented));
+        var netProfit = sell.HighestBidAmount - buy.HighestBidAmount + result.Sum(c => c.Amount);
+        netProfit.Should().BePositive("the flip is profitable after accounting for all crafting costs");
     }
 }
