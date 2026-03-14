@@ -1909,6 +1909,8 @@ public class ProfitChangeTests
 
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("AURORA_HELMET", null, 0, default))
             .ReturnsAsync(() => new() { Median = 5_000_000 });
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("CRIMSON_HELMET", null, 0, default))
+            .ReturnsAsync(() => new() { Median = 5_000_000 });
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("ESSENCE_CRIMSON", null, 0, default))
             .ReturnsAsync(() => new() { Median = 800 });
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("KUUDRA_TEETH", null, 0, default))

@@ -358,7 +358,10 @@ public class ProfitChangeService
             {
                 // Type changed (e.g., TERROR_CHESTPLATE → CRIMSON_CHESTPLATE) - kuudra transfer, since crafting service mocks prestige upgrade as craft we can depend on that
                 yield return new PastFlip.ProfitChange("/kuudratransfer cost", -100_000);
-                yield return await priceProvider.CostOf(sellBase, "Conversion Armor piece");
+                
+                // Get clean base armor piece (e.g., TERROR_CHESTPLATE without HOT/BURNING/etc tier prefix) for cheapest conversion option
+                var cleanBase = GetKuudraBase(sell.Tag);
+                yield return await priceProvider.CostOf(cleanBase, "Conversion Armor piece");
 
                 var buyTierPrefix = kuudraTiers.First(t => tagOnPurchase.StartsWith(t));
                 tagOnPurchase = buyTierPrefix + sellBase;
