@@ -360,8 +360,7 @@ public class ProfitChangeService
                 yield return new PastFlip.ProfitChange("/kuudratransfer cost", -100_000);
                 
                 // Get clean base armor piece (e.g., TERROR_CHESTPLATE without HOT/BURNING/etc tier prefix) for cheapest conversion option
-                var cleanBase = GetKuudraBase(sell.Tag);
-                yield return await priceProvider.CostOf(cleanBase, "Conversion Armor piece");
+                yield return await priceProvider.CostOf(sellBase, "Conversion Armor piece");
 
                 var buyTierPrefix = kuudraTiers.First(t => tagOnPurchase.StartsWith(t));
                 tagOnPurchase = buyTierPrefix + sellBase;
