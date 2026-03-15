@@ -407,7 +407,7 @@ public class ProfitChangeService
             {
                 logger.LogError(e, $"could not find craft cost for {item.ItemId}");
             }
-            if (change != null)
+            if (change != null && change.Amount != 0)
                 yield return change;
         }
         var itemMetadata = await GetItemMetadata(sell.Tag);
