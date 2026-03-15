@@ -147,7 +147,7 @@ public class ProfitChangeService
         {
             var change = await priceProvider.CostOf(buyHeldItem, $"Removed {buyHeldItem}", 1);
             var cost = hypixelItemService.GetPetItemRemovalCost(buyHeldItem);
-            change.Amount = -change.Amount-cost; // Invert because keeping/removing the item gives it to the player
+            change.Amount = -change.Amount - cost; // Invert because keeping/removing the item gives it to the player
             yield return change;
         }
 
@@ -358,9 +358,14 @@ public class ProfitChangeService
             {
                 // Type changed (e.g., TERROR_CHESTPLATE → CRIMSON_CHESTPLATE) - kuudra transfer, since crafting service mocks prestige upgrade as craft we can depend on that
                 yield return new PastFlip.ProfitChange("/kuudratransfer cost", -100_000);
-                
-                // Get clean base armor piece (e.g., TERROR_CHESTPLATE without HOT/BURNING/etc tier prefix) for cheapest conversion option
-                yield return await priceProvider.CostOf(sellBase, "Conversion Armor piece " + sellBase);
+
+                // Get clean base armor piece with "clean" filters, seemingly drops with at least one star
+                var filters = new Dictionary<string, string>()
+                {
+                    {"Stars", "0-1" },
+                    { "HasAttribute", "false" }
+                };
+                yield return await priceProvider.CostOf(sellBase, "Conversion Armor piece " + sellBase, 1, filters);
 
                 var buyTierPrefix = kuudraTiers.First(t => tagOnPurchase.StartsWith(t));
                 tagOnPurchase = buyTierPrefix + sellBase;
