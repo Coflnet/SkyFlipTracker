@@ -1349,6 +1349,19 @@ public class ProfitChangeTests
         return pricesApi;
     }
     [Test]
+    public async Task RemovedHookPartHasRemovalFee()
+    {
+        var buy = CreateAuction("PITCHIN_HELLFIRE_ROD", "rod", 1_000_000);
+        var sell = CreateAuction("PITCHIN_HELLFIRE_ROD", "rod", 100_000_000);
+        buy.FlatenedNBT["hook.part"] = "hotspot_hook";
+        SetupItemPrice(1_000_000);
+        var changes = await service.GetChanges(buy, sell);
+        Assert.That(changes.Count, Is.EqualTo(2), JsonConvert.SerializeObject(changes, Formatting.Indented));
+        Assert.That(changes[1].Amount, Is.EqualTo(1_000_000 * 98 / 100 - 5000));
+        Assert.That(changes[1].Label, Is.EqualTo("hotspot_hook hook.part removed"));
+    }
+
+    [Test]
     public async Task PromisingShovelSelfUpgradesEnchants()
     {
         var buy = CreateAuction("PROMISING_SPADE", "Promising Shovel", 10_000);

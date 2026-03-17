@@ -40,6 +40,9 @@ public class ProfitChangeService
             "drill_part_engine",
             "drill_part_fuel_tank",
             "drill_part_upgrade_module",
+            "hook.part",
+            "sinker.part",
+            "line.part"
         };
 
     /// <summary>
@@ -215,7 +218,16 @@ public class ProfitChangeService
         }
         foreach (var item in itemsRemoved)
         {
-            yield return await ValueOf(item.Value, $"{item.Value} {item.Key} removed");
+            var removalValue = await ValueOf(item.Value, $"{item.Value} {item.Key} removed");
+            if (item.Key == "hook.part" || item.Key == "sinker.part" || item.Key == "line.part")
+            {
+                removalValue.Amount -= 5000;
+            }
+            else if (item.Key.StartsWith("drill_part_"))
+            {
+                removalValue.Amount -= 9_999;
+            }
+            yield return removalValue;
         }
         var newEnchantmens = sell.Enchantments?.Where(f => !buy.Enchantments?.Where(e => e.Type == f.Type && f.Level == e.Level).Any() ?? true).ToList();
         if (newEnchantmens != null)
