@@ -2149,4 +2149,82 @@ public class ProfitChangeTests
         var netProfit = sell.HighestBidAmount - buy.HighestBidAmount + result.Sum(c => c.Amount);
         netProfit.Should().BePositive("the flip is profitable after accounting for all crafting costs");
     }
+
+    /// <summary>
+    /// Prestige upgrade from BURNING→FIERY should only count the prestige cost (10m coins + 4500 essence),
+    /// not the already existing 5 stars (upgrade_level 10) on the purchased item.
+    /// The crafts API recipe includes both prestige AND star costs; the star portion must be subtracted.
+    /// </summary>
+    [Test]
+    public async Task PrestigeUpgradeDoesNotCountExistingStars()
+    {
+        var buy = new Core.SaveAuction()
+        {
+            Uuid = Guid.NewGuid().ToString("N"),
+            Tag = "BURNING_CRIMSON_BOOTS",
+            ItemName = "Burning Crimson Boots ✪✪✪✪✪",
+            HighestBidAmount = 37_000_000,
+            StartingBid = 37_000_000,
+            FlatenedNBT = new()
+            {
+                { "upgrade_level", "10" },
+                { "uid", "b9187a173c8d" },
+                { "boss_tier", "0" },
+                { "uuid", "512a0d63-b115-4740-af3b-b9187a173c8d" },
+                { "color", "230:83:0" },
+                { "cc", "1" }
+            },
+            Enchantments = new(),
+            Reforge = Core.ItemReferences.Reforge.None,
+            Tier = Core.Tier.LEGENDARY
+        };
+        var sell = new Core.SaveAuction()
+        {
+            Uuid = Guid.NewGuid().ToString("N"),
+            Tag = "FIERY_CRIMSON_BOOTS",
+            ItemName = "Fiery Crimson Boots",
+            HighestBidAmount = 69_999_000,
+            StartingBid = 69_999_000,
+            FlatenedNBT = new()
+            {
+                { "uid", "b9187a173c8d" },
+                { "boss_tier", "0" },
+                { "uuid", "512a0d63-b115-4740-af3b-b9187a173c8d" },
+                { "color", "230:83:0" },
+                { "cc", "1" }
+            },
+            Enchantments = new(),
+            Reforge = Core.ItemReferences.Reforge.None,
+            Tier = Core.Tier.LEGENDARY
+        };
+
+        // Use realistic production recipe which includes prestige + star costs
+        craftsApi.Setup(c => c.GetAllAsync(0, default)).ReturnsAsync(() => new()
+        {
+            new() { ItemId = "FIERY_CRIMSON_BOOTS", Ingredients = new()
+            {
+                new() { ItemId = "BURNING_CRIMSON_BOOTS", Count = 1 },
+                new() { ItemId = "ESSENCE_CRIMSON", Count = 20845 },
+                new() { ItemId = "HEAVY_PEARL", Count = 12 },
+                new() { ItemId = "KUUDRA_TEETH", Count = 50 },
+                new() { ItemId = "SKYBLOCK_COIN", Count = 1, Cost = 10_000_000 },
+            }}
+        });
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("ESSENCE_CRIMSON", null, 0, default))
+            .ReturnsAsync(() => new() { Median = 2200 });
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.Is<string>(s => s != "ESSENCE_CRIMSON"), null, 0, default))
+            .ReturnsAsync(() => new() { Median = 500_000 });
+        itemsApi.Setup(i => i.ItemItemTagGetAsync("FIERY_CRIMSON_BOOTS", It.IsAny<bool?>(), It.IsAny<int>(), default))
+            .ReturnsAsync(() => new() { Tag = "FIERY_CRIMSON_BOOTS", Tier = Items.Client.Model.Tier.LEGENDARY });
+
+        var changes = await service.GetChanges(buy, sell);
+
+        var all = JsonConvert.SerializeObject(changes, Formatting.Indented);
+        // Should only charge prestige cost, not the star costs already on the buy
+        var essenceChange = changes.FirstOrDefault(c => c.Label.Contains("ESSENCE_CRIMSON"));
+        essenceChange.Should().NotBeNull($"should have essence cost, got: {all}");
+        essenceChange!.Amount.Should().Be(-4500 * 2200, $"only 4500 prestige essence (not 20845 which includes stars), got: {all}");
+        var coinsChange = changes.First(c => c.Label == "Coins");
+        coinsChange.Amount.Should().Be(-10_000_000, "prestige costs 10m coins");
+    }
 }

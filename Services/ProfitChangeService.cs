@@ -393,6 +393,45 @@ public class ProfitChangeService
         }
         var allIngredients = craft.Ingredients.ToList();
         AddCraftPathIngredients(tagOnPurchase, allCrafts, allIngredients);
+
+        // Kuudra prestige: the recipe includes star costs for the buy tag; subtract them
+        // since prestige strips all stars and those costs were already on the buy item
+        if (buyBase != null && sellBase != null && buyBase == sellBase
+            && buy.FlatenedNBT.TryGetValue("upgrade_level", out var buyUpgradeLevelStr))
+        {
+            var buyStarLevel = int.Parse(buyUpgradeLevelStr);
+            if (buyStarLevel > 0)
+            {
+                var starCosts = await hypixelItemService.GetStarCost(tagOnPurchase, 0, buyStarLevel);
+                var essenceGroups = starCosts.Where(c => c.Type == "ESSENCE").GroupBy(c => $"ESSENCE_{c.EssenceType}").ToList();
+                var itemGroups = starCosts.Where(c => c.Type == "ITEM").GroupBy(c => c.ItemId).ToList();
+
+                // Only subtract if the recipe actually includes star costs (has enough of each ingredient)
+                bool recipeIncludesStarCosts = essenceGroups.All(eg =>
+                {
+                    var ingredient = allIngredients.FirstOrDefault(i => i.ItemId == eg.Key);
+                    return ingredient != null && ingredient.Count >= eg.Sum(c => c.Amount);
+                });
+                if (recipeIncludesStarCosts)
+                {
+                    foreach (var essence in essenceGroups)
+                    {
+                        var ingredient = allIngredients.FirstOrDefault(i => i.ItemId == essence.Key);
+                        if (ingredient != null)
+                            ingredient.Count -= essence.Sum(c => c.Amount);
+                    }
+                    foreach (var itemCost in itemGroups)
+                    {
+                        var ingredient = allIngredients.FirstOrDefault(i => i.ItemId == itemCost.Key);
+                        if (ingredient != null)
+                            ingredient.Count -= itemCost.Sum(c => c.Amount);
+                    }
+                }
+                // Reset so GetRemainingDifference uses base 0 for any stars on the sell
+                buy.FlatenedNBT["upgrade_level"] = "0";
+            }
+        }
+
         foreach (var item in allIngredients)
         {
             var count = item.Count;
