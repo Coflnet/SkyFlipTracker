@@ -10,7 +10,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
-using AutoMapper;
 using Newtonsoft.Json;
 using Prometheus;
 using System.Globalization;
@@ -261,25 +260,11 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 version = Version;
             }
             var toRefresh = auctionIds.Except(existing.Where(e => e.Item2 < version).Select(e => e.Item1)).ToList();
-            var mapper = new AutoMapper.Mapper(new MapperConfiguration(cfg =>
-            {
-                cfg.CreateMap<Api.Client.Model.ColorSaveAuction, SaveAuction>().ForMember(dest => dest.FlatenedNBT, opt => opt.MapFrom(src => src.FlatNbt));
-                cfg.CreateMap<Api.Client.Model.ColorEnchant, Enchantment>();
-                cfg.CreateMap<Api.Client.Model.SaveBids, SaveBids>();
-                cfg.AddGlobalIgnore("NbtData");
-            }));
 
             var auctions = await Task.WhenAll(toRefresh.Select(async a =>
             {
                 var originalResp = await auctionsApi.ApiAuctionAuctionUuidGetWithHttpInfoAsync(a.ToString("N"));
                 return JsonConvert.DeserializeObject<ApiSaveAuction>(originalResp.RawContent);
-                /*if (original == null)
-                    throw new Exception($"auction {a.ToString("N")} could not be loaded");
-
-                var mapped = mapper.Map<SaveAuction>(original);
-                if (mapped == null)
-                    throw new Exception($"auction {JsonConvert.SerializeObject(original)} could not be mapped");
-                return mapped;*/
             }));
             logger.LogInformation("Refreshing flips {auctions}", JsonConvert.SerializeObject(auctions));
             await IndexCassandra(auctions, true);
@@ -709,7 +694,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             }
             if (itemTrade.Count > 0)
             {
-                (int itemCount, long tradeEstimate, _) = await GetTradeValue(itemTrade);
+                (int itemCount, long tradeEstimate, _) = await GetTradeValue(itemTrade, Guid.Parse(sell.AuctioneerId));
                 flags |= FlipFlags.ViaTrade;
                 buy.HighestBidAmount = tradeEstimate;
                 logger.LogInformation("From trade parts {parts} got {itemCount} {estimate}", JsonConvert.SerializeObject(itemTrade), itemCount, tradeEstimate);
@@ -728,10 +713,13 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
 
 
 
-        private async Task<(int itemCount, long tradeEstimate, List<Transaction> items)> GetTradeValue(List<Transaction> itemTrade)
+        private async Task<(int itemCount, long tradeEstimate, List<Transaction> items)> GetTradeValue(List<Transaction> itemTrade, Guid? sellerUuid = null)
         {
-            var time = itemTrade.First().TimeStamp;
-            var tradeitems = await transactionApi.TransactionPlayerPlayerUuidGetAsync(itemTrade.First().PlayerUuid, 1, time);
+            var relevantEntry = (sellerUuid.HasValue
+                ? itemTrade.FirstOrDefault(t => t.PlayerUuid == sellerUuid.Value)
+                : null) ?? itemTrade.First();
+            var time = relevantEntry.TimeStamp;
+            var tradeitems = await transactionApi.TransactionPlayerPlayerUuidGetAsync(relevantEntry.PlayerUuid, 1, time);
             var coins = tradeitems.Where(t => t.ItemId == COIN_ID).Sum(t => t.Amount);
             var itemCount = tradeitems.Where(t => t.ItemId != COIN_ID).Count();
             // overwrite buy cost
@@ -898,7 +886,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             var itemTrade = await transactionApi.TransactionItemItemIdGetAsync(long.Parse(uuid), 0);
             if (itemTrade.Count <= 0)
                 throw new Exception($"could not load trade {uuid}");
-            (int itemCount, long tradeEstimate, var items) = await GetTradeValue(itemTrade);
+            (int itemCount, long tradeEstimate, var items) = await GetTradeValue(itemTrade, Guid.Parse(sell.AuctioneerId));
             var potentialItems = items.Where(i => i.ItemId > COIN_ID + 100).ToList();
             if (potentialItems.Count == 0)
                 throw new Exception($"No item in trade for {uuid}");
