@@ -349,7 +349,7 @@ public class TrackerServiceTests
         mockFlipStorageService.Setup(x => x.GetFlips(It.IsAny<Guid>(), It.IsAny<DateTime>(), It.IsAny<DateTime>()))
             .ReturnsAsync(new List<PastFlip>());
         
-        var mockProfitChangeService = new Mock<ProfitChangeService>(null, null, null, null, null, null, null, null);
+        var mockProfitChangeService = new Mock<ProfitChangeService>(null, null, null, null, null, null, null, null, null);
         mockProfitChangeService.Setup(x => x.GetChanges(It.IsAny<SaveAuction>(), It.IsAny<SaveAuction>()))
             .ReturnsAsync(new List<PastFlip.ProfitChange>());
         
@@ -376,12 +376,13 @@ public class TrackerServiceTests
                     {
                         data[uid] = new List<Api.Client.Model.ItemSell>
                         {
-                            new Api.Client.Model.ItemSell
-                            {
-                                Uuid = purchaseUuid,
-                                Buyer = "8fb6da3fe4ba4530bcf58c1c10740b49",
-                                Timestamp = DateTime.UtcNow.AddDays(-10)
-                            }
+                            new Api.Client.Model.ItemSell(
+                                seller: "somesellerid",
+                                uuid: purchaseUuid,
+                                buyer: "8fb6da3fe4ba4530bcf58c1c10740b49",
+                                itemTag: "TEST_ITEM",
+                                highestBid: 45_000_000,
+                                timestamp: DateTime.UtcNow.AddDays(-10))
                         };
                     }
                 }

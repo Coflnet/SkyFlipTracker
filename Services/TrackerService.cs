@@ -312,7 +312,11 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                                 .GroupBy(s => new { uid = s.FlatenedNBT.Where(n => n.Key == "uid").First(), s.End }).Select(g => g.First())
                                 .ToDictionary(s => s.FlatenedNBT.Where(n => n.Key == "uid").Select(n => n.Value).FirstOrDefault());
             var tradeLookupTask = transactionApi.TransactionUuidItemIdPostAsync(GetItemUuids(sells));
-            var buyLookup = await auctionsApi.ApiAuctionsUidsSoldPostWithHttpInfoAsync(new Api.Client.Model.InventoryBatchLookup() { Uuids = sellLookup.Keys.ToList() });
+            var buyLookupRequest = new Api.Client.Model.InventoryBatchLookup(
+                sells.Select(s => s.ProfileId).FirstOrDefault(p => !string.IsNullOrWhiteSpace(p)) ?? Guid.Empty.ToString("N"),
+                sells.Select(s => s.AuctioneerId).FirstOrDefault(p => !string.IsNullOrWhiteSpace(p)) ?? Guid.Empty.ToString("N"),
+                sellLookup.Keys.ToList());
+            var buyLookup = await auctionsApi.ApiAuctionsUidsSoldPostWithHttpInfoAsync(buyLookupRequest);
             var tradeUuidLookup = await tradeLookupTask;
             if (buyLookup.StatusCode != System.Net.HttpStatusCode.OK)
                 throw new Exception("Could not reach api to load purchases " + buyLookup.StatusCode);
@@ -349,7 +353,13 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 soldAuctions.Add(new
                 {
                     sell = sell,
-                    buy = new Api.Client.Model.ItemSell() { Buyer = null, Uuid = tradeSource.Value.OrderByDescending(t => t).First().ToString() }
+                    buy = new Api.Client.Model.ItemSell(
+                        seller: Guid.Empty.ToString("N"),
+                        uuid: tradeSource.Value.OrderByDescending(t => t).First().ToString(),
+                        buyer: Guid.Empty.ToString("N"),
+                        itemTag: sell.Tag,
+                        highestBid: 0,
+                        timestamp: sell.End)
                 });
                 if (extraLog)
                     logger.LogInformation($"Added trade source {JsonConvert.SerializeObject(tradeSource)} for sell {JsonConvert.SerializeObject(sell)}");

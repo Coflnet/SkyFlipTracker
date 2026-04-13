@@ -1,5 +1,6 @@
 using Coflnet.Sky.SkyAuctionTracker.Models;
 using Coflnet.Sky.Api.Client.Model;
+using Coflnet.Sky.Api.Client.Api;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Coflnet.Sky.Crafts.Client.Api;
@@ -30,6 +31,7 @@ public class ProfitChangeService
     private Bazaar.Client.Api.IBazaarApi bazaarApi;
     private HypixelItemService hypixelItemService;
     private IPriceProviderFactory priceProviderFactory;
+    private IAuctionsApi auctionsApi;
     private string[] CrisonArmor = new string[] { "CRIMSON", "TERROR", "AURORA", "FERVOR", "HOLLOW" };
 
     /// <summary>
@@ -64,7 +66,8 @@ public class ProfitChangeService
         IItemsApi itemApi,
         HypixelItemService hypixelItemService,
         Bazaar.Client.Api.IBazaarApi bazaarApi,
-        IPriceProviderFactory priceProviderFactory)
+        IPriceProviderFactory priceProviderFactory,
+        IAuctionsApi auctionsApi)
     {
         this.pricesApi = pricesApi;
         this.katApi = katApi;
@@ -74,6 +77,7 @@ public class ProfitChangeService
         this.hypixelItemService = hypixelItemService;
         this.bazaarApi = bazaarApi;
         this.priceProviderFactory = priceProviderFactory;
+        this.auctionsApi = auctionsApi;
     }
 
     /// <summary>
@@ -148,9 +152,7 @@ public class ProfitChangeService
 
         if (buy.Tag.StartsWith("PET_") && buyHeldItem != null && buyHeldItem != sellHeldItem && buyHeldItem != "PET_ITEM_TIER_BOOST")
         {
-            var change = await priceProvider.CostOf(buyHeldItem, $"Removed {buyHeldItem}", 1);
-            var cost = hypixelItemService.GetPetItemRemovalCost(buyHeldItem);
-            change.Amount = -change.Amount - cost; // Invert because keeping/removing the item gives it to the player
+            var change = await GetPetItemRemovedValue(buy, sell, buyHeldItem, priceProvider);
             yield return change;
         }
 
@@ -937,6 +939,50 @@ public class ProfitChangeService
         if (itemMetadata == null)
             throw new Exception($"could not find item metadata for {tag}");
         return itemMetadata;
+    }
+
+    /// <summary>
+    /// Calculate the value of a pet item that was removed from a pet.
+    /// Uses the flipper's own AH sale, identified via heldItemUuid, when one is visible.
+    /// Falls back to a market price estimate if the item was transferred, traded, or not sold on AH.
+    /// </summary>
+    internal async Task<PastFlip.ProfitChange> GetPetItemRemovedValue(
+        Core.SaveAuction buy, Core.SaveAuction sell, string buyHeldItem, IPriceProvider priceProvider)
+    {
+        var removalCost = hypixelItemService.GetPetItemRemovalCost(buyHeldItem);
+        var heldItemUuid = buy.FlatenedNBT.FirstOrDefault(f => f.Key == "heldItemUuid").Value;
+        if (heldItemUuid != null && heldItemUuid.Length >= 12)
+        {
+            var uid = heldItemUuid.Substring(heldItemUuid.Length - 12);
+            try
+            {
+                var sales = await auctionsApi.ApiAuctionsUidUidSoldGetAsync(uid);
+                // Only trust the flipper's own AH sale; transferred or traded items must fall back to an estimate.
+                var petItemSale = sales?
+                    .Where(s => s.Seller == sell.AuctioneerId && s.ItemTag == buyHeldItem && s.Timestamp > buy.End)
+                    .OrderBy(s => s.Timestamp)
+                    .FirstOrDefault();
+                if (petItemSale != null)
+                {
+                    var saleAmount = petItemSale.HighestBid;
+                    var tax = GetAhTax(saleAmount, 0, petItemSale.Timestamp);
+                    return new PastFlip.ProfitChange()
+                    {
+                        Label = $"Removed {buyHeldItem}",
+                        Amount = saleAmount + tax.Amount - removalCost,
+                        ContextItemId = AuctionService.Instance.GetId(petItemSale.Uuid)
+                    };
+                }
+            }
+            catch (Exception e)
+            {
+                logger.LogWarning(e, "Failed to look up pet item sale for {heldItemUuid}", heldItemUuid);
+            }
+        }
+        // Fallback to market price estimate
+        var change = await priceProvider.CostOf(buyHeldItem, $"Removed {buyHeldItem}", 1);
+        change.Amount = -change.Amount - removalCost;
+        return change;
     }
 
     private async Task<PastFlip.ProfitChange> ValueOf(string item, string title, int amount = 1)

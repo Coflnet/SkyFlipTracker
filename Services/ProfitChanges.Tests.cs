@@ -25,8 +25,9 @@ public class TestProfitChangeService : ProfitChangeService
         Items.Client.Api.IItemsApi itemApi,
         HypixelItemService hypixelItemService,
         Bazaar.Client.Api.IBazaarApi bazaarApi,
-        IPriceProviderFactory priceProviderFactory)
-        : base(pricesApi, katApi, craftsApi, logger, itemApi, hypixelItemService, bazaarApi, priceProviderFactory)
+        IPriceProviderFactory priceProviderFactory,
+        IAuctionsApi auctionsApi)
+        : base(pricesApi, katApi, craftsApi, logger, itemApi, hypixelItemService, bazaarApi, priceProviderFactory, auctionsApi)
     {
     }
 
@@ -56,7 +57,7 @@ public class ProfitChangeTests
         var itemService = new HypixelItemService(new System.Net.Http.HttpClient(), NullLogger<HypixelItemService>.Instance);
         var priveProviderFactory = new PriceProviderFactory(playerapi.Object, pricesApi.Object, craftsApi.Object, auctionsApi.Object, bazaarApi.Object, NullLogger<PriceProviderFactory>.Instance);
         playerapi.Setup(p => p.ApiPlayerPlayerUuidBidsGetAsync(It.IsAny<string>(), 0, It.IsAny<Dictionary<string, string>>(), 0, default)).ReturnsAsync(() => new List<BidResult>());
-        service = new TestProfitChangeService(pricesApi.Object, katApi.Object, craftsApi.Object, NullLogger<ProfitChangeService>.Instance, itemsApi.Object, itemService, bazaarApi.Object, priveProviderFactory);
+        service = new TestProfitChangeService(pricesApi.Object, katApi.Object, craftsApi.Object, NullLogger<ProfitChangeService>.Instance, itemsApi.Object, itemService, bazaarApi.Object, priveProviderFactory, auctionsApi.Object);
     }
 
     [Test]
@@ -1673,8 +1674,10 @@ public class ProfitChangeTests
     [Test]
     public async Task ChecksPlayerPurchase()
     {
+        var flipperId = Guid.NewGuid().ToString("N");
         var buy = CreateAuction("INTIMIDATION_ARTIFACT", "Slab", 5_000_000, Core.Tier.EPIC);
         var sell = CreateAuction("INTIMIDATION_RELIC", "Realm", 45_000_000, Core.Tier.LEGENDARY);
+        sell.AuctioneerId = flipperId;
         craftsApi.Setup(c => c.GetAllAsync(0, default)).ReturnsAsync(() => new() {
                     new() { ItemId = "INTIMIDATION_RELIC", Ingredients = new() {
                         new() { ItemId = "INTIMIDATION_ARTIFACT", Count = 1 },
@@ -1683,10 +1686,32 @@ public class ProfitChangeTests
         pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("SCARE_FRAGMENT", null, 0, default)).ReturnsAsync(() => new() { Median = 4_220_000 });
         itemsApi.Setup(i => i.ItemItemTagGetAsync("INTIMIDATION_RELIC", It.IsAny<bool?>(), It.IsAny<int>(), default))
             .ReturnsAsync(() => new() { Tag = "INTIMIDATION_RELIC", Tier = Items.Client.Model.Tier.LEGENDARY });
-        playerapi.Setup(p => p.ApiPlayerPlayerUuidBidsGetAsync(It.IsAny<string>(), 0, It.IsAny<Dictionary<string, string>>(), 0, default))
-            .ReturnsAsync(() => [new() { AuctionId = buy.Uuid }]);
+        playerapi.Setup(p => p.ApiPlayerPlayerUuidBidsGetAsync(flipperId, 0, It.IsAny<Dictionary<string, string>>(), 0, default))
+            .ReturnsAsync(() => [new BidResult(5_000_000, buy.Uuid, 5_000_000, buy.ItemName, buy.Tag, DateTime.UtcNow, 5_000_000, true)]);
         auctionsApi.Setup(a => a.ApiAuctionAuctionUuidGetAsync(buy.Uuid, 0, default))
-            .ReturnsAsync(() => new() { Count = 8, HighestBidAmount = 5_000_000 });
+            .ReturnsAsync(() => new ColorSaveAuction(
+                enchantments: null,
+                uuid: buy.Uuid,
+                count: 8,
+                startingBid: 5_000_000,
+                tag: buy.Tag,
+                itemName: buy.ItemName,
+                start: DateTime.UtcNow.AddDays(-1),
+                end: DateTime.UtcNow,
+                auctioneerId: flipperId,
+                profileId: Guid.Empty.ToString("N"),
+                coop: null,
+                coopMembers: null,
+                highestBidAmount: 5_000_000,
+                bids: null,
+                anvilUses: 0,
+                nbtData: null,
+                itemCreatedAt: DateTime.UtcNow.AddDays(-2),
+                reforge: Coflnet.Sky.Api.Client.Model.Reforge.None,
+                category: Coflnet.Sky.Api.Client.Model.Category.UNKNOWN,
+                tier: Coflnet.Sky.Api.Client.Model.Tier.EPIC,
+                bin: true,
+                flatNbt: new Dictionary<string, string>()));
 
         var changes = await service.GetChanges(buy, sell);
         Assert.That(changes.Count, Is.EqualTo(2), JsonConvert.SerializeObject(changes, Formatting.Indented));
@@ -2226,5 +2251,194 @@ public class ProfitChangeTests
         essenceChange!.Amount.Should().Be(-4500 * 2200, $"only 4500 prestige essence (not 20845 which includes stars), got: {all}");
         var coinsChange = changes.First(c => c.Label == "Coins");
         coinsChange.Amount.Should().Be(-10_000_000, "prestige costs 10m coins");
+    }
+
+    [Test]
+    public async Task PetItemRemoved_UsesActualSalePrice()
+    {
+        var flipperId = Guid.NewGuid().ToString("N");
+        var heldItemUuid = "de0d5b9f-3322-410b-bc69-903a78509554";
+        var buy = CreateAuction("PET_TYRANNOSAURUS", "[Lvl 96] T-Rex", 20_000_000, Core.Tier.LEGENDARY);
+        buy.FlatenedNBT.Add("heldItem", "PET_ITEM_COMBAT_SKILL_BOOST_EPIC");
+        buy.FlatenedNBT.Add("heldItemUuid", heldItemUuid);
+        buy.FlatenedNBT.Add("exp", "19357147.31352516");
+        buy.End = new DateTime(2026, 4, 12, 14, 24, 53);
+
+        var sell = CreateAuction("PET_TYRANNOSAURUS", "[Lvl 96] T-Rex", 27_310_000, Core.Tier.LEGENDARY);
+        sell.AuctioneerId = flipperId;
+        sell.FlatenedNBT.Add("heldItem", "CROCHET_TIGER_PLUSHIE");
+        sell.FlatenedNBT.Add("exp", "19357147.31352516");
+
+        var petItemSaleUuid = Guid.NewGuid().ToString("N");
+        var petItemBuyer = Guid.NewGuid().ToString("N");
+        auctionsApi.Setup(a => a.ApiAuctionsUidUidSoldGetAsync("903a78509554", 0, default))
+            .ReturnsAsync(new List<ItemSell>
+            {
+                new ItemSell(
+                    seller: flipperId,
+                    uuid: petItemSaleUuid,
+                    buyer: petItemBuyer,
+                    itemTag: "PET_ITEM_COMBAT_SKILL_BOOST_EPIC",
+                    highestBid: 9_200_000,
+                    timestamp: new DateTime(2026, 4, 12, 15, 28, 45))
+            });
+
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("CROCHET_TIGER_PLUSHIE", null, 0, default))
+            .ReturnsAsync(() => new() { Median = 500_000 });
+
+        var changes = await service.GetChanges(buy, sell);
+
+        var removedChange = changes.FirstOrDefault(c => c.Label.Contains("Removed PET_ITEM_COMBAT_SKILL_BOOST_EPIC"));
+        Assert.That(removedChange, Is.Not.Null, "Expected a change for removing the pet item");
+        // Amount should be actual sale price minus ah tax minus removal cost
+        var expectedTax = service.GetAhTax(9_200_000);
+        var removalCost = 50_000;
+        Assert.That(removedChange.Amount, Is.EqualTo(9_200_000 + expectedTax.Amount - removalCost),
+            $"Should use actual sale price (9.2M) minus tax minus removal cost, got {removedChange.Amount}");
+    }
+
+    [Test]
+    public async Task PetItemRemoved_FallsBackToMarketPrice_WhenNoSaleFound()
+    {
+        var flipperId = Guid.NewGuid().ToString("N");
+        var heldItemUuid = "de0d5b9f-3322-410b-bc69-903a78509554";
+        var buy = CreateAuction("PET_TYRANNOSAURUS", "[Lvl 96] T-Rex", 20_000_000, Core.Tier.LEGENDARY);
+        buy.FlatenedNBT.Add("heldItem", "PET_ITEM_COMBAT_SKILL_BOOST_EPIC");
+        buy.FlatenedNBT.Add("heldItemUuid", heldItemUuid);
+        buy.FlatenedNBT.Add("exp", "19357147.31352516");
+        buy.End = new DateTime(2026, 4, 12, 14, 24, 53);
+
+        var sell = CreateAuction("PET_TYRANNOSAURUS", "[Lvl 96] T-Rex", 27_310_000, Core.Tier.LEGENDARY);
+        sell.AuctioneerId = flipperId;
+        sell.FlatenedNBT.Add("heldItem", "CROCHET_TIGER_PLUSHIE");
+        sell.FlatenedNBT.Add("exp", "19357147.31352516");
+
+        // No matching sale for the pet item
+        auctionsApi.Setup(a => a.ApiAuctionsUidUidSoldGetAsync("903a78509554", 0, default))
+            .ReturnsAsync(new List<ItemSell>());
+
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("PET_ITEM_COMBAT_SKILL_BOOST_EPIC", null, 0, default))
+            .ReturnsAsync(() => new() { Median = 7_750_000 });
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("CROCHET_TIGER_PLUSHIE", null, 0, default))
+            .ReturnsAsync(() => new() { Median = 500_000 });
+
+        var changes = await service.GetChanges(buy, sell);
+
+        var removedChange = changes.FirstOrDefault(c => c.Label.Contains("Removed PET_ITEM_COMBAT_SKILL_BOOST_EPIC"));
+        Assert.That(removedChange, Is.Not.Null, "Expected a change for removing the pet item");
+        var removalCost = 50_000;
+        Assert.That(removedChange.Amount, Is.EqualTo(7_750_000 - removalCost),
+            "Should fallback to market price when no actual sale found");
+    }
+
+    [Test]
+    public async Task PetItemRemoved_PetSoldFirst_ThenPetItemSold()
+    {
+        // Scenario: Pet is sold first, then pet item is sold later
+        // The profit change should still reference the pet item sale
+        var flipperId = Guid.NewGuid().ToString("N");
+        var heldItemUuid = "ab12cd34-ef56-7890-abcd-ef1234567890";
+        var buy = CreateAuction("PET_ENDERMAN", "[Lvl 100] Enderman", 50_000_000, Core.Tier.LEGENDARY);
+        buy.FlatenedNBT.Add("heldItem", "PET_ITEM_COMBAT_SKILL_BOOST_EPIC");
+        buy.FlatenedNBT.Add("heldItemUuid", heldItemUuid);
+        buy.FlatenedNBT.Add("exp", "25353230");
+        buy.End = new DateTime(2026, 4, 10, 10, 0, 0);
+
+        var sell = CreateAuction("PET_ENDERMAN", "[Lvl 100] Enderman", 60_000_000, Core.Tier.LEGENDARY);
+        sell.AuctioneerId = flipperId;
+        sell.FlatenedNBT.Add("exp", "25353230");
+        sell.End = new DateTime(2026, 4, 10, 12, 0, 0);
+
+        var petItemSaleUuid = Guid.NewGuid().ToString("N");
+        var petItemBuyer = Guid.NewGuid().ToString("N");
+        // Pet item sold AFTER the pet was sold
+        auctionsApi.Setup(a => a.ApiAuctionsUidUidSoldGetAsync("ef1234567890", 0, default))
+            .ReturnsAsync(new List<ItemSell>
+            {
+                new ItemSell(
+                    seller: flipperId,
+                    uuid: petItemSaleUuid,
+                    buyer: petItemBuyer,
+                    itemTag: "PET_ITEM_COMBAT_SKILL_BOOST_EPIC",
+                    highestBid: 8_000_000,
+                    timestamp: new DateTime(2026, 4, 10, 14, 0, 0)) // sold after pet
+            });
+
+        var changes = await service.GetChanges(buy, sell);
+
+        var removedChange = changes.FirstOrDefault(c => c.Label.Contains("Removed PET_ITEM_COMBAT_SKILL_BOOST_EPIC"));
+        Assert.That(removedChange, Is.Not.Null, "Expected a change for removing the pet item");
+        var expectedTax = service.GetAhTax(8_000_000);
+        var removalCost = 50_000;
+        Assert.That(removedChange.Amount, Is.EqualTo(8_000_000 + expectedTax.Amount - removalCost));
+    }
+
+    [Test]
+    public async Task PetItemRemoved_WithoutHeldItemUuid_FallsBackToMarketPrice()
+    {
+        // Older auctions may not have heldItemUuid in flatNbt
+        var buy = CreateAuction("PET_OCELOT", "[Lvl 85] Ocelot", 7_000_000, Core.Tier.EPIC);
+        buy.FlatenedNBT.Add("heldItem", "PET_ITEM_FORAGING_SKILL_BOOST_EPIC");
+        buy.FlatenedNBT.Add("exp", "6454188.694268968");
+
+        var sell = CreateAuction("PET_OCELOT", "[Lvl 85] Ocelot", 2_560_000, Core.Tier.EPIC);
+        sell.FlatenedNBT.Add("exp", "6454188.694268968");
+
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("PET_ITEM_FORAGING_SKILL_BOOST_EPIC", null, 0, default))
+            .ReturnsAsync(() => new() { Median = 7_000_000 });
+
+        var changes = await service.GetChanges(buy, sell);
+
+        var itemChange = changes.FirstOrDefault(c => c.Label.Contains("Removed PET_ITEM_FORAGING_SKILL_BOOST_EPIC"));
+        Assert.That(itemChange, Is.Not.Null, "Expected a change for removing the pet item.");
+        var removalCost = 50_000;
+        Assert.That(itemChange.Amount, Is.EqualTo(7_000_000 - removalCost),
+            "Without heldItemUuid should fallback to market price");
+    }
+
+    [Test]
+    public async Task PetItemRemoved_FallsBackToMarketPrice_WhenNoOwnAuctionSaleExists()
+    {
+        // If the flipper traded or transferred the item away, someone else may later auction it.
+        // We must not attribute that later sale to the original flipper.
+        var flipperId = Guid.NewGuid().ToString("N");
+        var otherPlayerId = Guid.NewGuid().ToString("N");
+        var heldItemUuid = "de0d5b9f-3322-410b-bc69-903a78509554";
+        var buy = CreateAuction("PET_TYRANNOSAURUS", "[Lvl 96] T-Rex", 20_000_000, Core.Tier.LEGENDARY);
+        buy.FlatenedNBT.Add("heldItem", "PET_ITEM_COMBAT_SKILL_BOOST_EPIC");
+        buy.FlatenedNBT.Add("heldItemUuid", heldItemUuid);
+        buy.FlatenedNBT.Add("exp", "19357147.31352516");
+        buy.End = new DateTime(2026, 4, 12, 14, 24, 53);
+
+        var sell = CreateAuction("PET_TYRANNOSAURUS", "[Lvl 96] T-Rex", 27_310_000, Core.Tier.LEGENDARY);
+        sell.AuctioneerId = flipperId;
+        sell.FlatenedNBT.Add("heldItem", "CROCHET_TIGER_PLUSHIE");
+        sell.FlatenedNBT.Add("exp", "19357147.31352516");
+
+        // Sale by a different player - should be ignored
+        auctionsApi.Setup(a => a.ApiAuctionsUidUidSoldGetAsync("903a78509554", 0, default))
+            .ReturnsAsync(new List<ItemSell>
+            {
+                new ItemSell(
+                    seller: otherPlayerId,
+                    uuid: Guid.NewGuid().ToString("N"),
+                    buyer: Guid.NewGuid().ToString("N"),
+                    itemTag: "PET_ITEM_COMBAT_SKILL_BOOST_EPIC",
+                    highestBid: 9_200_000,
+                    timestamp: new DateTime(2026, 4, 12, 15, 28, 45))
+            });
+
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("PET_ITEM_COMBAT_SKILL_BOOST_EPIC", null, 0, default))
+            .ReturnsAsync(() => new() { Median = 7_750_000 });
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("CROCHET_TIGER_PLUSHIE", null, 0, default))
+            .ReturnsAsync(() => new() { Median = 500_000 });
+
+        var changes = await service.GetChanges(buy, sell);
+
+        var removedChange = changes.FirstOrDefault(c => c.Label.Contains("Removed PET_ITEM_COMBAT_SKILL_BOOST_EPIC"));
+        Assert.That(removedChange, Is.Not.Null);
+        var removalCost = 50_000;
+        Assert.That(removedChange.Amount, Is.EqualTo(7_750_000 - removalCost),
+            "Should fallback to market price when no own AH sale is visible");
     }
 }
