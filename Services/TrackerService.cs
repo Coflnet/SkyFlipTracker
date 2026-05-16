@@ -723,11 +723,28 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
 
 
 
+        private static Transaction GetRelevantTradeEntry(List<Transaction> itemTrade, Guid? sellerUuid = null, DateTime? before = null)
+        {
+            IEnumerable<Transaction> matchingEntries = itemTrade;
+            if (sellerUuid.HasValue)
+            {
+                matchingEntries = matchingEntries.Where(t => t.PlayerUuid == sellerUuid.Value);
+            }
+            if (before.HasValue)
+            {
+                var beforeTrade = matchingEntries.Where(t => t.TimeStamp <= before.Value)
+                    .OrderByDescending(t => t.TimeStamp)
+                    .FirstOrDefault();
+                if (beforeTrade != null)
+                    return beforeTrade;
+            }
+            return matchingEntries.OrderByDescending(t => t.TimeStamp).FirstOrDefault()
+                ?? itemTrade.OrderByDescending(t => t.TimeStamp).First();
+        }
+
         private async Task<(int itemCount, long tradeEstimate, List<Transaction> items)> GetTradeValue(List<Transaction> itemTrade, Guid? sellerUuid = null)
         {
-            var relevantEntry = (sellerUuid.HasValue
-                ? itemTrade.FirstOrDefault(t => t.PlayerUuid == sellerUuid.Value)
-                : null) ?? itemTrade.First();
+            var relevantEntry = GetRelevantTradeEntry(itemTrade, sellerUuid);
             var time = relevantEntry.TimeStamp;
             var tradeitems = await transactionApi.TransactionPlayerPlayerUuidGetAsync(relevantEntry.PlayerUuid, 1, time);
             var coins = tradeitems.Where(t => t.ItemId == COIN_ID).Sum(t => t.Amount);
@@ -896,17 +913,19 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             var itemTrade = await transactionApi.TransactionItemItemIdGetAsync(long.Parse(uuid), 0);
             if (itemTrade.Count <= 0)
                 throw new Exception($"could not load trade {uuid}");
-            (int itemCount, long tradeEstimate, var items) = await GetTradeValue(itemTrade, Guid.Parse(sell.AuctioneerId));
+            var sellerUuid = Guid.Parse(sell.AuctioneerId);
+            var relevantTradeEntry = GetRelevantTradeEntry(itemTrade, sellerUuid, sell.Start == default ? sell.End : sell.Start);
+            (int itemCount, long tradeEstimate, var items) = await GetTradeValue(itemTrade, sellerUuid);
             var potentialItems = items.Where(i => i.ItemId > COIN_ID + 100).ToList();
             if (potentialItems.Count == 0)
                 throw new Exception($"No item in trade for {uuid}");
             var itemInfo = await itemsApi.ApiItemsIdGetAsync(long.Parse(uuid), 0);
             var auction = representationConverter.FromItemRepresent(itemInfo);
             auction.HighestBidAmount = tradeEstimate;
-            auction.End = itemTrade.First().TimeStamp;
+            auction.End = relevantTradeEntry.TimeStamp;
             auction.Uuid = Guid.Empty.ToString("N");
             logger.LogInformation("Created virtual trade item for {playerId} {auction} from {item}",
-                itemTrade.First().PlayerUuid,
+                relevantTradeEntry.PlayerUuid,
                 JsonConvert.SerializeObject(auction),
                 JsonConvert.SerializeObject(itemInfo));
             return auction;

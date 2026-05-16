@@ -100,6 +100,95 @@ public class TrackerServiceTests
         auction[0].HighestBidAmount.Should().Be(400000000); // each item traded for double of the value
     }
 
+    [Test]
+    public async Task TradeToAuctionSaleUsesSellerTradeTimestamp()
+    {
+        var sell = JsonConvert.DeserializeObject<ApiSaveAuction>(TradeToAuctionSale);
+        var savedFlips = new List<PastFlip>();
+        var mockFlipStorageService = new Mock<FlipStorageService>(null, null, null);
+        mockFlipStorageService.Setup(x => x.SaveFlip(It.IsAny<PastFlip>()))
+            .Callback<PastFlip>(flip => savedFlips.Add(flip))
+            .Returns(Task.CompletedTask);
+
+        var mockProfitChangeService = new Mock<ProfitChangeService>(null, null, null, null, null, null, null, null, null);
+        mockProfitChangeService.Setup(x => x.GetChanges(It.IsAny<SaveAuction>(), It.IsAny<SaveAuction>()))
+            .ReturnsAsync(new List<PastFlip.ProfitChange>
+            {
+                new("placeholder", 0),
+                new("placeholder-2", 0)
+            });
+
+        var mockTransactionApi = new Mock<PlayerState.Client.Api.ITransactionApi>();
+        mockTransactionApi.Setup(x => x.TransactionUuidItemIdPostAsync(It.IsAny<List<Guid>>(), It.IsAny<int>(), It.IsAny<System.Threading.CancellationToken>()))
+            .ReturnsAsync(new Dictionary<string, List<long>>
+            {
+                { "64eb3f8f-ce59-49f6-8907-6537d04453d3", new List<long> { 1378321401406987 } }
+            });
+        mockTransactionApi.Setup(x => x.TransactionItemItemIdGetAsync(1378321401406987, It.IsAny<int>(), It.IsAny<int>(), It.IsAny<System.Threading.CancellationToken>()))
+            .ReturnsAsync(JsonConvert.DeserializeObject<List<PlayerState.Client.Model.Transaction>>(TradeItemTransactions));
+        mockTransactionApi.Setup(x => x.TransactionPlayerPlayerUuidGetAsync(
+                Guid.Parse("20f00ed4-5b3e-4d76-b8e1-fe9984f5f17b"),
+                1,
+                new DateTime(2026, 5, 15, 8, 32, 17, 387),
+                It.IsAny<int>(),
+                It.IsAny<System.Threading.CancellationToken>()))
+            .ReturnsAsync(JsonConvert.DeserializeObject<List<PlayerState.Client.Model.Transaction>>(SellerTradeWindow));
+
+        var mockAuctionsApi = new Mock<Api.Client.Api.IAuctionsApi>();
+        mockAuctionsApi.Setup(x => x.ApiAuctionsUidsSoldPostWithHttpInfoAsync(It.IsAny<Api.Client.Model.InventoryBatchLookup>(), It.IsAny<int>(), It.IsAny<System.Threading.CancellationToken>()))
+            .ReturnsAsync(new Api.Client.Client.ApiResponse<Dictionary<string, List<Api.Client.Model.ItemSell>>>(
+                System.Net.HttpStatusCode.OK,
+                null,
+                new Dictionary<string, List<Api.Client.Model.ItemSell>>
+                {
+                    {
+                        "6537d04453d3",
+                        new List<Api.Client.Model.ItemSell>
+                        {
+                            new(
+                                seller: "20f00ed45b3e4d76b8e1fe9984f5f17b",
+                                uuid: "a906790fdb1045f6856eacd76b618015",
+                                buyer: "fb49036bb1654dcf994a93bbaa2bf4e9",
+                                itemTag: "ATOMSPLIT_KATANA",
+                                highestBid: 75_000_000,
+                                timestamp: new DateTime(2026, 5, 15, 8, 55, 47))
+                        }
+                    }
+                }));
+
+        var mockItemsApi = new Mock<PlayerState.Client.Api.IItemsApi>();
+        mockItemsApi.Setup(x => x.ApiItemsIdGetAsync(1378321401406987, It.IsAny<int>(), It.IsAny<System.Threading.CancellationToken>()))
+            .ReturnsAsync(JsonConvert.DeserializeObject<PlayerState.Client.Model.Item>(TradeItemState));
+
+        var trackerService = new TrackerService(
+            null,
+            NullLogger<TrackerService>.Instance,
+            mockAuctionsApi.Object,
+            null,
+            null,
+            mockProfitChangeService.Object,
+            mockFlipStorageService.Object,
+            new ActivitySource("test"),
+            null,
+            null,
+            new Mock<Settings.Client.Api.ISettingsApi>().Object,
+            mockItemsApi.Object,
+            mockTransactionApi.Object,
+            new RepresentationConverter(NullLogger<RepresentationConverter>.Instance, null)
+        );
+
+        await trackerService.IndexCassandra(new[] { sell });
+
+        savedFlips.Should().ContainSingle();
+        var flip = savedFlips.Single();
+        flip.Flags.Should().HaveFlag(FlipFlags.ViaTrade);
+        flip.ItemTag.Should().Be("ATOMSPLIT_KATANA");
+        flip.SellPrice.Should().Be(75_000_000);
+        flip.PurchaseCost.Should().Be(60_000_000);
+        flip.PurchaseTime.Should().Be(new DateTime(2026, 5, 15, 8, 32, 17, 387));
+        flip.PurchaseAuctionId.Should().Be(Guid.Empty);
+    }
+
     private static string FullTrade = """
     {
     "UserId": "627115",
@@ -570,6 +659,184 @@ public class TrackerServiceTests
         ],
         "OtherSide": "imjustcake",
         "TimeStamp": "2025-10-05T09:58:38.4644449Z"
+    }
+    """;
+
+    private static string TradeItemTransactions = """
+    [
+        {
+            "playerUuid": "e05d65be-432c-43c9-8b2f-c99684bccfc8",
+            "profileUuid": "00000000-0000-0000-0000-000000000000",
+            "type": 34,
+            "itemId": 1378321401406987,
+            "amount": 1,
+            "timeStamp": "2026-05-15T06:49:36.346"
+        },
+        {
+            "playerUuid": "20f00ed4-5b3e-4d76-b8e1-fe9984f5f17b",
+            "profileUuid": "00000000-0000-0000-0000-000000000000",
+            "type": 33,
+            "itemId": 1378321401406987,
+            "amount": 1,
+            "timeStamp": "2026-05-15T08:32:17.387"
+        },
+        {
+            "playerUuid": "9d60a2a9-39aa-4971-acba-652fcd457a45",
+            "profileUuid": "00000000-0000-0000-0000-000000000000",
+            "type": 34,
+            "itemId": 1378321401406987,
+            "amount": 1,
+            "timeStamp": "2026-05-15T08:32:17.43"
+        }
+    ]
+    """;
+
+    private static string SellerTradeWindow = """
+    [
+        {
+            "playerUuid": "20f00ed4-5b3e-4d76-b8e1-fe9984f5f17b",
+            "profileUuid": "00000000-0000-0000-0000-000000000000",
+            "type": 33,
+            "itemId": 1378321401406987,
+            "amount": 1,
+            "timeStamp": "2026-05-15T08:32:17.387"
+        },
+        {
+            "playerUuid": "20f00ed4-5b3e-4d76-b8e1-fe9984f5f17b",
+            "profileUuid": "00000000-0000-0000-0000-000000000000",
+            "type": 34,
+            "itemId": 1000001,
+            "amount": 600000000,
+            "timeStamp": "2026-05-15T08:32:17.387"
+        }
+    ]
+    """;
+
+    private static string TradeItemState = """
+    {
+        "id": 1378321401406987,
+        "itemName": "§dFabled Atomsplit Katana",
+        "tag": "ATOMSPLIT_KATANA",
+        "extraAttributes": {
+            "rarity_upgrades": 1,
+            "gems": {
+                "unlocked_slots": ["JASPER_0"],
+                "JASPER_0": "FINE"
+            },
+            "uuid": "64eb3f8f-ce59-49f6-8907-6537d04453d3",
+            "champion_combat_xp": 4968301.7053270275,
+            "uid": "6537d04453d3",
+            "modifier": "fabled",
+            "hot_potato_count": 10,
+            "timestamp": 1768006632626,
+            "tier": 8
+        },
+        "enchantments": {
+            "bane_of_arthropods": 6,
+            "champion": 10,
+            "critical": 6,
+            "cubism": 5,
+            "dragon_hunter": 5,
+            "ender_slayer": 6,
+            "experience": 4,
+            "fire_aspect": 3,
+            "first_strike": 4,
+            "giant_killer": 6,
+            "impaling": 5,
+            "lethality": 6,
+            "life_steal": 4,
+            "looting": 4,
+            "luck": 6,
+            "PROSECUTE": 5,
+            "scavenger": 5,
+            "sharpness": 6,
+            "smite": 6,
+            "thunderlord": 6,
+            "ultimate_swarm": 4,
+            "vampirism": 5,
+            "venomous": 6
+        },
+        "color": null,
+        "description": null,
+        "count": 1
+    }
+    """;
+
+    private static string TradeToAuctionSale = """
+    {
+        "enchantments": [
+            {"color":"§d","value":7999999,"type":"ultimate_swarm","level":4},
+            {"color":"§5","value":7373124,"type":"champion","level":10},
+            {"color":"§9","value":699996,"type":"looting","level":4},
+            {"color":"§5","value":685137,"type":"sharpness","level":6},
+            {"color":"§9","value":574963,"type":"experience","level":4},
+            {"color":"§5","value":430138,"type":"venomous","level":6},
+            {"color":"§5","value":365144,"type":"giant_killer","level":6},
+            {"color":"§5","value":283036,"type":"scavenger","level":5},
+            {"color":"§5","value":197803,"type":"ender_slayer","level":6},
+            {"color":"§5","value":91695,"type":"lethality","level":6},
+            {"color":"§5","value":76019,"type":"thunderlord","level":6},
+            {"color":"§5","value":74998,"type":"fire_aspect","level":3},
+            {"color":"§9","value":63457,"type":"life_steal","level":4},
+            {"color":"§5","value":56994,"type":"bane_of_arthropods","level":6},
+            {"color":"§5","value":55543,"type":"smite","level":6},
+            {"color":"§5","value":27998,"type":"luck","level":6},
+            {"color":"§5","value":14408,"type":"critical","level":6},
+            {"color":"§9","value":-1,"type":"impaling","level":5},
+            {"color":"§9","value":-1,"type":"vampirism","level":5},
+            {"color":"§9","value":-1,"type":"first_strike","level":4},
+            {"color":"§9","value":-1,"type":"dragon_hunter","level":5},
+            {"color":"§9","value":-1,"type":"cubism","level":5},
+            {"color":"§9","value":-1,"type":"prosecute","level":5}
+        ],
+        "uuid": "a906790fdb1045f6856eacd76b618015",
+        "count": 1,
+        "startingBid": 75000000,
+        "tag": "ATOMSPLIT_KATANA",
+        "itemName": "Fabled Atomsplit Katana",
+        "start": "2026-05-15T08:43:16",
+        "end": "2026-05-15T08:55:47",
+        "auctioneerId": "20f00ed45b3e4d76b8e1fe9984f5f17b",
+        "profileId": "21d8418e7c6f423a9a93b881ec0c657d",
+        "coop": null,
+        "coopMembers": null,
+        "highestBidAmount": 75000000,
+        "bids": [
+            {
+                "bidder": "fb49036bb1654dcf994a93bbaa2bf4e9",
+                "profileId": "5ed2d23ecf2b4cdd84af77b69874d94b",
+                "amount": 75000000,
+                "timestamp": "2026-05-15T08:55:47"
+            }
+        ],
+        "anvilUses": 0,
+        "nbtData": {
+            "data": {
+                "rarity_upgrades": 1,
+                "hpc": 10,
+                "gems": {
+                    "JASPER_0": "FINE",
+                    "unlocked_slots": ["JASPER_0"]
+                },
+                "champion_combat_xp": 4968301.7053270275,
+                "uid": "6537d04453d3",
+                "uuid": "64eb3f8f-ce59-49f6-8907-6537d04453d3"
+            }
+        },
+        "itemCreatedAt": "2026-01-10T00:57:12",
+        "reforge": "Fabled",
+        "category": "UNKNOWN",
+        "tier": "MYTHIC",
+        "bin": true,
+        "flatNbt": {
+            "rarity_upgrades": "1",
+            "hpc": "10",
+            "JASPER_0": "FINE",
+            "unlocked_slots": "JASPER_0",
+            "champion_combat_xp": "4968301.7053270275",
+            "uid": "6537d04453d3",
+            "uuid": "64eb3f8f-ce59-49f6-8907-6537d04453d3"
+        }
     }
     """;
 }
