@@ -254,7 +254,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
         /// <returns></returns>
         public async Task RefreshFlips(Guid playerId, IEnumerable<Guid> auctionIds, int version)
         {
-            var existing = await flipStorageService.GetFlipVersions(playerId, new DateTime(2020, 1, 1), DateTime.Now, auctionIds);
+            var existing = await flipStorageService.GetFlipVersions(playerId, new DateTime(2020, 1, 1), DateTime.UtcNow, auctionIds);
             if (version == 0)
             {
                 version = Version;

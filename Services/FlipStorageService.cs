@@ -47,7 +47,7 @@ public class FlipStorageService
         var table = GetFlipsTable(session);
         try
         {
-            await table.Insert(flip).ExecuteAsync();
+            await table.Insert(NormalizeFlipTimestamps(flip)).ExecuteAsync();
         }
         catch (InvalidQueryException e)
         {
@@ -106,14 +106,39 @@ public class FlipStorageService
     {
         var session = await GetSession();
         var table = GetFlipsTable(session);
-        await Task.WhenAll(flips.Select(f => table.Insert(f).ExecuteAsync()));
+        await Task.WhenAll(flips.Select(f => table.Insert(NormalizeFlipTimestamps(f)).ExecuteAsync()));
+    }
+
+    private static DateTime NormalizeUtc(DateTime value)
+    {
+        if (value == DateTime.MinValue || value == DateTime.MaxValue)
+            return value;
+
+        return value.Kind switch
+        {
+            DateTimeKind.Utc => value,
+            DateTimeKind.Local => value.ToUniversalTime(),
+            _ => DateTime.SpecifyKind(value, DateTimeKind.Utc)
+        };
+    }
+
+    private static PastFlip NormalizeFlipTimestamps(PastFlip flip)
+    {
+        if (flip == null)
+            return null;
+
+        // The DataStax driver deserializes Cassandra timestamps as unspecified DateTime values.
+        flip.PurchaseTime = NormalizeUtc(flip.PurchaseTime);
+        flip.SellTime = NormalizeUtc(flip.SellTime);
+        return flip;
     }
 
     public virtual async Task<IEnumerable<PastFlip>> GetFlips(Guid flipper, DateTime start, DateTime end)
     {
         var session = await GetSession();
         var table = GetFlipsTable(session);
-        return await table.Where(f => f.Flipper == flipper && f.SellTime >= start && f.SellTime <= end).ExecuteAsync();
+        return (await table.Where(f => f.Flipper == flipper && f.SellTime >= start && f.SellTime <= end).ExecuteAsync())
+            .Select(NormalizeFlipTimestamps);
     }
     public async Task<PastFlip> GetFlip(Guid flipper, long uid)
     {
@@ -121,9 +146,9 @@ public class FlipStorageService
         var table = GetFlipsTable(session);
         var end = DateTime.UtcNow;
         var start = end.AddDays(-10000);
-        return (await table.Where(f => f.Flipper == flipper && f.Uid == uid && f.SellTime > start && f.SellTime < end)
+        return NormalizeFlipTimestamps((await table.Where(f => f.Flipper == flipper && f.Uid == uid && f.SellTime > start && f.SellTime < end)
                 .AllowFiltering() // bad
-                .ExecuteAsync()).FirstOrDefault();
+                .ExecuteAsync()).FirstOrDefault());
     }
 
     public async Task<IEnumerable<(Guid, short)>> GetFlipVersions(Guid flipper, DateTime start, DateTime end, IEnumerable<Guid> auctionIds)
@@ -258,12 +283,13 @@ public class FlipStorageService
 
     public async Task SaveUnknownFlip(PastFlip flip)
     {
-        await unknownFlips.Insert(flip).ExecuteAsync();
+        await unknownFlips.Insert(NormalizeFlipTimestamps(flip)).ExecuteAsync();
     }
 
     public async Task<IEnumerable<PastFlip>> GetUnknownFlips(DateTime start, DateTime end)
     {
-        return await unknownFlips.Where(f => f.FinderType == 0 && f.SellTime >= start && f.SellTime <= end).ExecuteAsync();
+        return (await unknownFlips.Where(f => f.FinderType == 0 && f.SellTime >= start && f.SellTime <= end).ExecuteAsync())
+            .Select(NormalizeFlipTimestamps);
     }
 
     public async Task<IEnumerable<UnsoldFlip>> GetUnsoldFlips(DateTime olderThan, int amount)

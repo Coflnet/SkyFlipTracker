@@ -217,9 +217,9 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
         public async Task<IEnumerable<PastFlip>> GetFlipsOfPlayer(Guid PlayerId, DateTime from, DateTime to, bool getAll = false)
         {
             if (from == DateTime.MinValue)
-                from = DateTime.Now.AddYears(-1);
+                from = DateTime.UtcNow.AddYears(-1);
             if (to == DateTime.MinValue)
-                to = DateTime.Now;
+                to = DateTime.UtcNow;
             var all = await flipStorageService.GetFlips(PlayerId, from, to);
             if (getAll)
                 return all;
