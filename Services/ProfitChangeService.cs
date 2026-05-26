@@ -47,6 +47,13 @@ public class ProfitChangeService
             "line.part"
         };
 
+    private static readonly Dictionary<string, string> DrillPartAliases = new()
+    {
+        { "engine.id", "drill_part_engine" },
+        { "fuel_tank.id", "drill_part_fuel_tank" },
+        { "upgrade_module.id", "drill_part_upgrade_module" }
+    };
+
     /// <summary>
     /// 
     /// </summary>
@@ -259,7 +266,7 @@ public class ProfitChangeService
         }
         foreach (var item in sell.FlatenedNBT.Where(s => !buy.FlatenedNBT.Any(b => b.Key == s.Key && b.Value == s.Value)))
         {
-            if (ItemKeys.Contains(item.Key))
+            if (ItemKeys.Contains(item.Key) || IsDuplicateDrillPartAlias(sell, item))
                 continue; // already handled
             await foreach (var res in GetRemainingDifference(buy, sell, item, priceProvider))
             {
@@ -290,6 +297,13 @@ public class ProfitChangeService
     private static bool IsAuction(Core.SaveAuction sell)
     {
         return sell.Uuid != Guid.Empty.ToString("n");
+    }
+
+    private static bool IsDuplicateDrillPartAlias(Core.SaveAuction auction, KeyValuePair<string, string> item)
+    {
+        return DrillPartAliases.TryGetValue(item.Key, out var legacyKey)
+            && auction.FlatenedNBT.TryGetValue(legacyKey, out var legacyValue)
+            && string.Equals(legacyValue, item.Value, StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>

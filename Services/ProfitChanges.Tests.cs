@@ -1235,6 +1235,23 @@ public class ProfitChangeTests
     }
 
     [Test]
+    public async Task DrillPartAliasesAreNotDoubleCounted()
+    {
+        var buy = CreateAuction("DRILL", "drill", 1_000_000);
+        var sell = CreateAuction("DRILL", "drill", 100_000_000);
+        sell.FlatenedNBT["drill_part_engine"] = "mithril_drill_engine";
+        sell.FlatenedNBT["engine.id"] = "MITHRIL_DRILL_ENGINE";
+        SetupItemPrice(5_000_000);
+
+        var changes = await service.GetChanges(buy, sell);
+
+        Assert.That(changes.Count, Is.EqualTo(2), JsonConvert.SerializeObject(changes, Formatting.Indented));
+        changes.Should().NotContain(c => c.Label.Contains("engine.id"));
+        Assert.That(changes[1].Label, Is.EqualTo("mithril_drill_engine drill_part_engine added"));
+        Assert.That(changes[1].Amount, Is.EqualTo(-5_000_000));
+    }
+
+    [Test]
     public async Task AddedMasterStars()
     {
         var tag = "HYPERION";
