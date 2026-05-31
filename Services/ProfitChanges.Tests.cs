@@ -331,9 +331,9 @@ public class ProfitChangeTests
         katApi.Setup(k => k.GetAllKatAsync(0, default)).ReturnsAsync(KatResponse("PET_ENDER_DRAGON"));
 
         var changes = await service.GetChanges(buy, sell);
-        Assert.That(changes.Count, Is.EqualTo(3), JsonConvert.SerializeObject(changes));
-        Assert.That(changes[1].Label, Is.EqualTo("Kat cost for LEGENDARY"));
-        Assert.That(changes[1].Amount, Is.EqualTo(-40_000_000 * 0.997));
+        Assert.That(changes.Count, Is.EqualTo(4), JsonConvert.SerializeObject(changes));
+        Assert.That(changes.Any(c => c.Label == "Removed PET_ITEM_TIER_BOOST" && c.Amount == 4_950_000), JsonConvert.SerializeObject(changes));
+        Assert.That(changes.Any(c => c.Label == "Kat cost for LEGENDARY" && c.Amount == (long)(-40_000_000 * 0.997)), JsonConvert.SerializeObject(changes));
     }
 
     [Test]
@@ -355,6 +355,55 @@ public class ProfitChangeTests
         Assert.That(itemChange, Is.Not.Null, "Expected a change for removing the pet item.");
         var removalCost = 50_000;
         Assert.That(itemChange.Amount, Is.EqualTo(7_000_000 - removalCost));
+    }
+
+    [Test]
+    public async Task TierBoostRemovedWithRestoredHeldItem_ShouldIncludeTierBoostRemovalAndGoldClawsCost()
+    {
+        // Buy mirrors https://sky.coflnet.com/api/auction/7df67d6b4471461cba2010fa19eabbe2
+        var buy = CreateAuction("PET_ENDER_DRAGON", "[Lvl 100] Ender Dragon", 320_000_000, Core.Tier.LEGENDARY);
+        buy.FlatenedNBT.Add("tier", "EPIC");
+        buy.FlatenedNBT.Add("heldItem", "PET_ITEM_TIER_BOOST");
+        buy.FlatenedNBT.Add("heldItemUuid", "44658739-a488-4380-8665-1ec97dbb31c1");
+        buy.FlatenedNBT.Add("exp", "26358526.281362496");
+
+        // Sell mirrors https://sky.coflnet.com/api/auction/20feff6831dc48cdbdccd62308701b36
+        var sell = CreateAuction("PET_ENDER_DRAGON", "[Lvl 100] Ender Dragon", 516_100_000, Core.Tier.LEGENDARY);
+        sell.FlatenedNBT.Add("tier", "LEGENDARY");
+        sell.FlatenedNBT.Add("heldItem", "GOLD_CLAWS");
+        sell.FlatenedNBT.Add("heldItemUuid", "7f9ac20c-c4db-466f-8c1e-6e02d5016b55");
+        sell.FlatenedNBT.Add("exp", "27160695.556221604");
+
+        craftsApi.Setup(c => c.GetAllAsync(0, default)).ReturnsAsync(new List<Crafts.Client.Model.ProfitableCraft>());
+        katApi.Setup(k => k.GetAllKatAsync(0, default)).ReturnsAsync(KatResponse("PET_ENDER_DRAGON"));
+        katApi.Setup(k => k.GetUpgradeDataAsync(0, default)).ReturnsAsync(new List<Crafts.Client.Model.KatUpgradeCost>()
+        {
+            new()
+            {
+                Name = "Ender Dragon",
+                BaseRarity = Crafts.Client.Model.Tier.EPIC,
+                Hours = 288,
+                Cost = 40_000_000,
+                Material = "ENCHANTED_EYE_OF_ENDER",
+                Amount = 8
+            }
+        });
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), null, 0, default))
+            .ReturnsAsync(() => new() { Median = 100_000 });
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("PET_ITEM_TIER_BOOST", null, 0, default))
+            .ReturnsAsync(() => new() { Median = 90_000_000 });
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("GOLD_CLAWS", null, 0, default))
+            .ReturnsAsync(() => new() { Median = 6_600_000 });
+
+        var changes = await service.GetChanges(buy, sell);
+
+        var tierBoostRemoval = changes.FirstOrDefault(c => c.Label.Contains("Removed PET_ITEM_TIER_BOOST"));
+        Assert.That(tierBoostRemoval, Is.Not.Null, JsonConvert.SerializeObject(changes, Formatting.Indented));
+        Assert.That(tierBoostRemoval.Amount, Is.GreaterThan(0), JsonConvert.SerializeObject(changes, Formatting.Indented));
+
+        var goldClawsCost = changes.FirstOrDefault(c => c.Label.Contains("GOLD_CLAWS"));
+        Assert.That(goldClawsCost, Is.Not.Null, JsonConvert.SerializeObject(changes, Formatting.Indented));
+        Assert.That(goldClawsCost.Amount, Is.LessThan(0), JsonConvert.SerializeObject(changes, Formatting.Indented));
     }
 
     [Test]
@@ -410,6 +459,7 @@ public class ProfitChangeTests
         var changes = await service.GetChanges(buy, sell);
         Assert.That(changes.Count, Is.EqualTo(1), JsonConvert.SerializeObject(changes));
     }
+
     [Test]
     public async Task ReforgeChange()
     {

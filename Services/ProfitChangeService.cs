@@ -157,7 +157,7 @@ public class ProfitChangeService
         var buyHeldItem = buy.FlatenedNBT.FirstOrDefault(f => f.Key == "heldItem").Value;
         var sellHeldItem = sell.FlatenedNBT.FirstOrDefault(f => f.Key == "heldItem").Value;
 
-        if (buy.Tag.StartsWith("PET_") && buyHeldItem != null && buyHeldItem != sellHeldItem && buyHeldItem != "PET_ITEM_TIER_BOOST")
+        if (buy.Tag.StartsWith("PET_") && buyHeldItem != null && buyHeldItem != sellHeldItem)
         {
             var change = await GetPetItemRemovedValue(buy, sell, buyHeldItem, priceProvider);
             yield return change;
