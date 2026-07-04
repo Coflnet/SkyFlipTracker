@@ -189,6 +189,246 @@ public class TrackerServiceTests
         flip.PurchaseAuctionId.Should().Be(Guid.Empty);
     }
 
+    [Test]
+    public async Task TradeToTradeUsesBuyTradeNotSellTradeForPurchaseCost()
+    {
+        // Reproduces a trade->trade flip that was tracked wrong: the item was bought via trade for 785m
+        // and later sold via trade for 840m, but the purchase cost was recorded as 840m (the sell value)
+        // because the latest trade of the item (the sell) was used as the buy source.
+        const long necronItemId = 1420525896051481;
+        var player = Guid.Parse("4107089e-963a-4576-9e96-f32a2d75c530");
+        var buyTime = new DateTime(2026, 5, 15, 9, 54, 54, 63);
+        var sellTime = new DateTime(2026, 5, 15, 10, 4, 49, 957);
+
+        var trade = JsonConvert.DeserializeObject<Models.TradeModel>(TradeToTradeSell);
+        var savedFlips = new List<PastFlip>();
+
+        var mockFlipStorageService = new Mock<FlipStorageService>(null, null, null);
+        mockFlipStorageService.Setup(x => x.SaveFlip(It.IsAny<PastFlip>()))
+            .Callback<PastFlip>(flip => savedFlips.Add(flip))
+            .Returns(Task.CompletedTask);
+        mockFlipStorageService.Setup(x => x.GetFlips(It.IsAny<Guid>(), It.IsAny<DateTime>(), It.IsAny<DateTime>()))
+            .ReturnsAsync(new List<PastFlip>());
+
+        var mockProfitChangeService = new Mock<ProfitChangeService>(null, null, null, null, null, null, null, null, null);
+        mockProfitChangeService.Setup(x => x.GetChanges(It.IsAny<SaveAuction>(), It.IsAny<SaveAuction>()))
+            .ReturnsAsync(new List<PastFlip.ProfitChange>());
+
+        var mockTransactionApi = new Mock<PlayerState.Client.Api.ITransactionApi>();
+        mockTransactionApi.Setup(x => x.TransactionUuidItemIdPostAsync(It.IsAny<List<Guid>>(), It.IsAny<int>(), It.IsAny<System.Threading.CancellationToken>()))
+            .ReturnsAsync(new Dictionary<string, List<long>>());
+        // both the buy trade (receive) and the sell trade (give) of the item, sell trade being the latest
+        mockTransactionApi.Setup(x => x.TransactionItemItemIdGetAsync(necronItemId, It.IsAny<int>(), It.IsAny<int>(), It.IsAny<System.Threading.CancellationToken>()))
+            .ReturnsAsync(JsonConvert.DeserializeObject<List<PlayerState.Client.Model.Transaction>>(NecronItemTransactions));
+        // window around the buy trade -> player paid 785m
+        mockTransactionApi.Setup(x => x.TransactionPlayerPlayerUuidGetAsync(player, 1, buyTime, It.IsAny<int>(), It.IsAny<System.Threading.CancellationToken>()))
+            .ReturnsAsync(JsonConvert.DeserializeObject<List<PlayerState.Client.Model.Transaction>>(NecronBuyWindow));
+        // window around the sell trade -> player received 840m (must NOT be used as buy cost)
+        mockTransactionApi.Setup(x => x.TransactionPlayerPlayerUuidGetAsync(player, 1, sellTime, It.IsAny<int>(), It.IsAny<System.Threading.CancellationToken>()))
+            .ReturnsAsync(JsonConvert.DeserializeObject<List<PlayerState.Client.Model.Transaction>>(NecronSellWindow));
+
+        var mockAuctionsApi = new Mock<Api.Client.Api.IAuctionsApi>();
+        mockAuctionsApi.Setup(x => x.ApiAuctionsUidsSoldPostWithHttpInfoAsync(It.IsAny<Api.Client.Model.InventoryBatchLookup>(), It.IsAny<int>(), It.IsAny<System.Threading.CancellationToken>()))
+            .ReturnsAsync(new Api.Client.Client.ApiResponse<Dictionary<string, List<Api.Client.Model.ItemSell>>>(
+                System.Net.HttpStatusCode.OK,
+                null,
+                new Dictionary<string, List<Api.Client.Model.ItemSell>>
+                {
+                    {
+                        "abcdef012345",
+                        new List<Api.Client.Model.ItemSell>
+                        {
+                            // the item originally came from an auction won by someone else (not the player),
+                            // the player then acquired it via trade
+                            new(
+                                seller: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                                uuid: "945c3850f81f4e0096278eb3b22ada1b",
+                                buyer: "fb49036bb1654dcf994a93bbaa2bf4e9",
+                                itemTag: "NECRON_CELESTIAL",
+                                highestBid: 700_000_000,
+                                timestamp: new DateTime(2026, 5, 15, 9, 50, 0))
+                        }
+                    }
+                }));
+        mockAuctionsApi.Setup(x => x.ApiAuctionAuctionUuidGetWithHttpInfoAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<System.Threading.CancellationToken>()))
+            .ReturnsAsync(new Api.Client.Client.ApiResponse<Api.Client.Model.ColorSaveAuction>(
+                System.Net.HttpStatusCode.OK,
+                new Api.Client.Client.Multimap<string, string>(),
+                null,
+                OriginAuction));
+
+        var mockItemsApi = new Mock<PlayerState.Client.Api.IItemsApi>();
+        mockItemsApi.Setup(x => x.ApiItemsFindUuidPostAsync(It.IsAny<List<PlayerState.Client.Model.ItemIdSearch>>(), It.IsAny<int>(), It.IsAny<System.Threading.CancellationToken>()))
+            .ReturnsAsync(JsonConvert.DeserializeObject<List<PlayerState.Client.Model.Item>>("[" + NecronItemState + "]"));
+        mockItemsApi.Setup(x => x.ApiItemsIdGetAsync(necronItemId, It.IsAny<int>(), It.IsAny<System.Threading.CancellationToken>()))
+            .ReturnsAsync(JsonConvert.DeserializeObject<PlayerState.Client.Model.Item>(NecronItemState));
+
+        var trackerService = new TrackerService(
+            null,
+            NullLogger<TrackerService>.Instance,
+            mockAuctionsApi.Object,
+            null,
+            null,
+            mockProfitChangeService.Object,
+            mockFlipStorageService.Object,
+            new ActivitySource("test"),
+            null,
+            null,
+            new Mock<Settings.Client.Api.ISettingsApi>().Object,
+            mockItemsApi.Object,
+            mockTransactionApi.Object,
+            new RepresentationConverter(NullLogger<RepresentationConverter>.Instance, null)
+        );
+
+        await trackerService.AddTrades(new[] { trade });
+
+        savedFlips.Should().ContainSingle();
+        var flip = savedFlips.Single();
+        flip.Flags.Should().HaveFlag(FlipFlags.ViaTrade);
+        flip.ItemTag.Should().Be("NECRON_CELESTIAL");
+        flip.SellPrice.Should().Be(840_000_000);
+        flip.PurchaseCost.Should().Be(785_000_000); // was wrongly 840_000_000 (the sell trade value)
+        flip.Profit.Should().BePositive();
+    }
+
+    private static string TradeToTradeSell = """
+    {
+        "UserId": "1",
+        "MinecraftUuid": "4107089e-963a-4576-9e96-f32a2d75c530",
+        "Spent": [
+            {
+                "Id": 1420525896051481,
+                "ItemName": "§dCelestial Necron's Helmet Skin",
+                "Tag": "NECRON_CELESTIAL",
+                "ExtraAttributes": {
+                    "uid": "abcdef012345",
+                    "uuid": "1234abcd-1234-1234-1234-abcdef012345",
+                    "timestamp": 1759236287546,
+                    "tier": 5
+                },
+                "Enchantments": null,
+                "Color": null,
+                "Description": "§7Celestial Necron's Helmet Skin\n\n§d§l§ka§r §d§lMYTHIC §d§l§ka",
+                "Count": 1
+            }
+        ],
+        "Received": [
+            {
+                "Id": null,
+                "ItemName": "§6840M coins",
+                "Tag": null,
+                "ExtraAttributes": null,
+                "Enchantments": null,
+                "Color": null,
+                "Description": "§7Lump-sum amount\n\n§6Total Coins Offered:\n§7840M\n§8(840,000,000)",
+                "Count": 1
+            }
+        ],
+        "OtherSide": "someone",
+        "TimeStamp": "2026-05-15T10:04:49.957Z"
+    }
+    """;
+
+    private static string NecronItemTransactions = """
+    [
+        {
+            "playerUuid": "4107089e-963a-4576-9e96-f32a2d75c530",
+            "profileUuid": "00000000-0000-0000-0000-000000000000",
+            "type": 33,
+            "itemId": 1420525896051481,
+            "amount": 1,
+            "timeStamp": "2026-05-15T09:54:54.063"
+        },
+        {
+            "playerUuid": "4107089e-963a-4576-9e96-f32a2d75c530",
+            "profileUuid": "00000000-0000-0000-0000-000000000000",
+            "type": 34,
+            "itemId": 1420525896051481,
+            "amount": 1,
+            "timeStamp": "2026-05-15T10:04:49.957"
+        }
+    ]
+    """;
+
+    private static string NecronBuyWindow = """
+    [
+        {
+            "playerUuid": "4107089e-963a-4576-9e96-f32a2d75c530",
+            "profileUuid": "00000000-0000-0000-0000-000000000000",
+            "type": 33,
+            "itemId": 1420525896051481,
+            "amount": 1,
+            "timeStamp": "2026-05-15T09:54:54.063"
+        },
+        {
+            "playerUuid": "4107089e-963a-4576-9e96-f32a2d75c530",
+            "profileUuid": "00000000-0000-0000-0000-000000000000",
+            "type": 34,
+            "itemId": 1000001,
+            "amount": 7850000000,
+            "timeStamp": "2026-05-15T09:54:54.063"
+        }
+    ]
+    """;
+
+    private static string NecronSellWindow = """
+    [
+        {
+            "playerUuid": "4107089e-963a-4576-9e96-f32a2d75c530",
+            "profileUuid": "00000000-0000-0000-0000-000000000000",
+            "type": 34,
+            "itemId": 1420525896051481,
+            "amount": 1,
+            "timeStamp": "2026-05-15T10:04:49.957"
+        },
+        {
+            "playerUuid": "4107089e-963a-4576-9e96-f32a2d75c530",
+            "profileUuid": "00000000-0000-0000-0000-000000000000",
+            "type": 33,
+            "itemId": 1000001,
+            "amount": 8400000000,
+            "timeStamp": "2026-05-15T10:04:49.957"
+        }
+    ]
+    """;
+
+    private static string NecronItemState = """
+    {
+        "id": 1420525896051481,
+        "itemName": "§dCelestial Necron's Helmet Skin",
+        "tag": "NECRON_CELESTIAL",
+        "extraAttributes": {
+            "uid": "abcdef012345",
+            "uuid": "1234abcd-1234-1234-1234-abcdef012345",
+            "timestamp": 1759236287546,
+            "tier": 5
+        },
+        "enchantments": {},
+        "color": null,
+        "description": null,
+        "count": 1
+    }
+    """;
+
+    private static string OriginAuction = """
+    {
+        "uuid": "945c3850f81f4e0096278eb3b22ada1b",
+        "count": 1,
+        "startingBid": 700000000,
+        "tag": "NECRON_CELESTIAL",
+        "itemName": "§dCelestial Necron's Helmet Skin",
+        "start": "2026-05-15T09:30:00",
+        "end": "2026-05-15T09:40:00",
+        "auctioneerId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "highestBidAmount": 700000000,
+        "bids": [{"bidder":"fb49036bb1654dcf994a93bbaa2bf4e9","amount":700000000,"timestamp":"2026-05-15T09:40:00"}],
+        "nbtData": {"data": {"uid":"abcdef012345","uuid":"1234abcd-1234-1234-1234-abcdef012345"}},
+        "flatNbt": {"uid":"abcdef012345","uuid":"1234abcd-1234-1234-1234-abcdef012345"},
+        "tier": "MYTHIC",
+        "bin": true
+    }
+    """;
+
     private static string FullTrade = """
     {
     "UserId": "627115",

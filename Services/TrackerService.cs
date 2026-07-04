@@ -723,6 +723,9 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
 
 
 
+        // RECEIVE flag of PlayerState Transaction.TransactionType (item entered the inventory = was bought)
+        private const int ReceivedFlag = 1;
+
         private static Transaction GetRelevantTradeEntry(List<Transaction> itemTrade, Guid? sellerUuid = null, DateTime? before = null)
         {
             IEnumerable<Transaction> matchingEntries = itemTrade;
@@ -730,15 +733,22 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             {
                 matchingEntries = matchingEntries.Where(t => t.PlayerUuid == sellerUuid.Value);
             }
+            var candidates = matchingEntries;
             if (before.HasValue)
             {
-                var beforeTrade = matchingEntries.Where(t => t.TimeStamp <= before.Value)
-                    .OrderByDescending(t => t.TimeStamp)
-                    .FirstOrDefault();
-                if (beforeTrade != null)
-                    return beforeTrade;
+                var beforeTrade = matchingEntries.Where(t => t.TimeStamp <= before.Value);
+                if (beforeTrade.Any())
+                    candidates = beforeTrade;
             }
-            return matchingEntries.OrderByDescending(t => t.TimeStamp).FirstOrDefault()
+            // Prefer the trade where the player received (bought) the item over a later trade where they
+            // gave it away (sold it). Without this a trade->trade flip takes the sell trade as the buy
+            // source and records the sell value as the purchase cost.
+            var receivedEntry = candidates.Where(t => t.Type.HasValue && ((int)t.Type.Value & ReceivedFlag) != 0)
+                .OrderByDescending(t => t.TimeStamp)
+                .FirstOrDefault();
+            if (receivedEntry != null)
+                return receivedEntry;
+            return candidates.OrderByDescending(t => t.TimeStamp).FirstOrDefault()
                 ?? itemTrade.OrderByDescending(t => t.TimeStamp).First();
         }
 
