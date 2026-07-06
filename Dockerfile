@@ -8,14 +8,22 @@ COPY . .
 RUN dotnet test
 RUN dotnet publish -c release -o /app && rm /app/items.json
 
-FROM mcr.microsoft.com/dotnet/aspnet:10.0
+# noble-chiseled-extra ships a pre-configured non-root $APP_UID user and no
+# shell/package manager. Deployed with readOnlyRootFilesystem: true, so
+# nothing may write to disk at runtime besides transient state under
+# HOME=/tmp.
+FROM mcr.microsoft.com/dotnet/aspnet:10.0-noble-chiseled-extra
 WORKDIR /app
 
-COPY --from=build /app .
-RUN mkdir -p ah/files
-ENV ASPNETCORE_URLS=http://+:8000
+COPY --from=build --chown=$APP_UID:$APP_UID /app .
 
-RUN useradd --uid $(shuf -i 2000-65000 -n 1) app-user
-USER app-user
+ENV ASPNETCORE_URLS=http://+:8000 \
+    DOTNET_EnableDiagnostics=0 \
+    COMPlus_EnableDiagnostics=0 \
+    DOTNET_RUNNING_IN_CONTAINER=true \
+    HOME=/tmp \
+    TMPDIR=/tmp
+
+USER $APP_UID
 
 ENTRYPOINT ["dotnet", "SkyFlipTracker.dll", "--hostBuilder:reloadConfigOnChange=false"]
