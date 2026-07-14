@@ -411,8 +411,10 @@ public class ProfitChangeService
         AddCraftPathIngredients(tagOnPurchase, allCrafts, allIngredients);
 
         // Kuudra prestige: the recipe includes star costs for the buy tag; subtract them
-        // since prestige strips all stars and those costs were already on the buy item
-        if (buyBase != null && sellBase != null && buyBase == sellBase
+        // since prestige strips all stars and those costs were already on the buy item.
+        // Applies to transfers too, stars carry over to the new type before the prestige strips them
+        // (tagOnPurchase was rewritten to the sell type above).
+        if (buyBase != null && sellBase != null
             && buy.FlatenedNBT.TryGetValue("upgrade_level", out var buyUpgradeLevelStr))
         {
             var buyStarLevel = int.Parse(buyUpgradeLevelStr);

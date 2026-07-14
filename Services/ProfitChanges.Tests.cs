@@ -2320,6 +2320,107 @@ public class ProfitChangeTests
         coinsChange.Amount.Should().Be(-10_000_000, "prestige costs 10m coins");
     }
 
+    /// <summary>
+    /// Replicates https://sky.coflnet.com/player/b0d2b110e51e479aae4773d6ec9f10f0/flips/-6f467c0f9a7a28
+    /// Buy https://sky.coflnet.com/api/auction/b092996f9f224977bbd527931add9a18 (10 star BURNING_AURORA_LEGGINGS)
+    /// sold as https://sky.coflnet.com/api/auction/ff90b983f065485d93065c1cd83a7b14 (0 star FIERY_CRIMSON_LEGGINGS).
+    /// Prestige strips the stars, so the star portion of the recipe was already paid for on the buy and
+    /// must be subtracted - even though the armor type changed (kuudra transfer) on top of the prestige.
+    /// </summary>
+    [Test]
+    public async Task PrestigeWithTransferDoesNotCountExistingStars()
+    {
+        var buy = new Core.SaveAuction()
+        {
+            Uuid = Guid.NewGuid().ToString("N"),
+            Tag = "BURNING_AURORA_LEGGINGS",
+            ItemName = "Necrotic Burning Aurora Leggings ✪✪✪✪✪",
+            HighestBidAmount = 87_000_000,
+            StartingBid = 87_000_000,
+            FlatenedNBT = new()
+            {
+                { "rarity_upgrades", "1" },
+                { "hpc", "15" },
+                { "COMBAT_0", "FLAWLESS" },
+                { "unlocked_slots", "COMBAT_0,COMBAT_1" },
+                { "COMBAT_1_gem", "SAPPHIRE" },
+                { "COMBAT_0_gem", "SAPPHIRE" },
+                { "COMBAT_1", "FLAWLESS" },
+                { "upgrade_level", "10" },
+                { "uid", "10aa86bfc798" },
+                { "boss_tier", "3" },
+                { "uuid", "5b951baf-c0bb-4271-83f5-10aa86bfc798" },
+                { "color", "63:86:251" },
+                { "cc", "1" }
+            },
+            Enchantments = new(),
+            Reforge = Core.ItemReferences.Reforge.Necrotic,
+            Tier = Core.Tier.MYTHIC
+        };
+        var sell = new Core.SaveAuction()
+        {
+            Uuid = Guid.NewGuid().ToString("N"),
+            Tag = "FIERY_CRIMSON_LEGGINGS",
+            ItemName = "Ancient Fiery Crimson Leggings",
+            HighestBidAmount = 115_000_000,
+            StartingBid = 115_000_000,
+            FlatenedNBT = new()
+            {
+                { "rarity_upgrades", "1" },
+                { "hpc", "15" },
+                { "COMBAT_0", "FINE" },
+                { "unlocked_slots", "COMBAT_0,COMBAT_1" },
+                { "COMBAT_1_gem", "JASPER" },
+                { "COMBAT_0_gem", "JASPER" },
+                { "COMBAT_1", "FINE" },
+                { "uid", "10aa86bfc798" },
+                { "boss_tier", "3" },
+                { "uuid", "5b951baf-c0bb-4271-83f5-10aa86bfc798" },
+                { "color", "230:97:5" },
+                { "cc", "1" }
+            },
+            Enchantments = new(),
+            Reforge = Core.ItemReferences.Reforge.ancient,
+            Tier = Core.Tier.MYTHIC
+        };
+
+        // production recipe, includes the prestige cost as well as the star costs of the burning item
+        craftsApi.Setup(c => c.GetAllAsync(0, default)).ReturnsAsync(() => new()
+        {
+            new() { ItemId = "FIERY_CRIMSON_LEGGINGS", Ingredients = new()
+            {
+                new() { ItemId = "BURNING_CRIMSON_LEGGINGS", Count = 1 },
+                new() { ItemId = "ESSENCE_CRIMSON", Count = 20845 },
+                new() { ItemId = "HEAVY_PEARL", Count = 12 },
+                new() { ItemId = "KUUDRA_TEETH", Count = 50 },
+                new() { ItemId = "SKYBLOCK_COIN", Count = 1, Cost = 11_935_000 },
+            }}
+        });
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), It.IsAny<Dictionary<string, string>>(), 0, default))
+            .ReturnsAsync(() => new() { Median = 1_000_000 });
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("ESSENCE_CRIMSON", null, 0, default))
+            .ReturnsAsync(() => new() { Median = 1214 });
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("KUUDRA_TEETH", null, 0, default))
+            .ReturnsAsync(() => new() { Median = 11_600 });
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("HEAVY_PEARL", null, 0, default))
+            .ReturnsAsync(() => new() { Median = 324_700 });
+        itemsApi.Setup(i => i.ItemItemTagGetAsync("FIERY_CRIMSON_LEGGINGS", It.IsAny<bool?>(), It.IsAny<int>(), default))
+            .ReturnsAsync(() => new() { Tag = "FIERY_CRIMSON_LEGGINGS", Tier = Items.Client.Model.Tier.MYTHIC });
+
+        var changes = await service.GetChanges(buy, sell);
+
+        var all = JsonConvert.SerializeObject(changes, Formatting.Indented);
+        changes.Should().Contain(c => c.Label == "/kuudratransfer cost", $"the armor type changed, got: {all}");
+        var essenceChange = changes.FirstOrDefault(c => c.Label.Contains("ESSENCE_CRIMSON"));
+        essenceChange.Should().NotBeNull($"should have essence cost, got: {all}");
+        essenceChange!.Label.Should().Be("crafting material ESSENCE_CRIMSON x4500",
+            $"only the prestige essence, the 16345 essence for the 10 stars were paid on the buy, got: {all}");
+        // the whole upgrade (transfer, conversion piece and prestige) has to stay below what the stars alone would cost
+        var upgradeCost = changes.Where(c => c.Label != "ah tax" && !c.Label.Contains("gem") && !c.Label.Contains("Reforge"))
+            .Sum(c => c.Amount);
+        upgradeCost.Should().BeGreaterThan(-25_000_000, $"upgrading a 10 star burning to fiery is roughly 16m + conversion piece, got: {all}");
+    }
+
     [Test]
     public async Task PetItemRemoved_UsesActualSalePrice()
     {
