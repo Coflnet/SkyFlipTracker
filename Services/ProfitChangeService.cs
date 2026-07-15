@@ -32,6 +32,9 @@ public class ProfitChangeService
     private HypixelItemService hypixelItemService;
     private IPriceProviderFactory priceProviderFactory;
     private IAuctionsApi auctionsApi;
+    // Item tier/category is static per tag; cache it process-wide (service is a singleton) to avoid a
+    // network round-trip per unknown-tier auction - that lookup was a multi-second outlier in tracing.
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, Items.Client.Model.Item> itemMetadataCache = new();
     private string[] CrisonArmor = new string[] { "CRIMSON", "TERROR", "AURORA", "FERVOR", "HOLLOW" };
 
     /// <summary>
@@ -951,9 +954,12 @@ public class ProfitChangeService
 
     private async Task<Items.Client.Model.Item> GetItemMetadata(string tag)
     {
+        if (itemMetadataCache.TryGetValue(tag, out var cached))
+            return cached;
         var itemMetadata = await itemApi.ItemItemTagGetAsync(tag, true);
         if (itemMetadata == null)
             throw new Exception($"could not find item metadata for {tag}");
+        itemMetadataCache[tag] = itemMetadata;
         return itemMetadata;
     }
 

@@ -81,6 +81,104 @@ public class TrackerServiceTests
     }
 
     [Test]
+    public async Task GriffinManualXpFlipStored()
+    {
+        // https://sky.coflnet.com/player/c9ae33b7f1a24ecc8f11194e34bcd2e1/flips
+        // sell https://sky.coflnet.com/auction/b75370d2a0804cab90fb88b4ac6aea95 (lvl 100)
+        // buy  https://sky.coflnet.com/auction/eb67974a5dd3400dbe6e31773177763e (lvl 99, xp added)
+        // Regression: a leveled-up pet flip must be matched by uid and stored (verified end to end
+        // against the live tracker; the flip was only ever dropped by the sold-auction consumer, not here).
+        var sell = new Core.SaveAuction()
+        {
+            Uuid = "b75370d2a0804cab90fb88b4ac6aea95",
+            Tag = "PET_GRIFFIN",
+            ItemName = "[Lvl 100] Griffin",
+            HighestBidAmount = 194_950_348,
+            StartingBid = 194_950_348,
+            AuctioneerId = "c9ae33b7f1a24ecc8f11194e34bcd2e1",
+            ProfileId = "0efc3901ea93453fb44b824106f45a32",
+            Start = new DateTime(2026, 6, 25, 5, 34, 24),
+            End = new DateTime(2026, 6, 27, 14, 55, 5),
+            Tier = Core.Tier.MYTHIC,
+            Reforge = Core.ItemReferences.Reforge.None,
+            Bin = true,
+            Bids = new() { new() { Bidder = "27f149541c2f4b91bacf29e872f0dd7d", Amount = 194_950_348, Timestamp = new DateTime(2026, 6, 27, 14, 55, 5) } },
+            FlatenedNBT = new() {
+                { "type", "GRIFFIN" }, { "tier", "MYTHIC" }, { "heldItem", "PET_ITEM_LUCKY_CLOVER" },
+                { "candyUsed", "0" }, { "exp", "26312721.152631305" },
+                { "uid", "2c9f22da49c2" }, { "uuid", "7aa35889-dcf6-485c-86fb-2c9f22da49c2" }
+            }
+        };
+        var savedFlips = new List<PastFlip>();
+
+        var mockFlipStorageService = new Mock<FlipStorageService>(null, null, null);
+        mockFlipStorageService.Setup(x => x.SaveFlip(It.IsAny<PastFlip>()))
+            .Callback<PastFlip>(flip => savedFlips.Add(flip))
+            .Returns(Task.CompletedTask);
+        mockFlipStorageService.Setup(x => x.GetFlips(It.IsAny<Guid>(), It.IsAny<DateTime>(), It.IsAny<DateTime>()))
+            .ReturnsAsync(new List<PastFlip>());
+
+        var mockProfitChangeService = new Mock<ProfitChangeService>(null, null, null, null, null, null, null, null, null);
+        mockProfitChangeService.Setup(x => x.GetChanges(It.IsAny<SaveAuction>(), It.IsAny<SaveAuction>()))
+            .ReturnsAsync(new List<PastFlip.ProfitChange> { new("ah tax", -6_824_461), new("Exp cost", -441_407) });
+
+        var mockTransactionApi = new Mock<PlayerState.Client.Api.ITransactionApi>();
+        mockTransactionApi.Setup(x => x.TransactionUuidItemIdPostAsync(It.IsAny<List<Guid>>(), It.IsAny<int>(), It.IsAny<System.Threading.CancellationToken>()))
+            .ReturnsAsync(new Dictionary<string, List<long>>());
+
+        var mockAuctionsApi = new Mock<Api.Client.Api.IAuctionsApi>();
+        mockAuctionsApi.Setup(x => x.ApiAuctionsUidsSoldPostWithHttpInfoAsync(It.IsAny<Api.Client.Model.InventoryBatchLookup>(), It.IsAny<int>(), It.IsAny<System.Threading.CancellationToken>()))
+            .ReturnsAsync(new Api.Client.Client.ApiResponse<Dictionary<string, List<Api.Client.Model.ItemSell>>>(
+                System.Net.HttpStatusCode.OK,
+                null,
+                new Dictionary<string, List<Api.Client.Model.ItemSell>>
+                {
+                    {
+                        "2c9f22da49c2",
+                        new List<Api.Client.Model.ItemSell>
+                        {
+                            new(seller: "e109e4c6dffc479ea1182d2d6ecb4f62", uuid: "768f3d9e7a4b47ac8354b2529dbc7d3b", buyer: "a00cd46615d94bcf8b9688c17d67c85b", itemTag: "PET_GRIFFIN", highestBid: 193_000_000, timestamp: new DateTime(2026, 6, 3, 4, 4, 18)),
+                            new(seller: "a00cd46615d94bcf8b9688c17d67c85b", uuid: "eb67974a5dd3400dbe6e31773177763e", buyer: "c9ae33b7f1a24ecc8f11194e34bcd2e1", itemTag: "PET_GRIFFIN", highestBid: 150_000_000, timestamp: new DateTime(2026, 6, 25, 5, 33, 7)),
+                            new(seller: "c9ae33b7f1a24ecc8f11194e34bcd2e1", uuid: "b75370d2a0804cab90fb88b4ac6aea95", buyer: "27f149541c2f4b91bacf29e872f0dd7d", itemTag: "PET_GRIFFIN", highestBid: 194_950_348, timestamp: new DateTime(2026, 6, 27, 14, 55, 5))
+                        }
+                    }
+                }));
+        mockAuctionsApi.Setup(x => x.ApiAuctionAuctionUuidGetWithHttpInfoAsync("eb67974a5dd3400dbe6e31773177763e", It.IsAny<int>(), It.IsAny<System.Threading.CancellationToken>()))
+            .ReturnsAsync(new Api.Client.Client.ApiResponse<Api.Client.Model.ColorSaveAuction>(
+                System.Net.HttpStatusCode.OK, new Api.Client.Client.Multimap<string, string>(), null, GriffinBuy));
+
+        var trackerService = new TrackerService(
+            null,
+            NullLogger<TrackerService>.Instance,
+            mockAuctionsApi.Object,
+            null,
+            null,
+            mockProfitChangeService.Object,
+            mockFlipStorageService.Object,
+            new ActivitySource("test"),
+            null,
+            null,
+            new Mock<Settings.Client.Api.ISettingsApi>().Object,
+            new Mock<PlayerState.Client.Api.IItemsApi>().Object,
+            mockTransactionApi.Object,
+            new RepresentationConverter(NullLogger<RepresentationConverter>.Instance, null)
+        );
+
+        await trackerService.IndexCassandra(new[] { sell });
+
+        savedFlips.Should().ContainSingle();
+        var flip = savedFlips.Single();
+        flip.ItemTag.Should().Be("PET_GRIFFIN");
+        flip.PurchaseCost.Should().Be(150_000_000);
+        flip.SellPrice.Should().Be(194_950_348);
+        flip.Profit.Should().BeGreaterThan(30_000_000);
+    }
+
+    private static string GriffinBuy = """
+    {"enchantments":[],"uuid":"eb67974a5dd3400dbe6e31773177763e","count":1,"startingBid":150000000,"tag":"PET_GRIFFIN","itemName":"[Lvl 99] Griffin","start":"2026-06-25T05:30:56","end":"2026-06-25T05:33:07","auctioneerId":"a00cd46615d94bcf8b9688c17d67c85b","profileId":"cae80da3a69944ce871fbdbafd382286","highestBidAmount":150000000,"bids":[{"bidder":"c9ae33b7f1a24ecc8f11194e34bcd2e1","profileId":"0efc3901ea93453fb44b824106f45a32","amount":150000000,"timestamp":"2026-06-25T05:33:07"}],"anvilUses":0,"reforge":"None","category":"MISC","tier":"MYTHIC","bin":true,"flatNbt":{"type":"GRIFFIN","active":"False","exp":"24662721.152631305","tier":"MYTHIC","heldItem":"PET_ITEM_LUCKY_CLOVER","candyUsed":"0","uid":"2c9f22da49c2","uuid":"7aa35889-dcf6-485c-86fb-2c9f22da49c2"}}
+    """;
+
+    [Test]
     public async Task MultiItemTrade()
     {
         var trade = JsonConvert.DeserializeObject<Models.TradeModel>(FullTrade);

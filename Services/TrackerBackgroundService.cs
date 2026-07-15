@@ -226,7 +226,14 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                             await Task.Delay(1000);
                         }
                 };
-                await Task.WhenAny(work(), Task.Delay(TimeSpan.FromSeconds(5)));
+                // Fully await the indexing before returning. Previously this raced work() against a
+                // 5s timer and returned the faster one; when a batch took longer than 5s (common for
+                // slow profit calculations like pets with added xp or talisman/craft upgrades, which do
+                // extra price/craft lookups) the handler returned, the Kafka offset was committed, and
+                // work() kept running orphaned - so a rebalance or pod restart before it finished dropped
+                // those flips permanently. The consumer's SessionTimeoutMs (65s) and IndexCassandra's own
+                // 20s cancellation bound the wait, so awaiting to completion is safe.
+                await work();
                 if (consumeError)
                 {
                     logger.LogInformation("cassanra index backoff");
