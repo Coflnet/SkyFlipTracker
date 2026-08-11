@@ -214,7 +214,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 if (timeToBuy > TimeSpan.FromSeconds(10))
                     continue;
                 var playerUuid = item.Bids.First().Bidder;
-                var disabled = await settingsApi.SettingsGetSettingAsync(playerUuid, "disable-buy-speed-board");
+                var disabled = await settingsApi.GetSettingAsync(playerUuid, "disable-buy-speed-board");
                 if (!string.IsNullOrEmpty(disabled))
                 {
                     logger.LogInformation($"user {playerUuid} disabled buy speed board: {disabled}");
@@ -225,7 +225,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     try
                     {
                         var leaderboardSlug = $"sky-buyspeed-{DateTime.UtcNow.RoundDown(TimeSpan.FromDays(7)):yyyy-MM-dd}";
-                        await scoresApi.ScoresLeaderboardSlugPostAsync(leaderboardSlug, new Leaderboard.Client.Model.ScoreCreate()
+                        await scoresApi.AddScoreAsync(leaderboardSlug, new Leaderboard.Client.Model.ScoreCreate()
                         {
                             UserId = playerUuid,
                             Score = (long)(timeToBuy.TotalSeconds * -1000),
