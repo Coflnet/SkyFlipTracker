@@ -122,11 +122,12 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 {
                     if (item.StartingBid > 5_000_000 && item.Start > DateTime.UtcNow - TimeSpan.FromMinutes(1))
                         CheckLister(item); // expensive items may be underlisted
-                    if (!item.Coop.Any(c => AnalyseController.BadPlayersList.Contains(c)))
+                    var coop = item.Coop;
+                    if (coop == null || !coop.Any(c => AnalyseController.BadPlayersList.Contains(c)))
                     {
                         continue;
                     }
-                    foreach (var uuid in item.Coop)
+                    foreach (var uuid in coop)
                     {
                         if (!AnalyseController.BadPlayersList.Contains(uuid))
                             logger.LogWarning("found bad player in coop {uuid} from {auctioneer}", uuid, item.AuctioneerId);
