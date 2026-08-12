@@ -36,6 +36,10 @@ public class ProfitChangeService
     // network round-trip per unknown-tier auction - that lookup was a multi-second outlier in tracing.
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, Items.Client.Model.Item> itemMetadataCache = new();
     private string[] CrisonArmor = new string[] { "CRIMSON", "TERROR", "AURORA", "FERVOR", "HOLLOW" };
+    private static readonly Dictionary<Core.Enchantment.EnchantmentType, long> NpcEnchantPrices = new()
+    {
+        { Core.Enchantment.EnchantmentType.divine_gift, 25_000_000 }
+    };
 
     /// <summary>
     /// Keys containing itemTags that can be removed
@@ -827,6 +831,12 @@ public class ProfitChangeService
         {
             var allBazaar = await bazaarApi.GetAllPricesAsync();
             var itemValues = allBazaar.GroupBy(a => a.ProductId).ToDictionary(b => b.Key, b => b.Max(x => x.SellPrice));
+            if (NpcEnchantPrices.TryGetValue(item.Type, out var npcPrice))
+            {
+                var prefix = $"ENCHANTMENT_{item.Type.ToString().ToUpper()}";
+                for (var level = 1; level <= item.Level; level++)
+                    itemValues[$"{prefix}_{level}"] = npcPrice * Math.Pow(2, level - 1);
+            }
             var sellValue = GetCostForEnchant(item, sell, itemValues, item); //mapper.EnchantValue(item, sell.FlatenedNBT, itemValues);
             var buyValue = 0L;
             var enchantAtBuy = buy.Enchantments.Where(e => e.Type == item.Type).FirstOrDefault();

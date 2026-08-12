@@ -1011,6 +1011,24 @@ public class ProfitChangeTests
     }
 
     [Test]
+    public async Task DivineGiftUpgradeUsesNpcPrice()
+    {
+        var buy = CreateAuction("HYPERION");
+        buy.Enchantments = new() { new() { Type = Core.Enchantment.EnchantmentType.divine_gift, Level = 1 } };
+        var sell = CreateAuction("HYPERION");
+        sell.Enchantments = new() { new() { Type = Core.Enchantment.EnchantmentType.divine_gift, Level = 3 } };
+        bazaarApi.Setup(p => p.GetAllPricesAsync(0, default)).ReturnsAsync(() => new() {
+            new("ENCHANTMENT_DIVINE_GIFT_1", 25_999_986.4, 32, 5, 16_072_503.3),
+            new("ENCHANTMENT_DIVINE_GIFT_2", 75_499_999.6, 18, 18, 40_000_002.1),
+            new("ENCHANTMENT_DIVINE_GIFT_3", 104_999_996.3, 12, 1, 95_000_000)
+        });
+
+        var changes = await service.GetChanges(buy, sell);
+
+        Assert.That(changes[1].Amount, Is.EqualTo(-75_000_000));
+    }
+
+    [Test]
     public async Task EnchantUpgradeNonCobineDedication()
     {
         var buy = CreateAuction("HYPERION");
