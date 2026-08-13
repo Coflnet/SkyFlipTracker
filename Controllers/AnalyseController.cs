@@ -51,6 +51,9 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             "d223be875ed04d72b237789bd92b04d2", "877e47356af746a0ad638a4cdb0d4249",
              "e96f32ee1ce14f90ba33272a35c2c936", "5ca97128ac0c41269ba9a985b2c61e72",
             "f00b66f6631e483a8f47649e9e6d917e", "c607088b49154618a257b577005c58dd", // credit card fraud
+            "69234d0fd9a443ada412656a68c72317", "94693d1d98b4466087fa4ec4344f7be8", // negative purchase count exploit
+            "08950aacd70b4713b435594a1067ef3c", "4d576344a9734655856357779ef6a67a",
+            "9c7fb1158c994c409cc3c62c4d594aa9", "c858cfada85045e08977d09bf4cf9e07", // negative purchase count exploit
         };
         public static HashSet<string> BadPlayersList => BadPlayers;
 
