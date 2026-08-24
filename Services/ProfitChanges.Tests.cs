@@ -540,14 +540,20 @@ public class ProfitChangeTests
             Tier = Core.Tier.MYTHIC
         };
         var price = Random.Shared.Next(1, 5_000_000);
-        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("RUNE_SOULTWIST", null, 0, default)).ReturnsAsync(() => new() { Median = price });
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(
+                "RUNE_SOULTWIST",
+                It.Is<Dictionary<string, string>>(filters => filters.Count == 1 && filters["RUNE_SOULTWIST"] == "1"),
+                0,
+                default))
+            .ReturnsAsync(() => new() { Median = price });
         var changes = await service.GetChanges(buy, sell);
         Assert.That(changes.Count, Is.EqualTo(2));
         Assert.That(changes.Last().Amount, Is.EqualTo(-price));
+        pricesApi.Verify(p => p.ApiItemPriceItemTagGetAsync("RUNE_SOULTWIST", null, 0, default), Times.Never);
     }
-    [TestCase("RUNE_PRIMAL_FEAR", 80_000_000)]
-    [TestCase("RUNE_SOULTWIST", 960000000)]
-    public async Task HigherLevelUniqueRuneAddedStaysAtlvl3(string runeTag, int targetChange)
+    [TestCase("RUNE_PRIMAL_FEAR", "3", 80_000_000)]
+    [TestCase("RUNE_SOULTWIST", "1", 960000000)]
+    public async Task HigherLevelUniqueRuneAddedStaysAtlvl3(string runeTag, string ingredientTier, int targetChange)
     {
         var buy = new Core.SaveAuction()
         {
@@ -569,11 +575,159 @@ public class ProfitChangeTests
             Tier = Core.Tier.MYTHIC
         };
         var price = 80_000_000;
-        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(runeTag, null, 0, default)).ReturnsAsync(() => new() { Median = price });
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(
+                runeTag,
+                It.Is<Dictionary<string, string>>(filters => filters.Count == 1 && filters[runeTag] == ingredientTier),
+                0,
+                default))
+            .ReturnsAsync(() => new() { Median = price });
         var changes = await service.GetChanges(buy, sell);
         Assert.That(changes.Count, Is.EqualTo(2));
         Assert.That(changes.Last().Amount, Is.EqualTo(-targetChange));
+        pricesApi.Verify(p => p.ApiItemPriceItemTagGetAsync(runeTag, null, 0, default), Times.Never);
     }
+
+    /// <summary>
+    /// A tier-three Heartsplosion rune is assembled from twelve tier-one runes.
+    /// </summary>
+    [Test]
+    public async Task HeartsplosionRuneUsesTierOneIngredientPrice()
+    {
+        // Production auction evidence for tracked flip -1879660086103514038.
+        var buy = new Core.SaveAuction
+        {
+            Uuid = "28f42c93f2ea4415bb2f7fb91ea58354",
+            Count = 1,
+            StartingBid = 520_000_000,
+            HighestBidAmount = 520_000_000,
+            Start = DateTime.Parse("2026-08-05T15:08:29Z").ToUniversalTime(),
+            End = DateTime.Parse("2026-08-05T15:38:16Z").ToUniversalTime(),
+            AuctioneerId = "00000000000000000000000000000001",
+            Tag = "HYPERION",
+            Reforge = Core.ItemReferences.Reforge.Heroic,
+            Category = Core.Category.WEAPON,
+            Tier = Core.Tier.MYTHIC,
+            Bin = true,
+            FlatenedNBT = new()
+            {
+                { "hpc", "10" },
+                { "rarity_upgrades", "1" },
+                { "uid", "eab15910cd55" },
+                { "upgrade_level", "5" },
+                { "uuid", "2a1fb080-22b3-46b9-a304-eab15910cd55" }
+            },
+            Enchantments = HyperionPurchaseEnchantments()
+        };
+        var sell = new Core.SaveAuction
+        {
+            Uuid = "e5ea1b1c4d514e44a38dfc1d96749c9b",
+            Count = 1,
+            StartingBid = 1_125_000_000,
+            HighestBidAmount = 1_125_000_000,
+            Start = DateTime.Parse("2026-08-05T17:39:52Z").ToUniversalTime(),
+            End = DateTime.Parse("2026-08-05T20:01:09Z").ToUniversalTime(),
+            AuctioneerId = "00000000000000000000000000000002",
+            Tag = "HYPERION",
+            ItemName = "§dHeroic Hyperion §6✪✪✪✪✪§c➌",
+            Reforge = Core.ItemReferences.Reforge.Heroic,
+            Category = Core.Category.WEAPON,
+            Tier = Core.Tier.MYTHIC,
+            Bin = true,
+            FlatenedNBT = new()
+            {
+                { "COMBAT_0", "PERFECT" },
+                { "COMBAT_0_gem", "SAPPHIRE" },
+                { "RUNE_HEARTSPLOSION", "3" },
+                { "SAPPHIRE_0", "PERFECT" },
+                { "art_of_war_count", "1" },
+                { "champion_combat_xp", "3000000" },
+                { "hpc", "15" },
+                { "rarity_upgrades", "1" },
+                { "uid", "eab15910cd55" },
+                { "unlocked_slots", "COMBAT_0,SAPPHIRE_0" },
+                { "upgrade_level", "8" },
+                { "uuid", "2a1fb080-22b3-46b9-a304-eab15910cd55" }
+            },
+            Enchantments = HyperionSellEnchantments()
+        };
+
+        bazaarApi.Setup(p => p.GetAllPricesAsync(0, default)).ReturnsAsync(() => new());
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), null, 0, default))
+            .ReturnsAsync(() => new() { Median = 0 });
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(
+                "RUNE_HEARTSPLOSION",
+                It.Is<Dictionary<string, string>>(filters => filters.Count == 1 && filters["RUNE_HEARTSPLOSION"] == "1"),
+                0,
+                default))
+            .ReturnsAsync(() => new() { Median = 1_000_000 });
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("RUNE_HEARTSPLOSION", null, 0, default))
+            .ReturnsAsync(() => new() { Median = 64_000_000 });
+
+        var changes = await service.GetChanges(buy, sell);
+        var runeChange = changes.Single(c => c.Label == "Used 12x RUNE_HEARTSPLOSION to upgraded RUNE_HEARTSPLOSION to 3");
+
+        Assert.That(runeChange.Amount, Is.EqualTo(-12_000_000), JsonConvert.SerializeObject(changes, Formatting.Indented));
+    }
+
+    private static List<Core.Enchantment> HyperionPurchaseEnchantments() => new()
+    {
+        new() { Type = Core.Enchantment.EnchantmentType.venomous, Level = 6 },
+        new() { Type = Core.Enchantment.EnchantmentType.sharpness, Level = 6 },
+        new() { Type = Core.Enchantment.EnchantmentType.life_steal, Level = 4 },
+        new() { Type = Core.Enchantment.EnchantmentType.giant_killer, Level = 6 },
+        new() { Type = Core.Enchantment.EnchantmentType.scavenger, Level = 5 },
+        new() { Type = Core.Enchantment.EnchantmentType.ultimate_wise, Level = 5 },
+        new() { Type = Core.Enchantment.EnchantmentType.smite, Level = 6 },
+        new() { Type = Core.Enchantment.EnchantmentType.looting, Level = 4 },
+        new() { Type = Core.Enchantment.EnchantmentType.luck, Level = 6 },
+        new() { Type = Core.Enchantment.EnchantmentType.critical, Level = 6 },
+        new() { Type = Core.Enchantment.EnchantmentType.fire_aspect, Level = 3 },
+        new() { Type = Core.Enchantment.EnchantmentType.bane_of_arthropods, Level = 6 },
+        new() { Type = Core.Enchantment.EnchantmentType.ender_slayer, Level = 6 },
+        new() { Type = Core.Enchantment.EnchantmentType.impaling, Level = 5 },
+        new() { Type = Core.Enchantment.EnchantmentType.cleave, Level = 5 },
+        new() { Type = Core.Enchantment.EnchantmentType.knockback, Level = 2 },
+        new() { Type = Core.Enchantment.EnchantmentType.experience, Level = 3 },
+        new() { Type = Core.Enchantment.EnchantmentType.vampirism, Level = 5 },
+        new() { Type = Core.Enchantment.EnchantmentType.execute, Level = 5 },
+        new() { Type = Core.Enchantment.EnchantmentType.first_strike, Level = 4 },
+        new() { Type = Core.Enchantment.EnchantmentType.dragon_hunter, Level = 5 },
+        new() { Type = Core.Enchantment.EnchantmentType.thunderlord, Level = 5 },
+        new() { Type = Core.Enchantment.EnchantmentType.cubism, Level = 5 },
+        new() { Type = Core.Enchantment.EnchantmentType.lethality, Level = 5 }
+    };
+
+    private static List<Core.Enchantment> HyperionSellEnchantments() => new()
+    {
+        new() { Type = Core.Enchantment.EnchantmentType.cleave, Level = 6 },
+        new() { Type = Core.Enchantment.EnchantmentType.tabasco, Level = 3 },
+        new() { Type = Core.Enchantment.EnchantmentType.titan_killer, Level = 7 },
+        new() { Type = Core.Enchantment.EnchantmentType.venomous, Level = 7 },
+        new() { Type = Core.Enchantment.EnchantmentType.champion, Level = 10 },
+        new() { Type = Core.Enchantment.EnchantmentType.thunderlord, Level = 7 },
+        new() { Type = Core.Enchantment.EnchantmentType.dragon_hunter, Level = 6 },
+        new() { Type = Core.Enchantment.EnchantmentType.sharpness, Level = 6 },
+        new() { Type = Core.Enchantment.EnchantmentType.vampirism, Level = 6 },
+        new() { Type = Core.Enchantment.EnchantmentType.scavenger, Level = 5 },
+        new() { Type = Core.Enchantment.EnchantmentType.ultimate_wise, Level = 5 },
+        new() { Type = Core.Enchantment.EnchantmentType.experience, Level = 4 },
+        new() { Type = Core.Enchantment.EnchantmentType.mana_steal, Level = 3 },
+        new() { Type = Core.Enchantment.EnchantmentType.lethality, Level = 6 },
+        new() { Type = Core.Enchantment.EnchantmentType.looting, Level = 4 },
+        new() { Type = Core.Enchantment.EnchantmentType.luck, Level = 6 },
+        new() { Type = Core.Enchantment.EnchantmentType.critical, Level = 6 },
+        new() { Type = Core.Enchantment.EnchantmentType.fire_aspect, Level = 3 },
+        new() { Type = Core.Enchantment.EnchantmentType.ender_slayer, Level = 6 },
+        new() { Type = Core.Enchantment.EnchantmentType.impaling, Level = 5 },
+        new() { Type = Core.Enchantment.EnchantmentType.smite, Level = 7 },
+        new() { Type = Core.Enchantment.EnchantmentType.knockback, Level = 2 },
+        new() { Type = Core.Enchantment.EnchantmentType.magmarizer, Level = 5 },
+        new() { Type = Core.Enchantment.EnchantmentType.cubism, Level = 5 },
+        new() { Type = Core.Enchantment.EnchantmentType.bane_of_arthropods, Level = 7 },
+        new() { Type = Core.Enchantment.EnchantmentType.execute, Level = 5 },
+        new() { Type = Core.Enchantment.EnchantmentType.first_strike, Level = 4 }
+    };
+
     [Test]
     public async Task AoteReforgeNaming()
     {
