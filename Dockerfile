@@ -1,6 +1,7 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /build
-RUN git clone --depth=1 https://github.com/Coflnet/HypixelSkyblock.git dev
+RUN git clone https://github.com/Coflnet/HypixelSkyblock.git dev \
+    && git -C dev checkout 5ecabbd00aa2ad1e1e5e09c324b12ffb103fe889
 WORKDIR /build/sky
 COPY SkyFlipTracker.csproj SkyFlipTracker.csproj
 RUN dotnet restore
