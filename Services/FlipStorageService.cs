@@ -332,8 +332,9 @@ public class FlipStorageService
     private async Task<IEnumerable<PastFlip>> GetMissedFlipPartition(
         LowPricedAuction.FinderType finderType, DateTime start, DateTime end, int limit)
     {
+        var finderTypeValue = (int)finderType;
         return await unknownFlips
-            .Where(flip => flip.FinderType == finderType && flip.SellTime >= start && flip.SellTime <= end)
+            .Where(flip => (int)flip.FinderType == finderTypeValue && flip.SellTime >= start && flip.SellTime <= end)
             .Take(limit)
             .ExecuteAsync();
     }
