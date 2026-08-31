@@ -292,6 +292,52 @@ public class FlipStorageService
             .Select(NormalizeFlipTimestamps);
     }
 
+    /// <summary>
+    /// Gets a globally bounded cohort from the missed-flip table.
+    /// </summary>
+    public virtual async Task<IReadOnlyList<PastFlip>> GetMissedFlips(DateTime start, DateTime end, string cohort, int limit)
+    {
+        var finderTypes = GetMissedFlipFinderTypes(cohort);
+        var partitionResults = await Task.WhenAll(finderTypes.Select(finderType =>
+            GetMissedFlipPartition(finderType, start, end, limit)));
+        return MergeMissedFlips(partitionResults, limit);
+    }
+
+    internal static IReadOnlyList<LowPricedAuction.FinderType> GetMissedFlipFinderTypes(string cohort)
+    {
+        if (cohort == "finder_unknown")
+            return [LowPricedAuction.FinderType.UNKOWN];
+        if (cohort == "blocked_or_outsped")
+            return Enum.GetValues<LowPricedAuction.FinderType>()
+                .Where(finderType => (int)finderType != 0)
+                .Distinct()
+                .OrderBy(finderType => (int)finderType)
+                .ToList();
+        throw new ArgumentOutOfRangeException(nameof(cohort));
+    }
+
+    internal static IReadOnlyList<PastFlip> MergeMissedFlips(IEnumerable<IEnumerable<PastFlip>> partitions, int limit)
+    {
+        return partitions.SelectMany(partition => partition)
+            .OrderByDescending(flip => flip.SellTime)
+            .ThenBy(flip => (int)flip.FinderType)
+            .ThenBy(flip => flip.Uid)
+            .ThenBy(flip => flip.PurchaseAuctionId)
+            .ThenBy(flip => flip.SellAuctionId)
+            .Take(limit)
+            .Select(NormalizeFlipTimestamps)
+            .ToList();
+    }
+
+    private async Task<IEnumerable<PastFlip>> GetMissedFlipPartition(
+        LowPricedAuction.FinderType finderType, DateTime start, DateTime end, int limit)
+    {
+        return await unknownFlips
+            .Where(flip => flip.FinderType == finderType && flip.SellTime >= start && flip.SellTime <= end)
+            .Take(limit)
+            .ExecuteAsync();
+    }
+
     public async Task<IEnumerable<UnsoldFlip>> GetUnsoldFlips(DateTime olderThan, int amount)
     {
         return await unsoldFlips.Where(f => f.Slot == 0 && f.AuctionStart < olderThan).Take(amount).ExecuteAsync();
