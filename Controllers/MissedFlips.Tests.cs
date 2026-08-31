@@ -1,13 +1,20 @@
 using System;
 using System.Collections;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Threading.Tasks;
+using Cassandra;
+using Cassandra.Data.Linq;
+using Cassandra.Mapping;
 using Coflnet.Sky.Core;
 using Coflnet.Sky.SkyAuctionTracker.Models;
 using Coflnet.Sky.SkyAuctionTracker.Services;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.Mvc;
+using Moq;
 using NUnit.Framework;
 
 namespace Coflnet.Sky.SkyAuctionTracker.Controllers;
@@ -143,18 +150,61 @@ class MissedFlipsTests
     }
 
     [Test]
-    public void MissedFlipPartitionQueryDoesNotAllowFiltering()
+    public async Task MissedFlipQueriesBindExactIntegerPartitionsWithBoundsAndLimit()
     {
-        var projectDirectory = FindProjectDirectory();
-        var source = File.ReadAllText(Path.Combine(projectDirectory, "Services", "FlipStorageService.cs"));
-        var methodStart = source.IndexOf("private async Task<IEnumerable<PastFlip>> GetMissedFlipPartition", StringComparison.Ordinal);
-        var methodEnd = source.IndexOf("public async Task<IEnumerable<UnsoldFlip>>", methodStart, StringComparison.Ordinal);
+        using var cluster = Cluster.Builder().AddContactPoint("127.0.0.1").Build();
+        var service = CreateStorageWithCapturedStatements(cluster, out var queries, out var statements);
+        var start = Utc(0).UtcDateTime;
+        var end = Utc(1).UtcDateTime;
 
-        Assert.That(methodStart, Is.GreaterThanOrEqualTo(0));
-        Assert.That(methodEnd, Is.GreaterThan(methodStart));
-        var method = source[methodStart..methodEnd];
-        Assert.That(method, Does.Contain("flip.FinderType == finderType"));
-        Assert.That(method, Does.Not.Contain("AllowFiltering"));
+        await service.GetMissedFlips(start, end, "finder_unknown", 7);
+        await service.GetMissedFlips(start, end, "blocked_or_outsped", 7);
+
+        var expectedPartitions = Enum.GetValues<LowPricedAuction.FinderType>()
+            .Select(value => (int)value).Distinct().Order().ToList();
+        var bindings = statements.Select(statement => statement.QueryValues).ToList();
+        Assert.Multiple(() =>
+        {
+            Assert.That(queries, Has.Count.EqualTo(1));
+            Assert.That(queries.Single(), Does.Contain("WHERE FinderType = ?"));
+            Assert.That(queries.Single(), Does.Contain("SellTime >= ?"));
+            Assert.That(queries.Single(), Does.Contain("SellTime <= ?"));
+            Assert.That(queries.Single(), Does.Contain("LIMIT ?"));
+            Assert.That(queries.Single(), Does.Not.Contain("ALLOW FILTERING"));
+            Assert.That(bindings.Select(values => values[0]).Order(), Is.EqualTo(expectedPartitions));
+            Assert.That(bindings.Select(values => values[0]), Has.All.TypeOf<int>());
+            Assert.That(bindings.Select(values => values[1]), Has.All.EqualTo(start));
+            Assert.That(bindings.Select(values => values[2]), Has.All.EqualTo(end));
+            Assert.That(bindings.Select(values => values[3]), Has.All.EqualTo(7));
+        });
+    }
+
+    private static FlipStorageService CreateStorageWithCapturedStatements(
+        ICluster cluster, out ConcurrentQueue<string> queries, out ConcurrentQueue<IStatement> statements)
+    {
+        var session = new Mock<ISession>();
+        queries = new ConcurrentQueue<string>();
+        statements = new ConcurrentQueue<IStatement>();
+        var capturedQueries = queries;
+        var capturedStatements = statements;
+        session.SetupGet(value => value.Cluster).Returns(cluster);
+        session.SetupGet(value => value.Keyspace).Returns("flips");
+        session.Setup(value => value.PrepareAsync(It.IsAny<string>()))
+            .Callback<string>(query => capturedQueries.Enqueue(query))
+            .ReturnsAsync(new PreparedStatement());
+        session.Setup(value => value.ExecuteAsync(It.IsAny<IStatement>(), It.IsAny<string>()))
+            .Callback<IStatement, string>((statement, _) => capturedStatements.Enqueue(statement))
+            .ReturnsAsync(new RowSet());
+        var service = new FlipStorageService(
+            Mock.Of<ILogger<FlipStorageService>>(), Mock.Of<IConfiguration>(), session.Object);
+        var unknownFlips = new Table<PastFlip>(session.Object, new MappingConfiguration().Define(new Map<PastFlip>()
+            .PartitionKey(flip => flip.FinderType)
+            .ClusteringKey(flip => flip.SellTime, SortOrder.Descending)
+            .ClusteringKey(flip => flip.Uid)
+            .Column(flip => flip.FinderType, column => column.WithDbType<int>())), "unknown_flips2");
+        typeof(FlipStorageService).GetField("unknownFlips", BindingFlags.Instance | BindingFlags.NonPublic)
+            .SetValue(service, unknownFlips);
+        return service;
     }
 
     private static PastFlip Flip(DateTime sellTime, int finderType, long uid, string purchaseAuctionId)
@@ -180,11 +230,4 @@ class MissedFlipsTests
         return (string)validate.Invoke(null, [start, end, cohort, limit]);
     }
 
-    private static string FindProjectDirectory()
-    {
-        var directory = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);
-        while (directory != null && !File.Exists(Path.Combine(directory.FullName, "SkyFlipTracker.csproj")))
-            directory = directory.Parent;
-        return directory?.FullName ?? throw new DirectoryNotFoundException("Could not locate the project source directory.");
-    }
 }
