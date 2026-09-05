@@ -308,9 +308,10 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
 
         private async Task CalculateAndIndex(List<SaveAuction> sells, bool extraLog = false)
         {
-            var sellLookup = sells.Where(s => s.FlatenedNBT.Where(n => n.Key == "uid").Any() && s.HighestBidAmount > 0)
-                                .GroupBy(s => new { uid = s.FlatenedNBT.Where(n => n.Key == "uid").First(), s.End }).Select(g => g.First())
-                                .ToDictionary(s => s.FlatenedNBT.Where(n => n.Key == "uid").Select(n => n.Value).FirstOrDefault());
+            var orderedSells = sells.Where(s => s.FlatenedNBT.Any(n => n.Key == "uid") && s.HighestBidAmount > 0)
+                                .GroupBy(s => new { uid = GetItemUid(s), s.End }).Select(g => g.First())
+                                .OrderBy(s => s.End).ToList();
+            var sellLookup = orderedSells.GroupBy(GetItemUid).ToDictionary(g => g.Key, g => g.Last());
             var tradeLookupTask = transactionApi.TransactionUuidItemIdPostAsync(GetItemUuids(sells));
             var buyLookupRequest = new Api.Client.Model.InventoryBatchLookup(
                 sells.Select(s => s.ProfileId).FirstOrDefault(p => !string.IsNullOrWhiteSpace(p)) ?? Guid.Empty.ToString("N"),
@@ -323,44 +324,38 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             var exists = buyLookup.Data;
             if (tradeUuidLookup.Count > 0)
                 logger.LogInformation($"Found {tradeUuidLookup.Count} trade items");
-            if (exists.Count == 0)
-            {
-                logger.LogInformation($"no purchases found {sells.Count()}");
-                return;
-            }
             if (extraLog)
             {
                 logger.LogInformation($"Buy lookup {JsonConvert.SerializeObject(exists)}");
                 logger.LogInformation($"Sell lookup {JsonConvert.SerializeObject(sellLookup)}");
             }
-            var soldAuctions = exists.Select(item => new
+            var soldAuctions = MatchPurchases(orderedSells, exists);
+            if (soldAuctions.Count == 0 && tradeUuidLookup.Count == 0)
             {
-                sell = sellLookup.GetValueOrDefault(item.Key),
-                buy = item.Value.Where(v => v.Uuid != sellLookup.GetValueOrDefault(item.Key)?.Uuid
-                                        && (v.Timestamp < sellLookup.GetValueOrDefault(item.Key)?.End
-                                        || v.Timestamp > DateTime.UtcNow))
-                                    .OrderByDescending(u => u.Timestamp).FirstOrDefault()
-            }).Where(item => item.buy != null).ToList();
+                logger.LogInformation($"no purchases found {sells.Count()}");
+                return;
+            }
             if (extraLog)
                 logger.LogInformation($"Found {soldAuctions.Count} sold auctions {JsonConvert.SerializeObject(soldAuctions)}");
             var purchaseUid = soldAuctions.Select(u => GetId(u.buy.Uuid)).ToHashSet();
+            var matchedItemUids = soldAuctions.Select(match => GetItemUid(match.sell)).ToHashSet();
             foreach (var tradeSource in tradeUuidLookup)
             {
                 var uid = tradeSource.Key.Split("-").Last();
-                if (exists.TryGetValue(uid, out var existing) && soldAuctions.Count > 0)
+                if (matchedItemUids.Contains(uid))
                     continue; // know buy properties
                 var sell = sellLookup.GetValueOrDefault(uid) ?? throw new Exception($"Could not find sell for trade item {uid} {tradeSource.Key}");
-                soldAuctions.Add(new
-                {
-                    sell = sell,
-                    buy = new Api.Client.Model.ItemSell(
+                soldAuctions.Add((
+                    sell,
+                    new Api.Client.Model.ItemSell(
                         seller: Guid.Empty.ToString("N"),
                         uuid: tradeSource.Value.OrderByDescending(t => t).First().ToString(),
                         buyer: Guid.Empty.ToString("N"),
                         itemTag: sell.Tag,
                         highestBid: 0,
-                        timestamp: sell.End)
-                });
+                        timestamp: sell.End),
+                    (SaveAuction)null));
+                matchedItemUids.Add(uid);
                 if (extraLog)
                     logger.LogInformation($"Added trade source {JsonConvert.SerializeObject(tradeSource)} for sell {JsonConvert.SerializeObject(sell)}");
             }
@@ -387,7 +382,9 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     logger.LogInformation($"Already stored {item.sell.Uuid}");
                     return;
                 }
-                var buy = await GetAuction(item.buy.Uuid, item.sell, token).ConfigureAwait(false);
+                var buy = item.batchBuy == null
+                    ? await GetAuction(item.buy.Uuid, item.sell, token).ConfigureAwait(false)
+                    : CopyAsApiAuction(item.batchBuy);
                 try
                 {
                     var sell = item.sell;
@@ -483,6 +480,45 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 }
             });
             await noUidTask;
+        }
+
+        private static string GetItemUid(SaveAuction auction)
+        {
+            return auction.FlatenedNBT.First(n => n.Key == "uid").Value;
+        }
+
+        private static List<(SaveAuction sell, Api.Client.Model.ItemSell buy, SaveAuction batchBuy)> MatchPurchases(
+            List<SaveAuction> orderedSells, Dictionary<string, List<Api.Client.Model.ItemSell>> existingPurchases)
+        {
+            return orderedSells.Select(sell =>
+            {
+                var uid = GetItemUid(sell);
+                var apiBuy = existingPurchases.GetValueOrDefault(uid)?.Where(v => v.Uuid != sell.Uuid
+                                        && (v.Timestamp < sell.End || v.Timestamp > DateTime.UtcNow))
+                                    .OrderByDescending(v => v.Timestamp).FirstOrDefault();
+                var batchBuy = orderedSells.Where(candidate => GetItemUid(candidate) == uid
+                                        && candidate.Uuid != sell.Uuid && candidate.End < sell.End)
+                                    .OrderByDescending(candidate => candidate.End).FirstOrDefault();
+                if (batchBuy != null && (apiBuy == null || batchBuy.End >= apiBuy.Timestamp))
+                    return (sell, ToItemSell(batchBuy), batchBuy);
+                return (sell, apiBuy, (SaveAuction)null);
+            }).Where(match => match.Item2 != null).ToList();
+        }
+
+        private static ApiSaveAuction CopyAsApiAuction(SaveAuction auction)
+        {
+            return JsonConvert.DeserializeObject<ApiSaveAuction>(JsonConvert.SerializeObject(auction));
+        }
+
+        private static Api.Client.Model.ItemSell ToItemSell(SaveAuction auction)
+        {
+            return new Api.Client.Model.ItemSell(
+                seller: auction.AuctioneerId,
+                uuid: auction.Uuid,
+                buyer: auction.Bids?.OrderByDescending(b => b.Amount).FirstOrDefault()?.Bidder ?? Guid.Empty.ToString("N"),
+                itemTag: auction.Tag,
+                highestBid: auction.HighestBidAmount,
+                timestamp: auction.End);
         }
 
         private async Task MissedFlip(PastFlip flip, string v, SaveAuction buy)
