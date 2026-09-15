@@ -117,7 +117,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     var flips = flipsToSave.ToList();
                     var lookup = flips.Select(f => f.AuctionId).ToHashSet();
                     var existing = await db.Flips.Where(f => lookup.Contains(f.AuctionId)).ToListAsync();
-                    var newFlips = flips.Where(f => !existing.Where(ex => f.AuctionId == f.AuctionId && ex.FinderType == f.FinderType).Any()).ToList();
+                    var newFlips = flips.Where(f => !existing.Where(ex => ex.AuctionId == f.AuctionId && ex.FinderType == f.FinderType).Any()).ToList();
                     foreach (var item in newFlips)
                     {
                         if (item.Timestamp < minTime)
