@@ -165,6 +165,163 @@ public class TradeCostRegressionTests
         Assert.That(result.change.Label, Does.Contain("unknown"));
     }
 
+    /// <summary>A bundle bought for coins charges each item its share of the estimated value.</summary>
+    [Test]
+    public async Task BundleCostFollowsEstimatedValueShare()
+    {
+        var flips = await BundleFlips(BundleSales);
+
+        Assert.That(flips[0].cost, Is.EqualTo(1_761_104_357), "the drill carried 181,250,000, an even sixteenth");
+        Assert.That(flips[1].cost, Is.EqualTo(506_746_191));
+        Assert.That(flips.Sum(f => f.cost), Is.EqualTo(BundleCoins).Within(16));
+        Assert.That(BundleSales.Sum() - flips.Sum(f => f.cost), Is.EqualTo(BundleSales.Sum() - BundleCoins).Within(16));
+        foreach (var flip in flips)
+        {
+            Assert.That((int)flip.flags & (4 | 16), Is.EqualTo(4));
+            Assert.That(flip.change.Label, Does.StartWith("Item was traded with other items for about " + flip.cost));
+            Assert.That(flip.change.Amount, Is.Zero);
+        }
+    }
+
+    /// <summary>Without an estimate for every item the even split stays but is marked uncertain.</summary>
+    [Test]
+    public async Task BundleWithoutEstimatesKeepsEvenSplitMarkedUncertain()
+    {
+        var flips = await BundleFlips(BundleSales.Take(15).ToArray());
+
+        foreach (var flip in flips)
+        {
+            Assert.That(flip.cost, Is.EqualTo(181_250_000));
+            Assert.That((int)flip.flags & (4 | 16), Is.EqualTo(4 | 16));
+            Assert.That(flip.change.Label, Does.Contain("even split"));
+            Assert.That(flip.change.Amount, Is.Zero);
+        }
+    }
+
+    /// <summary>A bundle item never auctioned before is charged its value share from one valuation of the trade.</summary>
+    [Test]
+    public async Task TradeOnlyBundleIsValuedOnceAndMarkedMultiItem()
+    {
+        var bundle = CreateBundle(BundleSales);
+
+        var saved = await IndexBundle(bundle, null);
+
+        Assert.That(saved.Count, Is.EqualTo(16));
+        Assert.That(saved.Single(f => f.ItemTag == "DIVAN_DRILL").PurchaseCost, Is.EqualTo(1_761_104_357));
+        Assert.That(saved.Sum(f => f.Profit), Is.EqualTo(BundleSales.Sum() - BundleCoins).Within(16));
+        Assert.That(saved.Select(f => (int)f.Flags), Is.All.EqualTo(2 | 4));
+        Assert.That(saved.Select(f => f.ProfitChanges.Single().Amount), Is.All.Zero);
+        bundle.Sniper.Verify(x => x.GetPrices(It.IsAny<IEnumerable<SaveAuction>>()), Times.Once);
+        // one read for each item's own state and one for the shared valuation
+        bundle.Items.Verify(x => x.ApiItemsIdGetAsync(It.IsAny<long>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Exactly(32));
+    }
+
+    /// <summary>An even-split cost is stored without profit, summary event or missed-flip claim.</summary>
+    [Test]
+    public async Task UncertainBundleCostReportsNoProfit()
+    {
+        // An uninitialized producer and the null scope factory both throw if a summary or notification is attempted.
+        var producer = (FlipSumaryEventProducer)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(FlipSumaryEventProducer));
+
+        var saved = await IndexBundle(CreateBundle(BundleSales.Take(15).ToArray()), producer);
+
+        Assert.That(saved.Count, Is.EqualTo(16));
+        Assert.That(saved.Select(f => f.PurchaseCost), Is.All.EqualTo(181_250_000));
+        Assert.That(saved.Select(f => f.Profit), Is.All.Zero);
+        Assert.That(saved.Select(f => (int)f.Flags), Is.All.EqualTo(2 | 4 | 16));
+        Assert.That(saved.Select(f => f.ProfitChanges.Single().Label), Is.All.Contain("even split"));
+        var missed = typeof(TrackerService).GetMethod("MissedFlip", BindingFlags.Instance | BindingFlags.NonPublic);
+        await (Task)missed.Invoke(CreateTracker(Transactions(new()).Object), new object[]
+            { new PastFlip { PurchaseCost = 181_250_000, Profit = 1_883_493_039, Flags = (FlipFlags)16 }, "missed", new SaveAuction() });
+    }
+
+    // Reported bundle: sixteen items received for 2.9B coins, resold for about 3.4B. The drill and pendant
+    // values are the recorded sale allocations of their flips; the trade rows themselves could not be read,
+    // so the other fourteen items are placeholders sharing the remainder and the trade reuses the class times.
+    private const long BundleCoins = 2_900_000_000;
+    private static readonly long[] BundleSales =
+        new long[] { 2_064_743_040, 594_116_224 }.Concat(Enumerable.Repeat(52_938_624L, 14)).ToArray();
+
+    private sealed record Bundle(List<PlayerState.Client.Model.Item> States, Mock<PlayerState.Client.Api.IItemsApi> Items,
+        Mock<ISniperClient> Sniper, Mock<PlayerState.Client.Api.ITransactionApi> Api, RepresentationConverter Converter);
+
+    /// <summary>The bundle purchase with sniper estimates in bundle order; items beyond the estimates have none.</summary>
+    private static Bundle CreateBundle(long[] estimates)
+    {
+        var states = BundleSales.Select((_, i) => JObject.FromObject(new
+        {
+            id = 3000000 + i,
+            tag = i == 0 ? "DIVAN_DRILL" : i == 1 ? "DIVAN_PENDANT" : $"BUNDLE_ITEM_{i}",
+            itemName = i == 0 ? "Lustrous Divan's Drill" : i == 1 ? "Blazing Pendant of Divan" : $"Bundle item {i}",
+            count = 1,
+            extraAttributes = new { uuid = $"00000000-0000-0000-0000-{3000000 + i:x12}", uid = $"{3000000 + i:x12}" }
+        }).ToObject<PlayerState.Client.Model.Item>()).ToList();
+        var rows = states.Select(s => Entry(s.Id.Value, 33, 1, Bought)).Append(Entry(Coins, 34, BundleCoins * 10, Bought)).ToList();
+        var items = new Mock<PlayerState.Client.Api.IItemsApi>();
+        items.Setup(x => x.ApiItemsFindUuidPostAsync(It.IsAny<List<PlayerState.Client.Model.ItemIdSearch>>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((List<PlayerState.Client.Model.ItemIdSearch> search, int index, CancellationToken token) =>
+                states.Where(s => Guid.Parse(s.ExtraAttributes["uuid"].ToString()) == search[0].Uuid).ToList());
+        items.Setup(x => x.ApiItemsIdGetAsync(It.IsAny<long>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((long id, int index, CancellationToken token) => states.Single(s => s.Id == id));
+        var sniper = new Mock<ISniperClient>();
+        sniper.Setup(s => s.GetPrices(It.IsAny<IEnumerable<SaveAuction>>()))
+            .ReturnsAsync((IEnumerable<SaveAuction> auctions) => auctions.Select((_, i) =>
+                i < estimates.Length ? new Sniper.Client.Model.PriceEstimate { Median = estimates[i] } : null).ToList());
+        return new(states, items, sniper, Transactions(rows), new RepresentationConverter(NullLogger<RepresentationConverter>.Instance, sniper.Object));
+    }
+
+    private static SaveAuction BundleSale(Bundle bundle, int index)
+    {
+        var sell = bundle.Converter.FromItemRepresent(bundle.States[index]);
+        sell.AuctioneerId = Player.ToString("N");
+        sell.Uuid = Guid.Empty.ToString("N");
+        sell.UId = bundle.States[index].Id.Value;
+        sell.End = Sold;
+        sell.HighestBidAmount = BundleSales[index];
+        return sell;
+    }
+
+    /// <summary>Runs every bundle item through the linked-auction trade check.</summary>
+    private static async Task<List<(long cost, FlipFlags flags, PastFlip.ProfitChange change)>> BundleFlips(long[] estimates)
+    {
+        var bundle = CreateBundle(estimates);
+        var tracker = new TrackerService(null, NullLogger<TrackerService>.Instance, null, null, null, null,
+            null, new ActivitySource("bundle-trade"), null, null, null, bundle.Items.Object, bundle.Api.Object, bundle.Converter);
+        var method = typeof(TrackerService).GetMethod("CheckTrade", BindingFlags.Instance | BindingFlags.NonPublic);
+        var flips = new List<(long, FlipFlags, PastFlip.ProfitChange)>();
+        for (var i = 0; i < bundle.States.Count; i++)
+        {
+            var buy = new ApiSaveAuction { Bids = new() { new() { Bidder = "prior-owner" } }, FlatenedNBT = new(), End = Bought.AddDays(-10) };
+            var result = await (Task<(FlipFlags flags, PastFlip.ProfitChange change)>)method.Invoke(tracker, new object[] { buy, BundleSale(bundle, i) });
+            flips.Add((buy.HighestBidAmount, result.flags, result.change));
+        }
+        return flips;
+    }
+
+    /// <summary>Sells the whole bundle in one batch, each item's only known source being the trade.</summary>
+    private static async Task<List<PastFlip>> IndexBundle(Bundle bundle, FlipSumaryEventProducer producer)
+    {
+        bundle.Api.Setup(x => x.TransactionUuidItemIdPostAsync(It.IsAny<List<Guid>>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(bundle.States.ToDictionary(s => s.ExtraAttributes["uuid"].ToString(), s => new List<long> { s.Id.Value }));
+        var auctions = new Mock<Api.Client.Api.IAuctionsApi>();
+        auctions.Setup(x => x.ApiAuctionsUidsSoldPostWithHttpInfoAsync(It.IsAny<Api.Client.Model.InventoryBatchLookup>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Api.Client.Client.ApiResponse<Dictionary<string, List<Api.Client.Model.ItemSell>>>(
+                System.Net.HttpStatusCode.OK, null, new Dictionary<string, List<Api.Client.Model.ItemSell>>()));
+        var saved = new System.Collections.Concurrent.ConcurrentBag<PastFlip>();
+        var storage = new Mock<FlipStorageService>(null, null, null);
+        storage.Setup(x => x.SaveFlip(It.IsAny<PastFlip>())).Callback<PastFlip>(saved.Add).Returns(Task.CompletedTask);
+        var changes = new Mock<ProfitChangeService>(null, null, null, null, null, null, null, null, null);
+        changes.Setup(x => x.GetChanges(It.IsAny<SaveAuction>(), It.IsAny<SaveAuction>()))
+            .Returns(() => Task.FromResult(new List<PastFlip.ProfitChange>()));
+        var tracker = new TrackerService(null, NullLogger<TrackerService>.Instance, auctions.Object,
+            producer, null, changes.Object, storage.Object, new ActivitySource("bundle-sale"),
+            null, null, new Mock<Settings.Client.Api.ISettingsApi>().Object, bundle.Items.Object, bundle.Api.Object, bundle.Converter);
+
+        await tracker.IndexCassandra(bundle.States.Select((_, i) => BundleSale(bundle, i)).ToList());
+
+        return saved.ToList();
+    }
+
     private static List<SaveAuction> IncidentSales(JObject evidence,
         Mock<PlayerState.Client.Api.IItemsApi> items, RepresentationConverter converter,
         Dictionary<string, List<long>> lookup)

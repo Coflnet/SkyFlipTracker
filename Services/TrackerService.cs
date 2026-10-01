@@ -43,6 +43,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
         readonly Counter userFlipCounter = Metrics.CreateCounter("sky_fliptracker_user_flip", "How many flips were done by a user");
 
         private ConcurrentQueue<long> flipIds = new();
+        // valuations of the bundles met while one batch of sells is processed, so each trade is priced once
+        private static readonly AsyncLocal<ConcurrentDictionary<(Guid, DateTime), Lazy<Task<Dictionary<long, long>>>>> bundleShares = new();
 
         public TrackerService(
             TrackerDbContext db,
@@ -312,6 +314,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                                 .GroupBy(s => new { uid = GetItemUid(s), s.End }).Select(g => g.First())
                                 .OrderBy(s => s.End).ToList();
             var sellLookup = orderedSells.GroupBy(GetItemUid).ToDictionary(g => g.Key, g => g.Last());
+            bundleShares.Value = new();
             var tradeLookupTask = transactionApi.TransactionUuidItemIdPostAsync(GetItemUuids(sells));
             var buyLookupRequest = new Api.Client.Model.InventoryBatchLookup(
                 sells.Select(s => s.ProfileId).FirstOrDefault(p => !string.IsNullOrWhiteSpace(p)) ?? Guid.Empty.ToString("N"),
@@ -401,7 +404,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     (FlipFlags flags, var change) = await CheckTrade(buy, sell);
                     var purchaseId = GetId(buy.Uuid);
                     var flipFound = finders.Where(f => f != null && f.AuctionId == purchaseId).OrderBy(f => f.Timestamp).FirstOrDefault();
-                    if (buy.HighestBidAmount >= 0)
+                    var unmeasured = buy.HighestBidAmount < 0 || flags.HasFlag(FlipFlags.UncertainCost);
+                    if (!unmeasured)
                         flipSumaryEventProducer?.Produce(new FlipSumaryEvent()
                         {
                             Flipper = item.sell.AuctioneerId,
@@ -429,8 +433,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                         throw;
                     }
                     var profit = (long)(item.sell.HighestBidAmount - buy?.HighestBidAmount ?? 0) + changes.Sum(c => c.Amount);
-                    if (buy.HighestBidAmount < 0 || sell.End - buy.End > TimeSpan.FromDays(14))
-                        profit = 0; // Unknown cost is flagged; older outcomes are not counted as flips.
+                    if (unmeasured || sell.End - buy.End > TimeSpan.FromDays(14))
+                        profit = 0; // Unknown and uncertain costs are flagged; older outcomes are not counted as flips.
                     var name = GetDisplayName(buy, sell);
                     if (buy.AuctioneerId == null)
                         logger.LogInformation($"trade name determined {item.buy.ItemTag}");
@@ -524,7 +528,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
 
         private async Task MissedFlip(PastFlip flip, string v, SaveAuction buy)
         {
-            if (flip.PurchaseCost < 0 || flip.Flags.HasFlag(FlipFlags.UnknownCost))
+            if (flip.PurchaseCost < 0 || flip.Flags.HasFlag(FlipFlags.UnknownCost) || flip.Flags.HasFlag(FlipFlags.UncertainCost))
                 return;
             using var scope = scopeFactory.CreateScope();
             var configuration = scope.ServiceProvider.GetRequiredService<IConfiguration>();
@@ -706,8 +710,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             if (buy.Bids == null)
             {
                 if (buy.HighestBidAmount < 0)
-                    return UnknownTradeCost(FlipFlags.ViaTrade);
-                return (FlipFlags.ViaTrade, new PastFlip.ProfitChange($"Item was bought via trade for {buy.HighestBidAmount} coins", -1));
+                    return UnknownTradeCost(FlipFlags.ViaTrade | buy.TradeFlags);
+                return TradeCostChange(FlipFlags.ViaTrade | buy.TradeFlags, buy.HighestBidAmount, "bought via trade");
             }
             if (buy.Bids.OrderByDescending(b => b.Amount).First().Bidder == sell.AuctioneerId || itemUuid == default)
             {
@@ -746,22 +750,17 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             }
             if (itemTrade.Count > 0)
             {
-                (int itemCount, long tradeEstimate, _) = await GetTradeValue(itemTrade, Guid.Parse(sell.AuctioneerId), sell.Start == default ? sell.End : sell.Start);
-                flags |= FlipFlags.ViaTrade;
+                (int itemCount, long tradeEstimate, var tradeItems) = await GetTradeValue(itemTrade, Guid.Parse(sell.AuctioneerId), sell.Start == default ? sell.End : sell.Start);
+                var acquisition = GetRelevantTradeEntry(itemTrade, Guid.Parse(sell.AuctioneerId), sell.Start == default ? sell.End : sell.Start);
+                (tradeEstimate, var shareFlags) = await GetCostShare(acquisition, tradeItems, tradeEstimate);
+                flags |= FlipFlags.ViaTrade | shareFlags;
                 buy.HighestBidAmount = tradeEstimate;
                 logger.LogInformation("From trade parts {parts} got {itemCount} {estimate}", JsonConvert.SerializeObject(itemTrade), itemCount, tradeEstimate);
                 // adjust buy state to match traded attributes
-                var acquisition = GetRelevantTradeEntry(itemTrade, Guid.Parse(sell.AuctioneerId), sell.Start == default ? sell.End : sell.Start);
                 representationConverter.TryUpdatingBuyState(buy, itemStateAtTrade, acquisition == null ? new() : new() { acquisition });
-                if (itemCount > 1)
-                    flags |= FlipFlags.MultiItemTrade;
                 if (tradeEstimate < 0)
                     return UnknownTradeCost(flags);
-                if (itemCount > 1)
-                {
-                    return (flags, new PastFlip.ProfitChange($"Item was traded with other items for about {tradeEstimate} coins", -1));
-                }
-                return (flags, new PastFlip.ProfitChange($"Item was bought by trade for {tradeEstimate} coins", -1));
+                return TradeCostChange(flags, tradeEstimate, "bought by trade");
             }
 
             return (flags, null);
@@ -794,6 +793,15 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             return receivedEntry;
         }
 
+        private static (FlipFlags, PastFlip.ProfitChange) TradeCostChange(FlipFlags flags, long cost, string singleItemWording)
+        {
+            if (flags.HasFlag(FlipFlags.UncertainCost))
+                return (flags, new PastFlip.ProfitChange($"Item was traded with other items for about {cost} coins (even split, item values unknown)", 0));
+            if (flags.HasFlag(FlipFlags.MultiItemTrade))
+                return (flags, new PastFlip.ProfitChange($"Item was traded with other items for about {cost} coins", 0));
+            return (flags, new PastFlip.ProfitChange($"Item was {singleItemWording} for {cost} coins", -1));
+        }
+
         private static (FlipFlags, PastFlip.ProfitChange) UnknownTradeCost(FlipFlags flags)
         {
             return (flags | FlipFlags.UnknownCost,
@@ -821,6 +829,66 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             }
             // Negative net consideration is not a free acquisition with a measured profit.
             return (received.Count, cost < 0 ? -1 : cost / received.Count, items);
+        }
+
+        /// <summary>
+        /// Replaces the even split of a multi-item trade with the item's share of the estimated value.
+        /// </summary>
+        /// <returns>The item's cost and how it was determined, still the even split when an estimate was missing</returns>
+        private async Task<(long cost, FlipFlags flags)> GetCostShare(Transaction acquisition, List<Transaction> tradeItems, long evenSplit)
+        {
+            var received = tradeItems.Where(t => t.ItemId != COIN_ID && IsReceived(t)).ToList();
+            if (received.Count <= 1)
+                return (evenSplit, FlipFlags.None);
+            if (evenSplit <= 0)
+                return (evenSplit, FlipFlags.MultiItemTrade);
+            var shares = await GetBundleShares(acquisition, received, evenSplit);
+            if (shares == null || !shares.TryGetValue(acquisition.ItemId, out var share))
+                return (evenSplit, FlipFlags.MultiItemTrade | FlipFlags.UncertainCost);
+            return (share, FlipFlags.MultiItemTrade);
+        }
+
+        private Task<Dictionary<long, long>> GetBundleShares(Transaction acquisition, List<Transaction> received, long evenSplit)
+        {
+            var valued = bundleShares.Value;
+            if (valued == null)
+                return LoadBundleShares(received, evenSplit);
+            return valued.GetOrAdd((acquisition.PlayerUuid, acquisition.TimeStamp),
+                _ => new(() => LoadBundleShares(received, evenSplit))).Value;
+        }
+
+        /// <returns>The cost of each received item by id, or null when an item or its estimate is missing</returns>
+        private async Task<Dictionary<long, long>> LoadBundleShares(List<Transaction> received, long evenSplit)
+        {
+            var states = await GetItemStates(received);
+            if (states == null)
+                return null;
+            // the even split only dropped the remainder, so this restores the trade total to within one coin per item
+            var shares = await representationConverter.SplitByEstimate(states, evenSplit * received.Count);
+            return shares == null ? null : received.Zip(shares).GroupBy(p => p.First.ItemId).ToDictionary(g => g.Key, g => g.Sum(p => p.Second));
+        }
+
+        private async Task<List<SaveAuction>> GetItemStates(List<Transaction> received)
+        {
+            var states = new List<SaveAuction>();
+            foreach (var transaction in received)
+            {
+                PlayerState.Client.Model.Item item;
+                try
+                {
+                    item = await itemsApi.ApiItemsIdGetAsync(transaction.ItemId, 0);
+                }
+                catch (PlayerState.Client.Client.ApiException error) when (error.ErrorCode == 404)
+                {
+                    return null;
+                }
+                if (item?.ExtraAttributes == null)
+                    return null;
+                var state = representationConverter.FromItemRepresent(item);
+                state.Count = (int)transaction.Amount;
+                states.Add(state);
+            }
+            return states;
         }
 
         private static bool IsReceived(Transaction transaction)
@@ -1019,12 +1087,14 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             var sellerUuid = Guid.Parse(sell.AuctioneerId);
             var relevantTradeEntry = GetRelevantTradeEntry(itemTrade, sellerUuid, sell.Start == default ? sell.End : sell.Start);
             (int itemCount, long tradeEstimate, var items) = await GetTradeValue(itemTrade, sellerUuid, sell.Start == default ? sell.End : sell.Start);
+            (tradeEstimate, var tradeFlags) = await GetCostShare(relevantTradeEntry, items, tradeEstimate);
             var potentialItems = items.Where(i => i.ItemId > COIN_ID + 100).ToList();
             if (potentialItems.Count == 0)
                 throw new Exception($"No item in trade for {uuid}");
             var itemInfo = await itemsApi.ApiItemsIdGetAsync(long.Parse(uuid), 0);
             var auction = representationConverter.FromItemRepresent(itemInfo);
             auction.HighestBidAmount = tradeEstimate;
+            auction.TradeFlags = tradeFlags;
             auction.End = relevantTradeEntry?.TimeStamp ?? sell.End;
             auction.Uuid = Guid.Empty.ToString("N");
             logger.LogInformation("Created virtual trade item for {playerId} {auction} from {item}",

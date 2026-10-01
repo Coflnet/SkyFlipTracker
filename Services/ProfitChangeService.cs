@@ -1051,6 +1051,12 @@ public class ApiSaveAuction : Core.SaveAuction
     /// </summary>
     [DataMember(Name = "flatNbt", EmitDefaultValue = true)]
     public override Dictionary<string, string> FlatenedNBT { get; set; }
+
+    /// <summary>
+    /// How the cost of a purchase reconstructed from a trade was determined, never serialized
+    /// </summary>
+    [IgnoreDataMember, Newtonsoft.Json.JsonIgnore, MessagePack.IgnoreMember]
+    public Models.FlipFlags TradeFlags { get; set; }
 }
 
 public static class AuctionShortcuts

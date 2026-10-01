@@ -79,6 +79,22 @@ public class RepresentationConverter
         return auctions ?? new();
     }
 
+    /// <summary>
+    /// Splits <paramref name="total"/> across the items by their share of the summed sniper median.
+    /// </summary>
+    /// <returns>One amount per item, or null when any item has no estimate</returns>
+    public async Task<List<long>> SplitByEstimate(List<SaveAuction> items, long total)
+    {
+        var prices = await sniperApi.GetPrices(items) ?? [];
+        if (prices.Count != items.Count || prices.Any(p => p == null || p.Median <= 0))
+        {
+            logger.LogInformation("Got {count} usable prices for {itemCount} trade items", prices.Count(p => p?.Median > 0), items.Count);
+            return null;
+        }
+        var estimationSum = prices.Sum(p => (decimal)p.Median);
+        return prices.Select(p => (long)(total * (p.Median / estimationSum))).ToList();
+    }
+
 
     public void TryUpdatingBuyState(ApiSaveAuction buy, PlayerState.Client.Model.Item itemStateAtTrade, List<PlayerState.Client.Model.Transaction> itemTrade)
     {

@@ -12,4 +12,6 @@ public enum FlipFlags
     MultiItemTrade = 4,
     /// <summary>PurchaseCost is -1 and Profit is a placeholder, not a measured outcome.</summary>
     UnknownCost = 8,
+    /// <summary>PurchaseCost is an even split of a multi-item trade because the items could not be valued, Profit is a placeholder.</summary>
+    UncertainCost = 16,
 }
