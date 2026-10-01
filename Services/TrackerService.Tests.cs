@@ -215,6 +215,81 @@ public class TrackerServiceTests
         flip.Profit.Should().BeGreaterThan(30_000_000);
     }
 
+    /// <summary>
+    /// Verifies that a purchase from the same consume batch takes precedence over stale lookup results.
+    /// </summary>
+    [Test]
+    public async Task SameBatchPurchaseIsUsedBeforeDatabaseUpdate()
+    {
+        // Exact public auction evidence for issue #155. Both auctions contain item uid 31d93dcaa35a.
+        const string purchaseAuctionId = "a7eb0485640145e7b7fa92918c925cd1";
+        const string sellAuctionId = "90011186b4bd447a9fed3a438d37f19d";
+        // The bounded auction evidence excludes bidder identities. Preserve the observed buyer/seller
+        // relationship with pseudonyms so protected player UUIDs are not committed to the fixture.
+        const string pseudonymizedOwner = "10000000000000000000000000000001";
+        var purchase = new SaveAuction
+        {
+            Uuid = purchaseAuctionId,
+            Tag = "BURNING_CRIMSON_HELMET",
+            ItemName = "§dAncient Burning Crimson Helmet",
+            AuctioneerId = "20000000000000000000000000000002",
+            Start = new DateTime(2026, 8, 22, 19, 28, 59),
+            End = new DateTime(2026, 8, 23, 19, 58, 32),
+            StartingBid = 39_999_900,
+            HighestBidAmount = 39_999_900,
+            Tier = Tier.MYTHIC,
+            Reforge = ItemReferences.Reforge.ancient,
+            Bin = true,
+            Bids = new() { new() { Bidder = pseudonymizedOwner, Amount = 39_999_900, Timestamp = new DateTime(2026, 8, 21, 18, 58, 20, 227) } },
+            FlatenedNBT = new() { { "boss_tier", "2" }, { "hpc", "15" }, { "rarity_upgrades", "1" }, { "uid", "31d93dcaa35a" }, { "uuid", "0de48702-82b3-408c-ada5-31d93dcaa35a" } }
+        };
+        var sell = new SaveAuction
+        {
+            Uuid = sellAuctionId,
+            UId = -8070149787015624791,
+            Tag = "BURNING_CRIMSON_HELMET",
+            ItemName = "§dAncient Burning Crimson Helmet",
+            AuctioneerId = pseudonymizedOwner,
+            End = new DateTime(2026, 8, 30, 21, 16, 47, 971),
+            HighestBidAmount = 10_199_999,
+            Tier = Tier.MYTHIC,
+            Reforge = ItemReferences.Reforge.ancient,
+            Bin = true,
+            Bids = new() { new() { Bidder = "30000000000000000000000000000003", Amount = 10_199_999, Timestamp = new DateTime(2026, 8, 30, 21, 16, 47, 971) } },
+            FlatenedNBT = new() { { "boss_tier", "2" }, { "hpc", "15" }, { "rarity_upgrades", "1" }, { "uid", "31d93dcaa35a" }, { "uuid", "0de48702-82b3-408c-ada5-31d93dcaa35a" } }
+        };
+        var savedFlips = new List<PastFlip>();
+        var storage = new Mock<FlipStorageService>(null, null, null);
+        storage.Setup(x => x.SaveFlip(It.IsAny<PastFlip>())).Callback<PastFlip>(savedFlips.Add).Returns(Task.CompletedTask);
+        storage.Setup(x => x.GetFlips(It.IsAny<Guid>(), It.IsAny<DateTime>(), It.IsAny<DateTime>())).ReturnsAsync(new List<PastFlip>());
+
+        var changes = new Mock<ProfitChangeService>(null, null, null, null, null, null, null, null, null);
+        changes.Setup(x => x.GetChanges(It.IsAny<SaveAuction>(), It.IsAny<SaveAuction>()))
+            .ReturnsAsync(new List<PastFlip.ProfitChange> { new("ah tax", -307_199) });
+        var transactions = new Mock<PlayerState.Client.Api.ITransactionApi>();
+        transactions.Setup(x => x.TransactionUuidItemIdPostAsync(It.IsAny<List<Guid>>(), It.IsAny<int>(), It.IsAny<System.Threading.CancellationToken>()))
+            .ReturnsAsync(new Dictionary<string, List<long>>());
+        var auctions = new Mock<Api.Client.Api.IAuctionsApi>();
+        auctions.Setup(x => x.ApiAuctionsUidsSoldPostWithHttpInfoAsync(It.IsAny<Api.Client.Model.InventoryBatchLookup>(), It.IsAny<int>(), It.IsAny<System.Threading.CancellationToken>()))
+            .ReturnsAsync(new Api.Client.Client.ApiResponse<Dictionary<string, List<Api.Client.Model.ItemSell>>>(
+                System.Net.HttpStatusCode.OK, null, new Dictionary<string, List<Api.Client.Model.ItemSell>>()));
+
+        var tracker = new TrackerService(null, NullLogger<TrackerService>.Instance, auctions.Object, null, null,
+            changes.Object, storage.Object, new ActivitySource("test"), null, null,
+            new Mock<Settings.Client.Api.ISettingsApi>().Object,
+            new Mock<PlayerState.Client.Api.IItemsApi>().Object, transactions.Object,
+            new RepresentationConverter(NullLogger<RepresentationConverter>.Instance, null));
+
+        await tracker.IndexCassandra(new[] { sell, purchase });
+
+        var trackedSale = savedFlips.Should().ContainSingle(
+            flip => flip.SellAuctionId == Guid.Parse(sellAuctionId)).Which;
+        trackedSale.PurchaseAuctionId.Should().Be(Guid.Parse(purchaseAuctionId));
+        trackedSale.PurchaseCost.Should().Be(39_999_900);
+        trackedSale.Profit.Should().Be(-30_107_100);
+        trackedSale.Flags.Should().NotHaveFlag(FlipFlags.ViaTrade);
+    }
+
     private static string GriffinBuy = """
     {"enchantments":[],"uuid":"eb67974a5dd3400dbe6e31773177763e","count":1,"startingBid":150000000,"tag":"PET_GRIFFIN","itemName":"[Lvl 99] Griffin","start":"2026-06-25T05:30:56","end":"2026-06-25T05:33:07","auctioneerId":"a00cd46615d94bcf8b9688c17d67c85b","profileId":"cae80da3a69944ce871fbdbafd382286","highestBidAmount":150000000,"bids":[{"bidder":"c9ae33b7f1a24ecc8f11194e34bcd2e1","profileId":"0efc3901ea93453fb44b824106f45a32","amount":150000000,"timestamp":"2026-06-25T05:33:07"}],"anvilUses":0,"reforge":"None","category":"MISC","tier":"MYTHIC","bin":true,"flatNbt":{"type":"GRIFFIN","active":"False","exp":"24662721.152631305","tier":"MYTHIC","heldItem":"PET_ITEM_LUCKY_CLOVER","candyUsed":"0","uid":"2c9f22da49c2","uuid":"7aa35889-dcf6-485c-86fb-2c9f22da49c2"}}
     """;

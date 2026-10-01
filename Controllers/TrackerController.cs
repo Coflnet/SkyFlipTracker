@@ -264,6 +264,48 @@ namespace Coflnet.Sky.SkyAuctionTracker.Controllers
             return await flipStorageService.GetUnknownFlips(start, end);
         }
 
+        /// <summary>
+        /// Returns source-bounded evidence from the missed-flip table.
+        /// </summary>
+        /// <param name="start">Inclusive UTC start instant.</param>
+        /// <param name="end">Inclusive UTC end instant.</param>
+        /// <param name="cohort">Either finder_unknown or blocked_or_outsped.</param>
+        /// <param name="limit">Global result limit from 1 through 50.</param>
+        [HttpGet]
+        [Route("/flips/missed")]
+        public async Task<ActionResult<IReadOnlyList<MissedFlipDto>>> GetMissedFlips(
+            [FromQuery] DateTimeOffset? start,
+            [FromQuery] DateTimeOffset? end,
+            [FromQuery] string cohort,
+            [FromQuery] int limit = 20)
+        {
+            var validationError = ValidateMissedFlipsQuery(start, end, cohort, limit);
+            if (validationError != null)
+                return BadRequest(validationError);
+
+            var flips = await flipStorageService.GetMissedFlips(
+                start.Value.UtcDateTime, end.Value.UtcDateTime, cohort, limit);
+            return Ok(flips.Select(flip => MissedFlipDto.FromPastFlip(flip, cohort)).ToList());
+        }
+
+        internal static string ValidateMissedFlipsQuery(
+            DateTimeOffset? start, DateTimeOffset? end, string cohort, int limit)
+        {
+            if (start == null || end == null)
+                return "start and end are required UTC instants";
+            if (start.Value.Offset != TimeSpan.Zero || end.Value.Offset != TimeSpan.Zero)
+                return "start and end must be UTC instants";
+            if (end <= start)
+                return "end must be after start";
+            if (end - start > TimeSpan.FromHours(24))
+                return "the requested span must not exceed 24 hours";
+            if (cohort != "finder_unknown" && cohort != "blocked_or_outsped")
+                return "cohort must be finder_unknown or blocked_or_outsped";
+            if (limit < 1 || limit > 50)
+                return "limit must be between 1 and 50";
+            return null;
+        }
+
         [HttpGet]
         [Route("/flips/unsold")]
         [ResponseCache(Duration = 10, Location = ResponseCacheLocation.Any)]
