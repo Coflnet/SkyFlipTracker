@@ -17,6 +17,47 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services;
 
 public class TrackerServiceTests
 {
+    /// <summary>
+    /// Verifies that unavailable estimates fall back across every item in a multi-item trade.
+    /// </summary>
+    [Test]
+    public async Task UnavailableTradeEstimatesSplitValueAcrossEveryItem()
+    {
+        // Reuse the repository's captured trade: five items sold together for 1.3B.
+        var trade = JsonConvert.DeserializeObject<Models.TradeModel>(FullTrade);
+        var sniper = new Mock<ISniperClient>();
+        sniper.Setup(s => s.GetPrices(It.IsAny<IEnumerable<SaveAuction>>()))
+            .ReturnsAsync(new List<Sniper.Client.Model.PriceEstimate>());
+        var converter = new RepresentationConverter(NullLogger<RepresentationConverter>.Instance, sniper.Object);
+        var auctions = await converter.ConvertToDummyAuctions(trade);
+
+        auctions.Should().HaveCount(5);
+        auctions.Should().OnlyContain(a => a.HighestBidAmount == 260_000_000);
+
+        var partialSniper = new Mock<ISniperClient>();
+        partialSniper.Setup(s => s.GetPrices(It.IsAny<IEnumerable<SaveAuction>>())).ReturnsAsync(
+            new List<Sniper.Client.Model.PriceEstimate>
+            {
+                new() { Median = 55_951_748 }, null, new() { Median = 57_628_256 }
+            });
+        var partialConverter = new RepresentationConverter(NullLogger<RepresentationConverter>.Instance, partialSniper.Object);
+        var partialAuctions = await partialConverter.ConvertToDummyAuctions(
+            JsonConvert.DeserializeObject<Models.TradeModel>(ThreeItemTrade));
+
+        partialAuctions.Should().HaveCount(3);
+        partialAuctions.Should().OnlyContain(a => a.HighestBidAmount == 47_000_000);
+
+        var zeroSniper = new Mock<ISniperClient>();
+        zeroSniper.Setup(s => s.GetPrices(It.IsAny<IEnumerable<SaveAuction>>())).ReturnsAsync(
+            new List<Sniper.Client.Model.PriceEstimate> { new(), new(), new() });
+        var zeroConverter = new RepresentationConverter(NullLogger<RepresentationConverter>.Instance, zeroSniper.Object);
+        var zeroAuctions = await zeroConverter.ConvertToDummyAuctions(
+            JsonConvert.DeserializeObject<Models.TradeModel>(ThreeItemTrade));
+
+        zeroAuctions.Should().HaveCount(3);
+        zeroAuctions.Should().OnlyContain(a => a.HighestBidAmount == 47_000_000);
+    }
+
     [Test]
     [TestCase("§7[Lvl 1] §6Bat", "[Lvl 60] Bat", "[Lvl 1->60] Bat")]
     [TestCase("[Lvl 30] Bat", "§7[Lvl 100] §6Bat", "§7[Lvl 30->100] §6Bat")]
