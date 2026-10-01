@@ -52,20 +52,21 @@ public class RepresentationConverter
                 var prices = await sniperApi.GetPrices(auctions) ?? [];
                 var estimationSum = prices.Where(p => p != null).Select(p => p.Median).DefaultIfEmpty(0).Sum();
                 logger.LogInformation("Got {count} prices for {estimationSum} {coinAmount}", prices.Count, estimationSum, coinAmount);
-                // adjust each estimate based on the total estimation
-                auctions.Zip(prices, (a, p) =>
+                if (prices.Count != auctions.Count || prices.Any(p => p == null) || estimationSum <= 0)
                 {
-                    if (a == null || p == null)
+                    auctions.ForEach(a => a.HighestBidAmount = coinAmount / auctions.Count);
+                }
+                else
+                {
+                    // adjust each estimate based on the total estimation
+                    auctions.Zip(prices, (a, p) =>
                     {
-                        // use average difference if no price is available
-                        a.HighestBidAmount = coinAmount / auctions.Count;
-                        return null;
-                    }
-                    var percentageOfEstimation = (float)p.Median / estimationSum;
-                    a.HighestBidAmount = (long)(coinAmount * percentageOfEstimation);
-                    logger.LogInformation("Adjusted price to {price} {coinAmount} {median} {estSum} {key}", a.HighestBidAmount, coinAmount, p.Median, estimationSum, p.MedianKey);
-                    return a;
-                }).ToList();
+                        var percentageOfEstimation = (float)p.Median / estimationSum;
+                        a.HighestBidAmount = (long)(coinAmount * percentageOfEstimation);
+                        logger.LogInformation("Adjusted price to {price} {coinAmount} {median} {estSum} {key}", a.HighestBidAmount, coinAmount, p.Median, estimationSum, p.MedianKey);
+                        return a;
+                    }).ToList();
+                }
             }
             logger.LogInformation("Parsed trade {auction}", JsonConvert.SerializeObject(auctions));
         }

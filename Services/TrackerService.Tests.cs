@@ -17,6 +17,47 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services;
 
 public class TrackerServiceTests
 {
+    /// <summary>
+    /// Verifies that unavailable estimates fall back across every item in a multi-item trade.
+    /// </summary>
+    [Test]
+    public async Task UnavailableTradeEstimatesSplitValueAcrossEveryItem()
+    {
+        // Reuse the repository's captured trade: five items sold together for 1.3B.
+        var trade = JsonConvert.DeserializeObject<Models.TradeModel>(FullTrade);
+        var sniper = new Mock<ISniperClient>();
+        sniper.Setup(s => s.GetPrices(It.IsAny<IEnumerable<SaveAuction>>()))
+            .ReturnsAsync(new List<Sniper.Client.Model.PriceEstimate>());
+        var converter = new RepresentationConverter(NullLogger<RepresentationConverter>.Instance, sniper.Object);
+        var auctions = await converter.ConvertToDummyAuctions(trade);
+
+        auctions.Should().HaveCount(5);
+        auctions.Should().OnlyContain(a => a.HighestBidAmount == 260_000_000);
+
+        var partialSniper = new Mock<ISniperClient>();
+        partialSniper.Setup(s => s.GetPrices(It.IsAny<IEnumerable<SaveAuction>>())).ReturnsAsync(
+            new List<Sniper.Client.Model.PriceEstimate>
+            {
+                new() { Median = 55_951_748 }, null, new() { Median = 57_628_256 }
+            });
+        var partialConverter = new RepresentationConverter(NullLogger<RepresentationConverter>.Instance, partialSniper.Object);
+        var partialAuctions = await partialConverter.ConvertToDummyAuctions(
+            JsonConvert.DeserializeObject<Models.TradeModel>(ThreeItemTrade));
+
+        partialAuctions.Should().HaveCount(3);
+        partialAuctions.Should().OnlyContain(a => a.HighestBidAmount == 47_000_000);
+
+        var zeroSniper = new Mock<ISniperClient>();
+        zeroSniper.Setup(s => s.GetPrices(It.IsAny<IEnumerable<SaveAuction>>())).ReturnsAsync(
+            new List<Sniper.Client.Model.PriceEstimate> { new(), new(), new() });
+        var zeroConverter = new RepresentationConverter(NullLogger<RepresentationConverter>.Instance, zeroSniper.Object);
+        var zeroAuctions = await zeroConverter.ConvertToDummyAuctions(
+            JsonConvert.DeserializeObject<Models.TradeModel>(ThreeItemTrade));
+
+        zeroAuctions.Should().HaveCount(3);
+        zeroAuctions.Should().OnlyContain(a => a.HighestBidAmount == 47_000_000);
+    }
+
     [Test]
     [TestCase("§7[Lvl 1] §6Bat", "[Lvl 60] Bat", "[Lvl 1->60] Bat")]
     [TestCase("[Lvl 30] Bat", "§7[Lvl 100] §6Bat", "§7[Lvl 30->100] §6Bat")]
@@ -172,6 +213,81 @@ public class TrackerServiceTests
         flip.PurchaseCost.Should().Be(150_000_000);
         flip.SellPrice.Should().Be(194_950_348);
         flip.Profit.Should().BeGreaterThan(30_000_000);
+    }
+
+    /// <summary>
+    /// Verifies that a purchase from the same consume batch takes precedence over stale lookup results.
+    /// </summary>
+    [Test]
+    public async Task SameBatchPurchaseIsUsedBeforeDatabaseUpdate()
+    {
+        // Exact public auction evidence for issue #155. Both auctions contain item uid 31d93dcaa35a.
+        const string purchaseAuctionId = "a7eb0485640145e7b7fa92918c925cd1";
+        const string sellAuctionId = "90011186b4bd447a9fed3a438d37f19d";
+        // The bounded auction evidence excludes bidder identities. Preserve the observed buyer/seller
+        // relationship with pseudonyms so protected player UUIDs are not committed to the fixture.
+        const string pseudonymizedOwner = "10000000000000000000000000000001";
+        var purchase = new SaveAuction
+        {
+            Uuid = purchaseAuctionId,
+            Tag = "BURNING_CRIMSON_HELMET",
+            ItemName = "§dAncient Burning Crimson Helmet",
+            AuctioneerId = "20000000000000000000000000000002",
+            Start = new DateTime(2026, 8, 22, 19, 28, 59),
+            End = new DateTime(2026, 8, 23, 19, 58, 32),
+            StartingBid = 39_999_900,
+            HighestBidAmount = 39_999_900,
+            Tier = Tier.MYTHIC,
+            Reforge = ItemReferences.Reforge.ancient,
+            Bin = true,
+            Bids = new() { new() { Bidder = pseudonymizedOwner, Amount = 39_999_900, Timestamp = new DateTime(2026, 8, 21, 18, 58, 20, 227) } },
+            FlatenedNBT = new() { { "boss_tier", "2" }, { "hpc", "15" }, { "rarity_upgrades", "1" }, { "uid", "31d93dcaa35a" }, { "uuid", "0de48702-82b3-408c-ada5-31d93dcaa35a" } }
+        };
+        var sell = new SaveAuction
+        {
+            Uuid = sellAuctionId,
+            UId = -8070149787015624791,
+            Tag = "BURNING_CRIMSON_HELMET",
+            ItemName = "§dAncient Burning Crimson Helmet",
+            AuctioneerId = pseudonymizedOwner,
+            End = new DateTime(2026, 8, 30, 21, 16, 47, 971),
+            HighestBidAmount = 10_199_999,
+            Tier = Tier.MYTHIC,
+            Reforge = ItemReferences.Reforge.ancient,
+            Bin = true,
+            Bids = new() { new() { Bidder = "30000000000000000000000000000003", Amount = 10_199_999, Timestamp = new DateTime(2026, 8, 30, 21, 16, 47, 971) } },
+            FlatenedNBT = new() { { "boss_tier", "2" }, { "hpc", "15" }, { "rarity_upgrades", "1" }, { "uid", "31d93dcaa35a" }, { "uuid", "0de48702-82b3-408c-ada5-31d93dcaa35a" } }
+        };
+        var savedFlips = new List<PastFlip>();
+        var storage = new Mock<FlipStorageService>(null, null, null);
+        storage.Setup(x => x.SaveFlip(It.IsAny<PastFlip>())).Callback<PastFlip>(savedFlips.Add).Returns(Task.CompletedTask);
+        storage.Setup(x => x.GetFlips(It.IsAny<Guid>(), It.IsAny<DateTime>(), It.IsAny<DateTime>())).ReturnsAsync(new List<PastFlip>());
+
+        var changes = new Mock<ProfitChangeService>(null, null, null, null, null, null, null, null, null);
+        changes.Setup(x => x.GetChanges(It.IsAny<SaveAuction>(), It.IsAny<SaveAuction>()))
+            .ReturnsAsync(new List<PastFlip.ProfitChange> { new("ah tax", -307_199) });
+        var transactions = new Mock<PlayerState.Client.Api.ITransactionApi>();
+        transactions.Setup(x => x.TransactionUuidItemIdPostAsync(It.IsAny<List<Guid>>(), It.IsAny<int>(), It.IsAny<System.Threading.CancellationToken>()))
+            .ReturnsAsync(new Dictionary<string, List<long>>());
+        var auctions = new Mock<Api.Client.Api.IAuctionsApi>();
+        auctions.Setup(x => x.ApiAuctionsUidsSoldPostWithHttpInfoAsync(It.IsAny<Api.Client.Model.InventoryBatchLookup>(), It.IsAny<int>(), It.IsAny<System.Threading.CancellationToken>()))
+            .ReturnsAsync(new Api.Client.Client.ApiResponse<Dictionary<string, List<Api.Client.Model.ItemSell>>>(
+                System.Net.HttpStatusCode.OK, null, new Dictionary<string, List<Api.Client.Model.ItemSell>>()));
+
+        var tracker = new TrackerService(null, NullLogger<TrackerService>.Instance, auctions.Object, null, null,
+            changes.Object, storage.Object, new ActivitySource("test"), null, null,
+            new Mock<Settings.Client.Api.ISettingsApi>().Object,
+            new Mock<PlayerState.Client.Api.IItemsApi>().Object, transactions.Object,
+            new RepresentationConverter(NullLogger<RepresentationConverter>.Instance, null));
+
+        await tracker.IndexCassandra(new[] { sell, purchase });
+
+        var trackedSale = savedFlips.Should().ContainSingle(
+            flip => flip.SellAuctionId == Guid.Parse(sellAuctionId)).Which;
+        trackedSale.PurchaseAuctionId.Should().Be(Guid.Parse(purchaseAuctionId));
+        trackedSale.PurchaseCost.Should().Be(39_999_900);
+        trackedSale.Profit.Should().Be(-30_107_100);
+        trackedSale.Flags.Should().NotHaveFlag(FlipFlags.ViaTrade);
     }
 
     private static string GriffinBuy = """

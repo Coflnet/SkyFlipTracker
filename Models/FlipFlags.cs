@@ -10,4 +10,6 @@ public enum FlipFlags
     /// More than one item was traded, not exact price
     /// </summary>
     MultiItemTrade = 4,
+    /// <summary>PurchaseCost is -1 and Profit is a placeholder, not a measured outcome.</summary>
+    UnknownCost = 8,
 }
