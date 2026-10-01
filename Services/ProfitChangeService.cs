@@ -699,8 +699,24 @@ public class ProfitChangeService
         {
             if (item.Value == "PET_ITEM_TIER_BOOST")
                 continue; // already handled
-            if (item.Key.StartsWith("RUNE_") && item.Key != ingredient.Key)
-                continue; // rune mapping returns both without and with level and here we only handle without
+            if (item.Key.StartsWith("RUNE_"))
+            {
+                if (item.Key != ingredient.Key)
+                    continue; // rune mapping returns exact, generic and unique variants
+
+                // Combined runes consume tier-one ingredients. Non-combinable runes have a
+                // single ingredient and must retain the tier at which they are applied.
+                var ingredientTier = ingredient.count == 1 ? item.Value : "1";
+                var label = ingredient.count == 1
+                    ? $"Used {ingredient.Key} to upgraded {item.Key} to {item.Value}"
+                    : $"Used {ingredient.count}x {ingredient.Key} to upgraded {item.Key} to {item.Value}";
+                yield return await priceProvider.CostOf(
+                    ingredient.Key,
+                    label,
+                    ingredient.count,
+                    new() { { item.Key, ingredientTier } });
+                continue;
+            }
             if (item.Key == "ability_scroll")
             {
                 yield return await priceProvider.CostOf(ingredient.Key, $"Applied {ingredient.Key}");
