@@ -44,7 +44,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
 
         private ConcurrentQueue<long> flipIds = new();
         // valuations of the bundles met while one batch of sells is processed, so each trade is priced once
-        private static readonly AsyncLocal<ConcurrentDictionary<(Guid, DateTime), Lazy<Task<Dictionary<long, long>>>>> bundleShares = new();
+        private static readonly AsyncLocal<ConcurrentDictionary<(Guid, DateTime), Lazy<Task<Dictionary<long, (long cost, bool uncertain)>>>>> bundleShares = new();
 
         public TrackerService(
             TrackerDbContext db,
@@ -796,7 +796,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
         private static (FlipFlags, PastFlip.ProfitChange) TradeCostChange(FlipFlags flags, long cost, string singleItemWording)
         {
             if (flags.HasFlag(FlipFlags.UncertainCost))
-                return (flags, new PastFlip.ProfitChange($"Item was traded with other items for about {cost} coins (even split, item values unknown)", 0));
+                return (flags, new PastFlip.ProfitChange($"Item was traded with other items for about {cost} coins (even share, item value unknown)", 0));
             if (flags.HasFlag(FlipFlags.MultiItemTrade))
                 return (flags, new PastFlip.ProfitChange($"Item was traded with other items for about {cost} coins", 0));
             return (flags, new PastFlip.ProfitChange($"Item was {singleItemWording} for {cost} coins", -1));
@@ -834,7 +834,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
         /// <summary>
         /// Replaces the even split of a multi-item trade with the item's share of the estimated value.
         /// </summary>
-        /// <returns>The item's cost and how it was determined, still the even split when an estimate was missing</returns>
+        /// <returns>The item's cost and how it was determined, uncertain when the item itself could not be valued</returns>
         private async Task<(long cost, FlipFlags flags)> GetCostShare(Transaction acquisition, List<Transaction> tradeItems, long evenSplit)
         {
             var received = tradeItems.Where(t => t.ItemId != COIN_ID && IsReceived(t)).ToList();
@@ -843,12 +843,12 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             if (evenSplit <= 0)
                 return (evenSplit, FlipFlags.MultiItemTrade);
             var shares = await GetBundleShares(acquisition, received, evenSplit);
-            if (shares == null || !shares.TryGetValue(acquisition.ItemId, out var share))
+            if (!shares.TryGetValue(acquisition.ItemId, out var share))
                 return (evenSplit, FlipFlags.MultiItemTrade | FlipFlags.UncertainCost);
-            return (share, FlipFlags.MultiItemTrade);
+            return (share.cost, share.uncertain ? FlipFlags.MultiItemTrade | FlipFlags.UncertainCost : FlipFlags.MultiItemTrade);
         }
 
-        private Task<Dictionary<long, long>> GetBundleShares(Transaction acquisition, List<Transaction> received, long evenSplit)
+        private Task<Dictionary<long, (long cost, bool uncertain)>> GetBundleShares(Transaction acquisition, List<Transaction> received, long evenSplit)
         {
             var valued = bundleShares.Value;
             if (valued == null)
@@ -857,38 +857,41 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 _ => new(() => LoadBundleShares(received, evenSplit))).Value;
         }
 
-        /// <returns>The cost of each received item by id, or null when an item or its estimate is missing</returns>
-        private async Task<Dictionary<long, long>> LoadBundleShares(List<Transaction> received, long evenSplit)
+        /// <returns>The cost of each received item by id and whether that cost is only an even share</returns>
+        private async Task<Dictionary<long, (long cost, bool uncertain)>> LoadBundleShares(List<Transaction> received, long evenSplit)
         {
             var states = await GetItemStates(received);
-            if (states == null)
-                return null;
             // the even split only dropped the remainder, so this restores the trade total to within one coin per item
             var shares = await representationConverter.SplitByEstimate(states, evenSplit * received.Count);
-            return shares == null ? null : received.Zip(shares).GroupBy(p => p.First.ItemId).ToDictionary(g => g.Key, g => g.Sum(p => p.Second));
+            return received.Zip(shares).GroupBy(p => p.First.ItemId)
+                .ToDictionary(g => g.Key, g => (g.Sum(p => p.Second.cost), g.Any(p => p.Second.uncertain)));
         }
 
+        /// <returns>The state of each received item, null where it is not known</returns>
         private async Task<List<SaveAuction>> GetItemStates(List<Transaction> received)
         {
             var states = new List<SaveAuction>();
             foreach (var transaction in received)
-            {
-                PlayerState.Client.Model.Item item;
-                try
-                {
-                    item = await itemsApi.ApiItemsIdGetAsync(transaction.ItemId, 0);
-                }
-                catch (PlayerState.Client.Client.ApiException error) when (error.ErrorCode == 404)
-                {
-                    return null;
-                }
-                if (item?.ExtraAttributes == null)
-                    return null;
-                var state = representationConverter.FromItemRepresent(item);
-                state.Count = (int)transaction.Amount;
-                states.Add(state);
-            }
+                states.Add(await GetItemState(transaction));
             return states;
+        }
+
+        private async Task<SaveAuction> GetItemState(Transaction transaction)
+        {
+            PlayerState.Client.Model.Item item;
+            try
+            {
+                item = await itemsApi.ApiItemsIdGetAsync(transaction.ItemId, 0);
+            }
+            catch (PlayerState.Client.Client.ApiException error) when (error.ErrorCode == 404)
+            {
+                return null;
+            }
+            if (item?.ExtraAttributes == null)
+                return null;
+            var state = representationConverter.FromItemRepresent(item);
+            state.Count = (int)transaction.Amount;
+            return state;
         }
 
         private static bool IsReceived(Transaction transaction)

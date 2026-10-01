@@ -20,8 +20,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services;
 /// </summary>
 public class ProfitChangeService
 {
-    private const int ExpPetMaxLevel = 25353230;
-    private const int ExpMaxLevelGoldenDragon = 210255385;
+    internal const int ExpPetMaxLevel = 25353230;
+    internal const int ExpMaxLevelGoldenDragon = 210255385;
     private Coflnet.Sky.Api.Client.Api.IPricesApi pricesApi;
     private Crafts.Client.Api.IKatApi katApi;
     private ICraftsApi craftsApi;
