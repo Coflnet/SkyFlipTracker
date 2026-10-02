@@ -285,6 +285,9 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             }
             catch (System.Exception error)
             {
+                // store/network problems are not caused by the sells, let the caller retry instead of splitting and dropping
+                if (TrackerBackgroundService.IsInfrastructureError(error))
+                    throw;
                 if (error.Message.Contains("with the same key has already been added."))
                 {
                     foreach (var item in sells.ToList())
