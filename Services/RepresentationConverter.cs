@@ -142,14 +142,16 @@ public class RepresentationConverter
     }
 
     /// <summary>
-    /// Tag-level price with as many attribute filters as still find sales, the first one is never dropped.
+    /// Tag-level price with as many attribute filters as still find sales, only a pet never drops its first one.
     /// </summary>
     private async Task<decimal> GetTagEstimate(SaveAuction item)
     {
         if (pricesApi == null)
             return 0;
         var filters = TagFilters(item);
-        for (var count = filters.Count; count >= Math.Min(1, filters.Count); count--)
+        // sales of some tags are stored without rarity, a pet's price depends on it too much to go without
+        var required = IsPet(item) ? Math.Min(1, filters.Count) : 0;
+        for (var count = filters.Count; count >= required; count--)
         {
             try
             {
