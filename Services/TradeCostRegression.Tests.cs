@@ -200,6 +200,25 @@ public class TradeCostRegressionTests
         }
     }
 
+    /// <summary>The Divan drill without a sniper median takes its tag's price: its sales are stored without rarity, no rarity filter finds them.</summary>
+    [Test]
+    public async Task ItemWithoutSalesOfItsRarityTakesUnfilteredTagPrice()
+    {
+        var items = BundleBuy.Select(i => i.Tag == "DIVAN_DRILL" ? i with { Median = 0 } : i).ToArray();
+        var bundle = CreateTrade(BundleCoins, items, (tag, filters) => tag == "DIVAN_DRILL" && !filters.ContainsKey("Rarity") ? 1_775_000_000 : 0);
+
+        var flips = await TradeFlips(bundle);
+
+        Assert.That(flips["DIVAN_DRILL"].cost, Is.EqualTo(1_506_493_506), "the drill carried 327,302,302, an even share");
+        Assert.That((int)flips["DIVAN_DRILL"].flags & (4 | 16), Is.EqualTo(4));
+        Assert.That(flips["DIVAN_PENDANT"].cost, Is.EqualTo(381_927_931), "the pendant carried 522,522,522");
+        Assert.That(bundle.TagRequests.Where(r => r.tag == "DIVAN_DRILL").Select(r => string.Join(",", r.filters.Keys)).Distinct(),
+            Is.EqualTo(new[] { "Rarity,Reforge", "Rarity", "" }));
+        // a pet's price depends on its rarity, it is never asked for without
+        Assert.That(bundle.TagRequests.Where(r => r.tag.StartsWith("PET_")).Select(r => r.filters.ContainsKey("Rarity")), Is.All.True);
+        Assert.That((int)flips["PET_ARMADILLO"].flags & (4 | 16), Is.EqualTo(4 | 16));
+    }
+
     /// <summary>The bundle left in four later trades, each batch is valued once and its profit is its coins minus its items' cost.</summary>
     [Test]
     public async Task BundleSoldInBatchesIsValuedOncePerBatch()
