@@ -94,6 +94,72 @@ public class ProfitChangeTests
         Assert.That(result.Count, Is.EqualTo(4));
     }
     [Test]
+    public async Task PetSkinSellDoesNotThrowOrGetKatCost()
+    {
+        var buy = new Core.SaveAuction()
+        {
+            Uuid = Guid.NewGuid().ToString("N"),
+            Tag = "PET_SKIN_BLACK_CAT_CATGIRL",
+            HighestBidAmount = 1000,
+            FlatenedNBT = new(),
+            Tier = Core.Tier.COMMON
+        };
+        var sell = new Core.SaveAuction()
+        {
+            Uuid = Guid.NewGuid().ToString("N"),
+            Tag = "PET_SKIN_BLACK_CAT_CATGIRL",
+            HighestBidAmount = 1000,
+            FlatenedNBT = new(),
+            Tier = Core.Tier.RARE
+        };
+        katApi.Setup(k => k.GetAllKatAsync(0, default)).ReturnsAsync(KatResponse());
+        katApi.Setup(k => k.GetUpgradeDataAsync(0, default)).ReturnsAsync(new List<Crafts.Client.Model.KatUpgradeCost>());
+
+        var changes = await service.GetChanges(buy, sell);
+
+        changes.Any(c => c.Label.StartsWith("Kat")).Should().BeFalse(JsonConvert.SerializeObject(changes));
+    }
+
+    [Test]
+    public async Task PetWithoutKatCostEntryDoesNotThrow()
+    {
+        var buy = new Core.SaveAuction()
+        {
+            Uuid = Guid.NewGuid().ToString("N"),
+            Tag = "PET_NOT_IN_KAT_DATA",
+            HighestBidAmount = 1000,
+            FlatenedNBT = new(),
+            Tier = Core.Tier.RARE
+        };
+        var sell = new Core.SaveAuction()
+        {
+            Uuid = Guid.NewGuid().ToString("N"),
+            Tag = "PET_NOT_IN_KAT_DATA",
+            HighestBidAmount = 1000,
+            FlatenedNBT = new(),
+            Tier = Core.Tier.EPIC
+        };
+        katApi.Setup(k => k.GetAllKatAsync(0, default)).ReturnsAsync(KatResponse());
+        katApi.Setup(k => k.GetUpgradeDataAsync(0, default)).ReturnsAsync(new List<Crafts.Client.Model.KatUpgradeCost>());
+
+        var changes = await service.GetChanges(buy, sell);
+
+        changes.Any(c => c.Label.StartsWith("Kat")).Should().BeFalse(JsonConvert.SerializeObject(changes));
+    }
+
+    [TestCase("PET_SKIN_BLACK_CAT_CATGIRL", false)]
+    [TestCase("PET_ITEM_TIER_BOOST", false)]
+    [TestCase("PET_CAKE", false)]
+    [TestCase("PET_SATCHEL", false)]
+    [TestCase("PET_ENDERMAN", true)]
+    [TestCase("PET_GOLDEN_DRAGON", true)]
+    [TestCase("ASPECT_OF_THE_END", false)]
+    public void IsPetExcludesPetPrefixedNonPets(string tag, bool expected)
+    {
+        ProfitChangeService.IsPet(tag).Should().Be(expected);
+    }
+
+    [Test]
     public async Task EndermanMultiLevel()
     {
         var buy = new Core.SaveAuction()
