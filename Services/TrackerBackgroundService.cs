@@ -14,6 +14,7 @@ using Coflnet.Sky.Core;
 using Coflnet.Sky.Proxy.Client.Api;
 using Coflnet.Sky.Kafka;
 using Newtonsoft.Json;
+using System.Collections.Generic;
 
 namespace Coflnet.Sky.SkyAuctionTracker.Services
 {
@@ -28,6 +29,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
         private static Prometheus.Counter consumeEvent = Prometheus.Metrics.CreateCounter("sky_fliptracker_consume_event", "Counts the consumed flip events");
         private static Prometheus.Counter consumedSells = Prometheus.Metrics.CreateCounter("sky_fliptracker_consume_sells", "Counts the consumed sells");
         private static Prometheus.Counter flipsUpdated = Prometheus.Metrics.CreateCounter("sky_fliptracker_flips_updated", "How many flips were updated");
+        internal static Prometheus.Counter consumeErrors = Prometheus.Metrics.CreateCounter("sky_fliptracker_consume_errors_total", "Counts messages that could not be processed and were skipped", "topic");
         private KafkaCreator kafkaCreator;
         public TrackerBackgroundService(
             IServiceScopeFactory scopeFactory, IConfiguration config, ILogger<TrackerBackgroundService> logger, KafkaCreator kafkaCreator)
@@ -65,6 +67,104 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 throw new Exception("at least one consuming process stopped");
         }
 
+        /// <summary>
+        /// Exceptions that say the store/network is unavailable, not that the message is bad.
+        /// Those must be retried instead of skipping the message.
+        /// </summary>
+        internal static bool IsInfrastructureError(Exception e)
+        {
+            switch (e)
+            {
+                case null:
+                    return false;
+                case AggregateException agg:
+                    return agg.InnerExceptions.Any(IsInfrastructureError);
+                case TimeoutException:
+                case OperationCanceledException:
+                case System.Net.Http.HttpRequestException:
+                case System.Net.Sockets.SocketException:
+                case System.IO.IOException:
+                case KafkaException:
+                case System.Data.Common.DbException:
+                case global::Cassandra.NoHostAvailableException:
+                case global::Cassandra.OperationTimedOutException:
+                case global::Cassandra.QueryExecutionException:
+                    return true;
+            }
+            return IsInfrastructureError(e.InnerException);
+        }
+
+        private static string Describe(object item)
+        {
+            return item switch
+            {
+                SaveAuction a => $"{a.Uuid} {a.Tag}",
+                LowPricedAuction lp => $"{lp.Auction?.Uuid} {lp.Auction?.Tag}",
+                _ => Truncate(JsonConvert.SerializeObject(item))
+            };
+        }
+
+        private static string Truncate(string text) => text.Length > 500 ? text.Substring(0, 500) : text;
+
+        /// <summary>
+        /// Processes a consumed batch so one bad message can never stop the consumer.
+        /// Infrastructure errors are retried with backoff (never skipped), a message that fails
+        /// deterministically is logged, counted and skipped so its offset gets committed.
+        /// </summary>
+        internal static TimeSpan MaxInfrastructureRetry = TimeSpan.FromMinutes(10);
+
+        internal static async Task ProcessResilient<T>(IReadOnlyCollection<T> items, Func<IEnumerable<T>, Task> process, string topic,
+            ILogger logger, CancellationToken stoppingToken, Func<TimeSpan, CancellationToken, Task> delay = null)
+        {
+            delay ??= Task.Delay;
+            async Task<Exception> TryProcess(IReadOnlyCollection<T> toProcess)
+            {
+                var backoff = TimeSpan.FromSeconds(1);
+                var started = DateTime.UtcNow;
+                while (true)
+                {
+                    try
+                    {
+                        await process(toProcess);
+                        return null;
+                    }
+                    // a store that stays unreachable ends the consumer (and with it the host) so the restart and its alert show it
+                    catch (Exception e) when (IsInfrastructureError(e) && !stoppingToken.IsCancellationRequested && DateTime.UtcNow - started < MaxInfrastructureRetry)
+                    {
+                        logger.LogError(e, "store unavailable while consuming {topic}, retrying in {backoff}", topic, backoff);
+                        await delay(backoff, stoppingToken);
+                        if (backoff < TimeSpan.FromSeconds(30))
+                            backoff *= 2;
+                    }
+                    catch (Exception e) when (!IsInfrastructureError(e))
+                    {
+                        return e;
+                    }
+                }
+            }
+            void Skip(IEnumerable<T> bad, Exception e)
+            {
+                logger.LogError(e, "This sell caused error on {topic}, skipping: {item}", topic, string.Join(',', bad.Select(i => Describe(i))));
+                consumeErrors.WithLabels(topic).Inc();
+            }
+
+            var error = await TryProcess(items);
+            if (error == null)
+                return;
+            if (items.Count == 1)
+            {
+                Skip(items, error);
+                return;
+            }
+            // find out which messages are bad, process the rest one by one
+            foreach (var item in items)
+            {
+                var itemError = await TryProcess(new[] { item });
+                if (itemError != null)
+                    Skip(new[] { item }, itemError);
+            }
+        }
+
         private async Task Run(Task task, string message)
         {
             try
@@ -99,18 +199,12 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
         {
             await KafkaConsumer.ConsumeBatch<T>(config, config[topicName], async elements =>
             {
-                for (int i = 0; i < 3; i++)
-                    try
-                    {
-                        using var scope = scopeFactory.CreateScope();
-                        var service = scope.ServiceProvider.GetRequiredService<TrackerService>();
-                        await NewMethod(elements, service);
-                        return;
-                    }
-                    catch (Exception e)
-                    {
-                        logger.LogError(e, "could not from " + topicName);
-                    }
+                await ProcessResilient(elements.ToList(), async batch =>
+                {
+                    using var scope = scopeFactory.CreateScope();
+                    var service = scope.ServiceProvider.GetRequiredService<TrackerService>();
+                    await NewMethod(batch, service);
+                }, config[topicName], logger, stoppingToken);
             }, stoppingToken, "sky-fliptracker", batchSize);
         }
 
@@ -186,23 +280,15 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                         logger.LogInformation("skipping old sell");
                     return;
                 }
-                for (int i = 0; i < 3; i++)
-                    try
-                    {
-                        using var scope = scopeFactory.CreateScope();
-                        var service = scope.ServiceProvider.GetRequiredService<TrackerService>();
-                        await service.AddSells(sells);
-                        consumedSells.Inc(sells.Count());
-                        await service.PutBuySpeedOnBoard(sells);
-                        return;
-                    }
-                    catch (Exception e)
-                    {
-                        logger.LogError(e, "could not save sells once");
-                        await Task.Delay(1000);
-                    }
+                await ProcessResilient(sells.ToList(), async batch =>
+                {
+                    using var scope = scopeFactory.CreateScope();
+                    var service = scope.ServiceProvider.GetRequiredService<TrackerService>();
+                    await service.AddSells(batch);
+                    consumedSells.Inc(batch.Count());
+                    await service.PutBuySpeedOnBoard(batch);
+                }, config["TOPICS:SOLD_AUCTION"], logger, stoppingToken);
             }, stoppingToken, 50);
-            var consumeError = false;
             await KafkaConsumer.ConsumeBatch<SaveAuction>(consumeConfig, config["TOPICS:SOLD_AUCTION"], async flipEvents =>
             {
                 if (flipEvents.All(e => e.End < DateTime.UtcNow - TimeSpan.FromDays(2)))
@@ -210,23 +296,6 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     logger.LogInformation("skipping old sell");
                     return;
                 }
-                var work = async () =>
-                {
-                    for (int i = 0; i < 3; i++)
-                        try
-                        {
-                            using var scope = scopeFactory.CreateScope();
-                            var service = scope.ServiceProvider.GetRequiredService<TrackerService>();
-                            await service.IndexCassandra(flipEvents.Where(e => e.End > DateTime.UtcNow - TimeSpan.FromDays(5)));
-                            return;
-                        }
-                        catch (Exception e)
-                        {
-                            logger.LogError(e, "could not save event once");
-                            consumeError = true;
-                            await Task.Delay(1000);
-                        }
-                };
                 // Fully await the indexing before returning. Previously this raced work() against a
                 // 5s timer and returned the faster one; when a batch took longer than 5s (common for
                 // slow profit calculations like pets with added xp or talisman/craft upgrades, which do
@@ -234,13 +303,13 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 // work() kept running orphaned - so a rebalance or pod restart before it finished dropped
                 // those flips permanently. The consumer's SessionTimeoutMs (65s) and IndexCassandra's own
                 // 20s cancellation bound the wait, so awaiting to completion is safe.
-                await work();
-                if (consumeError)
+                var recent = flipEvents.Where(e => e.End > DateTime.UtcNow - TimeSpan.FromDays(5)).ToList();
+                await ProcessResilient(recent, async batch =>
                 {
-                    logger.LogInformation("cassanra index backoff");
-                    await Task.Delay(20_000);
-                    consumeError = false;
-                }
+                    using var scope = scopeFactory.CreateScope();
+                    var service = scope.ServiceProvider.GetRequiredService<TrackerService>();
+                    await service.IndexCassandra(batch);
+                }, config["TOPICS:SOLD_AUCTION"], logger, stoppingToken);
             }, stoppingToken, 32);
             throw new Exception("consuming sells stopped");
         }
@@ -248,11 +317,14 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
         {
             await KafkaConsumer.ConsumeBatch<SaveAuction>(config, config["TOPICS:LOAD_FLIPS"], async toUpdate =>
             {
-                using var scope = scopeFactory.CreateScope();
-                var service = scope.ServiceProvider.GetRequiredService<TrackerService>();
-                await service.IndexCassandra(toUpdate);
-                flipsUpdated.Inc(toUpdate.Count());
-                Console.WriteLine("updated flips " + toUpdate.Count());
+                await ProcessResilient(toUpdate.ToList(), async batch =>
+                {
+                    using var scope = scopeFactory.CreateScope();
+                    var service = scope.ServiceProvider.GetRequiredService<TrackerService>();
+                    await service.IndexCassandra(batch);
+                    flipsUpdated.Inc(batch.Count());
+                    Console.WriteLine("updated flips " + batch.Count());
+                }, config["TOPICS:LOAD_FLIPS"], logger, stoppingToken);
             }, stoppingToken, "sky-fliptracker", 8);
         }
 
@@ -265,27 +337,30 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 if (lps.All(lp => lp.Auction.End < DateTime.UtcNow - TimeSpan.FromDays(4)))
                     return;
 
-                using var scope = scopeFactory.CreateScope();
-                var service = scope.ServiceProvider.GetRequiredService<TrackerService>();
                 consumeCounter.Inc(lps.Count());
                 if (lps.All(lp => lp.Auction.End < DateTime.UtcNow))
                     return;
+                await ProcessResilient(lps.ToList(), async batch =>
+                {
+                using var scope = scopeFactory.CreateScope();
+                var service = scope.ServiceProvider.GetRequiredService<TrackerService>();
                 try
                 {
-                    await Recheck(lps, scope, service);
+                    await Recheck(batch, scope, service);
                 }
                 catch (System.Exception e)
                 {
                     logger.LogError(e, "could not rerequest player auctions");
                 }
-                await StoreContext(lps, scope);
+                await StoreContext(batch, scope);
                 await Task.Delay(3000); // wait for db to store potential double sales in the same minute
-                await service.AddFlips(lps.DistinctBy(lp => lp.UId + (int)lp.Finder + lp.TargetPrice).Select(lp => new Flip()
+                await service.AddFlips(batch.DistinctBy(lp => lp.UId + (int)lp.Finder + lp.TargetPrice).Select(lp => new Flip()
                 {
                     AuctionId = lp.UId,
                     FinderType = lp.Finder,
                     TargetPrice = (int)(int.MaxValue > lp.TargetPrice ? lp.TargetPrice : int.MaxValue)
                 }));
+                }, config["TOPICS:LOW_PRICED"], logger, stoppingToken);
             }, stoppingToken, "sky-fliptracker", 50);
         }
 

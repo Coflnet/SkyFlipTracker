@@ -20,8 +20,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services;
 /// </summary>
 public class ProfitChangeService
 {
-    private const int ExpPetMaxLevel = 25353230;
-    private const int ExpMaxLevelGoldenDragon = 210255385;
+    internal const int ExpPetMaxLevel = 25353230;
+    internal const int ExpMaxLevelGoldenDragon = 210255385;
     private Coflnet.Sky.Api.Client.Api.IPricesApi pricesApi;
     private Crafts.Client.Api.IKatApi katApi;
     private ICraftsApi craftsApi;
@@ -148,7 +148,7 @@ public class ProfitChangeService
             }
         }
 
-        if (buy.Tier == Core.Tier.UNKNOWN && buy.Tag.StartsWith("PET_"))
+        if (buy.Tier == Core.Tier.UNKNOWN && IsPet(buy.Tag))
         {
             if (Enum.TryParse(buy.FlatenedNBT.Where(l => l.Key == "tier").FirstOrDefault().Value, out Core.Tier tier))
                 buy.Tier = tier;
@@ -164,14 +164,14 @@ public class ProfitChangeService
         var buyHeldItem = buy.FlatenedNBT.FirstOrDefault(f => f.Key == "heldItem").Value;
         var sellHeldItem = sell.FlatenedNBT.FirstOrDefault(f => f.Key == "heldItem").Value;
 
-        if (buy.Tag.StartsWith("PET_") && buyHeldItem != null && buyHeldItem != sellHeldItem)
+        if (IsPet(buy.Tag) && buyHeldItem != null && buyHeldItem != sellHeldItem)
         {
             var change = await GetPetItemRemovedValue(buy, sell, buyHeldItem, priceProvider);
             yield return change;
         }
 
         if ((int)buy.Tier < (int)sell.Tier)
-            if (sell.Tag.StartsWith("PET_"))
+            if (IsPet(sell.Tag))
             {
                 await foreach (var item in GetPetRarityUpgrades(buy, sell, priceProvider))
                 {
@@ -213,6 +213,8 @@ public class ProfitChangeService
             var parts = itemKey.Split('_');
             var rarity = parts[0];
             var gemValue = await ValueOf(itemKey, $"{rarity} {parts[1]} gem removed");
+            if (gemValue == null)
+                continue;
             gemValue.Amount -= rarity switch
             {
                 "PERFECT" => 500_000,
@@ -235,6 +237,8 @@ public class ProfitChangeService
         foreach (var item in itemsRemoved)
         {
             var removalValue = await ValueOf(item.Value, $"{item.Value} {item.Key} removed");
+            if (removalValue == null)
+                continue;
             if (item.Key == "hook.part" || item.Key == "sinker.part" || item.Key == "line.part")
             {
                 removalValue.Amount -= 5000;
@@ -699,14 +703,30 @@ public class ProfitChangeService
         {
             if (item.Value == "PET_ITEM_TIER_BOOST")
                 continue; // already handled
-            if (item.Key.StartsWith("RUNE_") && item.Key != ingredient.Key)
-                continue; // rune mapping returns both without and with level and here we only handle without
+            if (item.Key.StartsWith("RUNE_"))
+            {
+                if (item.Key != ingredient.Key)
+                    continue; // rune mapping returns exact, generic and unique variants
+
+                // Combined runes consume tier-one ingredients. Non-combinable runes have a
+                // single ingredient and must retain the tier at which they are applied.
+                var ingredientTier = ingredient.count == 1 ? item.Value : "1";
+                var label = ingredient.count == 1
+                    ? $"Used {ingredient.Key} to upgraded {item.Key} to {item.Value}"
+                    : $"Used {ingredient.count}x {ingredient.Key} to upgraded {item.Key} to {item.Value}";
+                yield return await priceProvider.CostOf(
+                    ingredient.Key,
+                    label,
+                    ingredient.count,
+                    new() { { item.Key, ingredientTier } });
+                continue;
+            }
             if (item.Key == "ability_scroll")
             {
                 yield return await priceProvider.CostOf(ingredient.Key, $"Applied {ingredient.Key}");
                 continue;
             }
-            if (item.Key == "skin" && sell.Tag.StartsWith("PET_"))
+            if (item.Key == "skin" && IsPet(sell.Tag))
             {
                 yield return await priceProvider.CostOf($"PET_SKIN_" + ingredient.Key, $"Applied {ingredient.Key}");
                 continue;
@@ -716,6 +736,16 @@ public class ProfitChangeService
             else
                 yield return await priceProvider.CostOf(ingredient.Key, $"Used {ingredient.count}x {ingredient.Key} to upgraded {item.Key} to {item.Value}", ingredient.count);
         }
+    }
+
+    /// <summary>
+    /// Tags starting with PET_ that are not pets (skins, pet items, cake, satchel) and have no kat upgrades
+    /// </summary>
+    internal static bool IsPet(string tag)
+    {
+        if (tag == null || !tag.StartsWith("PET_"))
+            return false;
+        return !(tag.StartsWith("PET_SKIN_") || tag.StartsWith("PET_ITEM_") || tag == "PET_ITEM" || tag == "PET_CAKE" || tag == "PET_SATCHEL");
     }
 
     private async IAsyncEnumerable<PastFlip.ProfitChange> GetPetRarityUpgrades(Core.SaveAuction buy, Core.SaveAuction sell, IPriceProvider priceProvider)
@@ -733,7 +763,7 @@ public class ProfitChangeService
         {
             var allCosts = await katApi.GetAllKatAsync(0, default);
             if (allCosts == null)
-                throw new Exception("could not get kat costs from crafts api");
+                throw new System.Net.Http.HttpRequestException("could not get kat costs from crafts api");
             var cost = allCosts.Where(c => ((int)c.TargetRarity) > i && c.CoreData.ItemTag == sell.Tag)
                         .OrderBy(c => c.TargetRarity).FirstOrDefault();
             var upgradeCost = (double?)cost?.CoreData?.Cost;
@@ -773,12 +803,20 @@ public class ProfitChangeService
                         Core.Tier.UNCOMMON => "FROST",
                         Core.Tier.RARE => "GLACIAL",
                         Core.Tier.EPIC => "SUBZERO",
-                        _ => throw new Exception($"could not find wisp upgrade stone for {i}({(Core.Tier)rarityInt}) {sell.Tag}")
+                        _ => null
                     };
+                    if (kind == null)
+                    {
+                        logger.LogWarning("could not find wisp upgrade stone for tier {tier}({tierName}) and tag {tag}, skipping cost", i, (Core.Tier)rarityInt, sell.Tag);
+                        continue;
+                    }
                     // craft cost is used because subZero can't be/isn't traded
                     var craft = allCrafts.Where(c => c.ItemId == $"UPGRADE_STONE_{kind}").FirstOrDefault();
                     if (craft == null)
-                        throw new Exception($"could not find craft for wisp UPGRADE_STONE_{kind}");
+                    {
+                        logger.LogWarning("could not find craft for wisp UPGRADE_STONE_{kind} on tag {tag}, skipping cost", kind, sell.Tag);
+                        continue;
+                    }
                     yield return new PastFlip.ProfitChange()
                     {
                         Label = $"Wisp upgrade stone for {kind}",
@@ -787,7 +825,11 @@ public class ProfitChangeService
                     continue;
                 }
                 if (raw == null)
-                    throw new Exception($"could not find kat cost for tier {i}({(Core.Tier)rarityInt}) and tag {sell.Tag} {buy.Uuid} -> {sell.Uuid}");
+                {
+                    // missing price data must not fail the whole flip, treat the upgrade cost as unknown
+                    logger.LogWarning("could not find kat cost for tier {tier}({tierName}) and tag {tag} {buy} -> {sell}, skipping cost", i, (Core.Tier)rarityInt, sell.Tag, buy.Uuid, sell.Uuid);
+                    continue;
+                }
                 upgradeCost = raw.Cost * (1.0 - 0.003 * level);
                 if (raw.Material != null)
                 {
@@ -1017,13 +1059,21 @@ public class ProfitChangeService
         return change;
     }
 
+    /// <summary>
+    /// Value of an item, null if no price is known (the caller skips the change instead of failing the flip)
+    /// </summary>
     private async Task<PastFlip.ProfitChange> ValueOf(string item, string title, int amount = 1)
     {
+        var price = await pricesApi.ApiItemPriceItemTagGetAsync(item);
+        if (price == null)
+        {
+            logger.LogWarning("could not find price for {item}, skipping {title}", item, title);
+            return null;
+        }
         return new PastFlip.ProfitChange()
         {
             Label = title,
-            Amount = (long)(await pricesApi.ApiItemPriceItemTagGetAsync(item)
-                ?? throw new Exception($"could not find price for {item}")).Median * amount * 98 / 100
+            Amount = (long)price.Median * amount * 98 / 100
         };
     }
 }
@@ -1035,6 +1085,12 @@ public class ApiSaveAuction : Core.SaveAuction
     /// </summary>
     [DataMember(Name = "flatNbt", EmitDefaultValue = true)]
     public override Dictionary<string, string> FlatenedNBT { get; set; }
+
+    /// <summary>
+    /// How the cost of a purchase reconstructed from a trade was determined, never serialized
+    /// </summary>
+    [IgnoreDataMember, Newtonsoft.Json.JsonIgnore, MessagePack.IgnoreMember]
+    public Models.FlipFlags TradeFlags { get; set; }
 }
 
 public static class AuctionShortcuts

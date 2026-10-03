@@ -241,17 +241,8 @@ public class FlipStorageService
         session.Execute("CREATE TABLE IF NOT EXISTS complicated_flips (item_tag text, auction_id uuid, attribute_values map<text, bigint>, ended_at timestamp, sold_for bigint, PRIMARY KEY (item_tag, auction_id))"
          + " WITH default_time_to_live = 2592000 AND compaction = { 'class' : 'TimeWindowCompactionStrategy', 'compaction_window_size' : 1, 'compaction_window_unit' : 'DAYS' }");
 
-        unknownFlips = new Table<PastFlip>(session, new MappingConfiguration().Define(new Map<PastFlip>()
-            .PartitionKey(c => c.FinderType)
-            .ClusteringKey(c => c.SellTime, SortOrder.Descending)
-            .ClusteringKey(c => c.Uid)
-            .Column(c => c.FinderType, cm => cm.WithDbType<int>())
-            .Column(c => c.ItemTier, cm => cm.WithDbType<int>())
-            .Column(c => c.ProfitChanges, cm => cm.Ignore())
-            .Column(o => o.Flags, c => c.WithName("flags").WithDbType<int>())
-            ), "unknown_flips2");
+        await EnsureUnknownFlipsTable(session);
         // set the table to have a ttl of 14 days and time window compaction
-        await unknownFlips.CreateIfNotExistsAsync();
         session.Execute("ALTER TABLE unknown_flips2 WITH default_time_to_live = 1209600 AND compaction = { 'class' : 'TimeWindowCompactionStrategy', 'compaction_window_size' : 1, 'compaction_window_unit' : 'DAYS' }");
 
         unsoldFlips = new Table<UnsoldFlip>(session, new MappingConfiguration().Define(new Map<UnsoldFlip>()
@@ -267,6 +258,20 @@ public class FlipStorageService
         await unsoldFlips.CreateIfNotExistsAsync();
         session.Execute("ALTER TABLE unsold_flips WITH default_time_to_live = 7200 AND compaction = { 'class' : 'TimeWindowCompactionStrategy', 'compaction_window_size' : 30, 'compaction_window_unit' : 'MINUTES' }");
         logger.LogInformation("Migration complete, all tables created and configured.");
+    }
+
+    internal async Task EnsureUnknownFlipsTable(ISession tableSession)
+    {
+        unknownFlips = new Table<PastFlip>(tableSession, new MappingConfiguration().Define(new Map<PastFlip>()
+            .PartitionKey(c => c.FinderType)
+            .ClusteringKey(c => c.SellTime, SortOrder.Descending)
+            .ClusteringKey(c => c.Uid)
+            .Column(c => c.FinderType, cm => cm.WithDbType<int>())
+            .Column(c => c.ItemTier, cm => cm.WithDbType<int>())
+            .Column(c => c.ProfitChanges, cm => cm.Ignore())
+            .Column(o => o.Flags, c => c.WithName("flags").WithDbType<int>())
+            ), "unknown_flips2");
+        await unknownFlips.CreateIfNotExistsAsync();
     }
 
     public async Task StoreComplicated(ComplicatedFlip flip)
@@ -290,6 +295,54 @@ public class FlipStorageService
     {
         return (await unknownFlips.Where(f => f.FinderType == 0 && f.SellTime >= start && f.SellTime <= end).ExecuteAsync())
             .Select(NormalizeFlipTimestamps);
+    }
+
+    /// <summary>
+    /// Gets a globally bounded cohort from the missed-flip table. Each selected finder partition
+    /// loads at most <paramref name="limit"/> rows before the merge, which returns at most that limit.
+    /// </summary>
+    public virtual async Task<IReadOnlyList<PastFlip>> GetMissedFlips(DateTime start, DateTime end, string cohort, int limit)
+    {
+        var finderTypes = GetMissedFlipFinderTypes(cohort);
+        var partitionResults = await Task.WhenAll(finderTypes.Select(finderType =>
+            GetMissedFlipPartition(finderType, start, end, limit)));
+        return MergeMissedFlips(partitionResults, limit);
+    }
+
+    internal static IReadOnlyList<LowPricedAuction.FinderType> GetMissedFlipFinderTypes(string cohort)
+    {
+        if (cohort == "finder_unknown")
+            return [LowPricedAuction.FinderType.UNKOWN];
+        if (cohort == "blocked_or_outsped")
+            return Enum.GetValues<LowPricedAuction.FinderType>()
+                .Where(finderType => (int)finderType != 0)
+                .Distinct()
+                .OrderBy(finderType => (int)finderType)
+                .ToList();
+        throw new ArgumentOutOfRangeException(nameof(cohort));
+    }
+
+    internal static IReadOnlyList<PastFlip> MergeMissedFlips(IEnumerable<IEnumerable<PastFlip>> partitions, int limit)
+    {
+        return partitions.SelectMany(partition => partition)
+            .OrderByDescending(flip => flip.SellTime)
+            .ThenBy(flip => (int)flip.FinderType)
+            .ThenBy(flip => flip.Uid)
+            .ThenBy(flip => flip.PurchaseAuctionId)
+            .ThenBy(flip => flip.SellAuctionId)
+            .Take(limit)
+            .Select(NormalizeFlipTimestamps)
+            .ToList();
+    }
+
+    private async Task<IEnumerable<PastFlip>> GetMissedFlipPartition(
+        LowPricedAuction.FinderType finderType, DateTime start, DateTime end, int limit)
+    {
+        var finderTypeValue = (int)finderType;
+        return await unknownFlips
+            .Where(flip => (int)flip.FinderType == finderTypeValue && flip.SellTime >= start && flip.SellTime <= end)
+            .Take(limit)
+            .ExecuteAsync();
     }
 
     public async Task<IEnumerable<UnsoldFlip>> GetUnsoldFlips(DateTime olderThan, int amount)
