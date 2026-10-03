@@ -117,7 +117,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     var flips = flipsToSave.ToList();
                     var lookup = flips.Select(f => f.AuctionId).ToHashSet();
                     var existing = await db.Flips.Where(f => lookup.Contains(f.AuctionId)).ToListAsync();
-                    var newFlips = flips.Where(f => !existing.Where(ex => f.AuctionId == f.AuctionId && ex.FinderType == f.FinderType).Any()).ToList();
+                    var newFlips = GetNewFlips(flips, existing);
                     foreach (var item in newFlips)
                     {
                         if (item.Timestamp < minTime)
@@ -135,6 +135,11 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     await Task.Delay(500);
                 }
             }
+        }
+
+        internal static List<Flip> GetNewFlips(IEnumerable<Flip> flips, IEnumerable<Flip> existing)
+        {
+            return flips.Where(f => !existing.Any(ex => ex.AuctionId == f.AuctionId && ex.FinderType == f.FinderType)).ToList();
         }
 
         public async Task<FlipEvent> AddEvent(FlipEvent flipEvent)

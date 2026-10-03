@@ -18,6 +18,18 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services;
 public class TrackerServiceTests
 {
     [Test]
+    public void BatchKeepsValuationsForOtherAuctionsAndFinders()
+    {
+        var known = new Flip { AuctionId = 1, FinderType = LowPricedAuction.FinderType.SNIPER_MEDIAN };
+        var otherAuction = new Flip { AuctionId = 2, FinderType = known.FinderType, TargetPrice = 12_000_000 };
+        var otherFinder = new Flip { AuctionId = 1, FinderType = LowPricedAuction.FinderType.SNIPER };
+
+        var added = TrackerService.GetNewFlips(new[] { known, otherAuction, otherFinder }, new[] { known });
+
+        added.Should().BeEquivalentTo(new[] { otherAuction, otherFinder });
+    }
+
+    [Test]
     [TestCase("§7[Lvl 1] §6Bat", "[Lvl 60] Bat", "[Lvl 1->60] Bat")]
     [TestCase("[Lvl 30] Bat", "§7[Lvl 100] §6Bat", "§7[Lvl 30->100] §6Bat")]
     public void CheckLevelDisplay(string startName, string sellName, string expected)
