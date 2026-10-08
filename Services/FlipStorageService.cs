@@ -41,8 +41,35 @@ public class FlipStorageService
         return session;
     }
 
+    /// <summary>
+    /// Opted out players are never stored
+    /// </summary>
+    internal static bool ShouldStore(Guid player) => !PlayerOptOut.IsOptedOut(player);
+
+    /// <summary>
+    /// All flips of one player (whole partition)
+    /// </summary>
+    public virtual async Task<IReadOnlyList<PastFlip>> GetAllFlips(Guid flipper)
+    {
+        var session = await GetSession();
+        var table = GetFlipsTable(session);
+        return (await table.Where(f => f.Flipper == flipper).ExecuteAsync()).Select(NormalizeFlipTimestamps).ToList();
+    }
+
+    /// <summary>
+    /// Deletes the whole partition of a player
+    /// </summary>
+    public virtual async Task DeleteAllFlips(Guid flipper)
+    {
+        var session = await GetSession();
+        var table = GetFlipsTable(session);
+        await table.Where(f => f.Flipper == flipper).Delete().ExecuteAsync();
+    }
+
     public virtual async Task SaveFlip(PastFlip flip)
     {
+        if (!ShouldStore(flip.Flipper))
+            return;
         var session = await GetSession();
         var table = GetFlipsTable(session);
         try
@@ -104,6 +131,9 @@ public class FlipStorageService
 
     public async Task SaveFlips(IEnumerable<PastFlip> flips)
     {
+        flips = flips.Where(f => ShouldStore(f.Flipper)).ToList();
+        if (flips.Count() == 0)
+            return;
         var session = await GetSession();
         var table = GetFlipsTable(session);
         await Task.WhenAll(flips.Select(f => table.Insert(NormalizeFlipTimestamps(f)).ExecuteAsync()));
@@ -288,6 +318,8 @@ public class FlipStorageService
 
     public async Task SaveUnknownFlip(PastFlip flip)
     {
+        if (!ShouldStore(flip.Flipper))
+            return;
         await unknownFlips.Insert(NormalizeFlipTimestamps(flip)).ExecuteAsync();
     }
 

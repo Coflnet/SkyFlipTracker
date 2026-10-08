@@ -88,6 +88,9 @@ namespace Coflnet.Sky.SkyAuctionTracker
             services.AddTransient<TrackerService>();
             services.AddSingleton<KafkaCreator>();
             services.AddCoflnetCore();
+            // start even if the opt-out list can't be loaded, stored flips of opted out players are removed whenever it loads
+            services.AddPlayerOptOut(required: false, onLoaded: (sp, token) => sp.GetRequiredService<PrivacyService>().RemoveOptedOut(token));
+            services.AddSingleton<PrivacyService>();
             services.AddSingleton<FlipSumaryEventProducer>();
             services.AddSingleton<HypixelItemService>();
             services.AddHttpClient();
