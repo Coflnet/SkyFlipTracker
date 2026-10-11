@@ -411,7 +411,7 @@ public class ProfitChangeService
             }
             if (tagOnPurchase == sell.Tag) yield break;
         }
-        var allCrafts = await craftsApi.GetAllAsync();
+        var allCrafts = await BulkFetchGate.Shared.Run(() => craftsApi.GetAllAsync());
         var craft = allCrafts.Where(c => c.ItemId == sell.Tag).FirstOrDefault();
         if (craft == null)
         {
@@ -761,7 +761,7 @@ public class ProfitChangeService
         Console.WriteLine($"buy tier {(int)buy.Tier} {buy.Tier} sell tier {(int)sellTier} {sellTier}");
         for (int i = ((int)buy.Tier); i < (int)sellTier; i++)
         {
-            var allCosts = await katApi.GetAllKatAsync(0, default);
+            var allCosts = await BulkFetchGate.Shared.Run(() => katApi.GetAllKatAsync(0, default));
             if (allCosts == null)
                 throw new System.Net.Http.HttpRequestException("could not get kat costs from crafts api");
             var cost = allCosts.Where(c => ((int)c.TargetRarity) > i && c.CoreData.ItemTag == sell.Tag)
@@ -782,7 +782,7 @@ public class ProfitChangeService
             if (cost == null || cost.MaterialCost >= 1_000_000 || level > 2)
             {
                 // approximate cost with raw
-                var rawCost = await katApi.GetUpgradeDataAsync();
+                var rawCost = await BulkFetchGate.Shared.Run(() => katApi.GetUpgradeDataAsync());
                 var rarityInt = i;
                 if (i > (int)Core.Tier.LEGENDARY)
                     break;
@@ -796,7 +796,7 @@ public class ProfitChangeService
                 // special pet upgrades 
                 if (sell.Tag.EndsWith("_WISP"))
                 {
-                    var allCrafts = await craftsApi.GetAllAsync();
+                    var allCrafts = await BulkFetchGate.Shared.Run(() => craftsApi.GetAllAsync());
                     Console.WriteLine($"wisp upgrade stone for {i}({(Core.Tier)rarityInt}) {sell.Tag}");
                     var kind = (Core.Tier)i switch
                     {
@@ -855,6 +855,30 @@ public class ProfitChangeService
         return float.Parse(value, System.Globalization.CultureInfo.InvariantCulture);
     }
 
+    private readonly object bazaarLock = new();
+    private DateTime bazaarFetched;
+    private Task<List<Bazaar.Client.Model.ItemPrice>> bazaarPrices;
+    internal static readonly TimeSpan BazaarCacheTime = TimeSpan.FromSeconds(60);
+
+    /// <summary>
+    /// All bazaar prices, shared for <see cref="BazaarCacheTime"/>. Every new enchant of every sell used to download the full list again.
+    /// The list is only read, callers copy what they change. A failed fetch is not kept.
+    /// </summary>
+    internal Task<List<Bazaar.Client.Model.ItemPrice>> GetBazaarPrices()
+    {
+        Task<List<Bazaar.Client.Model.ItemPrice>> current;
+        lock (bazaarLock)
+        {
+            if (bazaarPrices == null || bazaarPrices.IsFaulted || bazaarPrices.IsCanceled || DateTime.UtcNow - bazaarFetched > BazaarCacheTime)
+            {
+                bazaarFetched = DateTime.UtcNow;
+                bazaarPrices = BulkFetchGate.Shared.Run(() => bazaarApi.GetAllPricesAsync());
+            }
+            current = bazaarPrices;
+        }
+        return current;
+    }
+
     private async Task<PastFlip.ProfitChange> GetCostForEnchant(Core.Enchantment item, Core.SaveAuction buy, Core.SaveAuction sell)
     {
         if (item.Type == Core.Enchantment.EnchantmentType.telekinesis)
@@ -871,7 +895,7 @@ public class ProfitChangeService
         PastFlip.ProfitChange found = null;
         try
         {
-            var allBazaar = await bazaarApi.GetAllPricesAsync();
+            var allBazaar = await GetBazaarPrices();
             var itemValues = allBazaar.GroupBy(a => a.ProductId).ToDictionary(b => b.Key, b => b.Max(x => x.SellPrice));
             if (NpcEnchantPrices.TryGetValue(item.Type, out var npcPrice))
             {

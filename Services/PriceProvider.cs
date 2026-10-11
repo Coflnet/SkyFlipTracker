@@ -86,7 +86,7 @@ public class PriceProvider : IPriceProvider
             // try to fall back to craft cost if available
             try
             {
-                var allCrafts = await craftsApi.GetAllAsync();
+                var allCrafts = await BulkFetchGate.Shared.Run(() => craftsApi.GetAllAsync());
                 var craft = allCrafts.FirstOrDefault(c => c.ItemId == item);
                 if (craft != null && craft.CraftCost != null)
                 {
@@ -124,7 +124,7 @@ public class PriceProvider : IPriceProvider
         }
         else if (itemPrice.Median == 500_000_000)
         {
-            var allCrafts = await craftsApi.GetAllAsync();
+            var allCrafts = await BulkFetchGate.Shared.Run(() => craftsApi.GetAllAsync());
             median = (long)(allCrafts.Where(c => c.ItemId == item).FirstOrDefault()?.CraftCost ?? 500_000_000);
         }
 

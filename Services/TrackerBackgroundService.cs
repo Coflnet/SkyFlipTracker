@@ -197,7 +197,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
 
         private async Task ConsumeTryCatch<T>(Func<IEnumerable<T>, TrackerService, Task> NewMethod, string topicName, int batchSize, CancellationToken stoppingToken)
         {
-            await KafkaConsumer.ConsumeBatch<T>(config, config[topicName], async elements =>
+            await KafkaConsumer.ConsumeBatch<T>(BoundedKafkaConfig.Create(config, "sky-fliptracker"), config[topicName], async elements =>
             {
                 await ProcessResilient(elements.ToList(), async batch =>
                 {
@@ -205,12 +205,12 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     var service = scope.ServiceProvider.GetRequiredService<TrackerService>();
                     await NewMethod(batch, service);
                 }, config[topicName], logger, stoppingToken);
-            }, stoppingToken, "sky-fliptracker", batchSize);
+            }, stoppingToken, batchSize);
         }
 
         private async Task NewAuctions(CancellationToken stoppingToken)
         {
-            await KafkaConsumer.ConsumeBatch<SaveAuction>(config, config["TOPICS:NEW_AUCTION"], async toUpdate =>
+            await KafkaConsumer.ConsumeBatch<SaveAuction>(BoundedKafkaConfig.Create(config, "sky-fliptracker", AutoOffsetReset.Latest), config["TOPICS:NEW_AUCTION"], async toUpdate =>
             {
                 foreach (var item in toUpdate)
                 {
@@ -228,7 +228,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                         AnalyseController.BadPlayersList.Add(uuid);
                     }
                 }
-            }, stoppingToken, "sky-fliptracker", 40, AutoOffsetReset.Latest);
+            }, stoppingToken, 40);
         }
 
         private void CheckLister(SaveAuction item)
@@ -265,6 +265,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 AutoCommitIntervalMs = 0,
                 PartitionAssignmentStrategy = PartitionAssignmentStrategy.CooperativeSticky
             };
+            BoundedKafkaConfig.Bound(consumeConfig, config);
             var sellConsumeConfig = new ConsumerConfig(consumeConfig.ToDictionary(c => c.Key, c => c.Value))
             {
                 GroupId = "sky-fliptracker-sell",
@@ -315,7 +316,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
         }
         private async Task LoadFlip(CancellationToken stoppingToken)
         {
-            await KafkaConsumer.ConsumeBatch<SaveAuction>(config, config["TOPICS:LOAD_FLIPS"], async toUpdate =>
+            await KafkaConsumer.ConsumeBatch<SaveAuction>(BoundedKafkaConfig.Create(config, "sky-fliptracker"), config["TOPICS:LOAD_FLIPS"], async toUpdate =>
             {
                 await ProcessResilient(toUpdate.ToList(), async batch =>
                 {
@@ -325,12 +326,12 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     flipsUpdated.Inc(batch.Count());
                     Console.WriteLine("updated flips " + batch.Count());
                 }, config["TOPICS:LOAD_FLIPS"], logger, stoppingToken);
-            }, stoppingToken, "sky-fliptracker", 8);
+            }, stoppingToken, 8);
         }
 
         private async Task ConsumeFlips(CancellationToken stoppingToken)
         {
-            await KafkaConsumer.ConsumeBatch<LowPricedAuction>(config, config["TOPICS:LOW_PRICED"], async lps =>
+            await KafkaConsumer.ConsumeBatch<LowPricedAuction>(BoundedKafkaConfig.Create(config, "sky-fliptracker"), config["TOPICS:LOW_PRICED"], async lps =>
             {
                 if (lps.Count() == 0)
                     return;
@@ -361,7 +362,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     TargetPrice = (int)(int.MaxValue > lp.TargetPrice ? lp.TargetPrice : int.MaxValue)
                 }));
                 }, config["TOPICS:LOW_PRICED"], logger, stoppingToken);
-            }, stoppingToken, "sky-fliptracker", 50);
+            }, stoppingToken, 50);
         }
 
         private async Task StoreContext(IEnumerable<LowPricedAuction> lps, IServiceScope scope)
