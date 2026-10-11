@@ -2847,4 +2847,71 @@ public class ProfitChangeTests
         Assert.That(removedChange.Amount, Is.EqualTo(7_750_000 - removalCost),
             "Should fallback to market price when no own AH sale is visible");
     }
+    /// <summary>
+    /// An item the api does not know (SKYBLOCK_COPPER) has no craft cost; it must not be logged as failure and must not drop the other ingredients.
+    /// </summary>
+    [Test]
+    public async Task CraftIngredientNotFoundIsNoCostWithoutErrorLog()
+    {
+        var logger = new CapturingLogger<ProfitChangeService>();
+        var itemService = new HypixelItemService(new System.Net.Http.HttpClient(), NullLogger<HypixelItemService>.Instance);
+        var factory = new PriceProviderFactory(playerapi.Object, pricesApi.Object, craftsApi.Object, auctionsApi.Object, bazaarApi.Object, NullLogger<PriceProviderFactory>.Instance);
+        var logged = new TestProfitChangeService(pricesApi.Object, katApi.Object, craftsApi.Object, logger, itemsApi.Object, itemService, bazaarApi.Object, factory, auctionsApi.Object);
+        var buy = new Core.SaveAuction()
+        {
+            Uuid = "d4e5e5157e7d428c90e82f88b32ff64e",
+            Tag = "FIERY_CRIMSON_CHESTPLATE",
+            ItemName = "Fiery Crimson Chestplate",
+            HighestBidAmount = 100_000_000,
+            FlatenedNBT = new() { { "uid", "a5ed78627503" } },
+            Tier = Core.Tier.MYTHIC
+        };
+        var sell = new Core.SaveAuction()
+        {
+            Uuid = "3693dbdce7e449bea132f08c202a1548",
+            Tag = "INFERNAL_CRIMSON_CHESTPLATE",
+            ItemName = "Infernal Crimson Chestplate",
+            HighestBidAmount = 299_999_999,
+            FlatenedNBT = new() { { "uid", "a5ed78627503" } },
+            Tier = Core.Tier.MYTHIC
+        };
+        craftsApi.Setup(c => c.GetAllAsync(0, default)).ReturnsAsync(() => new()
+        {
+            new() { ItemId = "INFERNAL_CRIMSON_CHESTPLATE", Ingredients = new()
+            {
+                new() { ItemId = "FIERY_CRIMSON_CHESTPLATE", Count = 1 },
+                new() { ItemId = "SKYBLOCK_COPPER", Count = 5 },
+                new() { ItemId = "KUUDRA_TEETH", Count = 100 }
+            }}
+        });
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("SKYBLOCK_COPPER", null, 0, default))
+            .ThrowsAsync(new Coflnet.Sky.Api.Client.Client.ApiException(404, "Error calling ApiItemPriceItemTagGet: {\"slug\":\"item_not_found\",\"message\":\"item not found\"}"));
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("KUUDRA_TEETH", null, 0, default))
+            .ReturnsAsync(() => new() { Median = 1_000_000 });
+        itemsApi.Setup(i => i.ItemItemTagGetAsync("INFERNAL_CRIMSON_CHESTPLATE", It.IsAny<bool?>(), It.IsAny<int>(), default))
+            .ReturnsAsync(() => new() { Tag = "INFERNAL_CRIMSON_CHESTPLATE", Tier = Items.Client.Model.Tier.MYTHIC });
+
+        var result = await logged.GetChanges(buy, sell);
+
+        result.Should().Contain(c => c.Label.Contains("crafting material KUUDRA_TEETH"));
+        result.Should().NotContain(c => c.Label.Contains("SKYBLOCK_COPPER"));
+        logger.Entries.Should().NotContain(e => e.level >= LogLevel.Warning && e.message.Contains("SKYBLOCK_COPPER"));
+    }
+
+    [Test]
+    public void ItemNotFoundIsRecognizedThroughWrapping()
+    {
+        ProfitChangeService.IsItemNotFound(new Exception("outer", new Exception("{\"slug\":\"item_not_found\"}"))).Should().BeTrue();
+        ProfitChangeService.IsItemNotFound(new Exception("timeout")).Should().BeFalse();
+    }
+}
+
+/// <summary>Collects log entries for assertions</summary>
+public class CapturingLogger<T> : ILogger<T>
+{
+    public System.Collections.Concurrent.ConcurrentQueue<(LogLevel level, string message)> Entries { get; } = new();
+    public IDisposable BeginScope<TState>(TState state) where TState : notnull => null;
+    public bool IsEnabled(LogLevel logLevel) => true;
+    public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter)
+        => Entries.Enqueue((logLevel, formatter(state, exception) + exception));
 }

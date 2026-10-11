@@ -68,6 +68,36 @@ public class TradeCostRegressionTests
         changes.Verify(x => x.GetChanges(It.IsAny<SaveAuction>(), It.IsAny<SaveAuction>()), Times.Never);
     }
 
+    /// <summary>A sell whose trade holds only coins has nothing to take a purchase from: warn once and keep the rest of the batch.</summary>
+    [Test]
+    public async Task SellWithoutItemInTradeIsSkippedWithWarning()
+    {
+        const long coinOnlyTrade = Coins;
+        var rows = new List<Transaction> { Entry(Coins, 33, 5000, Sold) };
+        var api = Transactions(rows);
+        var sell = new SaveAuction
+        {
+            Uuid = Guid.NewGuid().ToString("N"), Tag = "STICK", AuctioneerId = Player.ToString("N"),
+            End = Sold, HighestBidAmount = 1000, FlatenedNBT = new() { { "uid", "abcdef123456" } }
+        };
+        var lookup = new Dictionary<string, List<long>> { { "x-abcdef123456", new List<long> { coinOnlyTrade } } };
+        api.Setup(x => x.TransactionUuidItemIdPostAsync(It.IsAny<List<Guid>>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(lookup);
+        var auctions = new Mock<Api.Client.Api.IAuctionsApi>();
+        auctions.Setup(x => x.ApiAuctionsUidsSoldPostWithHttpInfoAsync(It.IsAny<Api.Client.Model.InventoryBatchLookup>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Api.Client.Client.ApiResponse<Dictionary<string, List<Api.Client.Model.ItemSell>>>(
+                System.Net.HttpStatusCode.OK, null, new Dictionary<string, List<Api.Client.Model.ItemSell>>()));
+        var logger = new CapturingLogger<TrackerService>();
+        var tracker = new TrackerService(null, logger, auctions.Object, null, null, null, null, new ActivitySource("no-item"),
+            null, null, null, new Mock<PlayerState.Client.Api.IItemsApi>().Object, api.Object,
+            new RepresentationConverter(NullLogger<RepresentationConverter>.Instance, null));
+
+        await tracker.IndexCassandra(new[] { sell });
+
+        Assert.That(logger.Entries.Where(e => e.level >= Microsoft.Extensions.Logging.LogLevel.Error), Is.Empty);
+        Assert.That(logger.Entries.Count(e => e.level == Microsoft.Extensions.Logging.LogLevel.Warning && e.message.Contains("No item in trade")), Is.EqualTo(1));
+    }
+
     /// <summary>Checks conventional consideration and allocation independently of the incident.</summary>
     [TestCase(3000, false, false, 100)]
     [TestCase(0, false, false, 0)]

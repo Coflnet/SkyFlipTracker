@@ -483,6 +483,11 @@ public class ProfitChangeService
                 if (count > 0)
                     change = await priceProvider.CostOf(item.ItemId, $"crafting material {item.ItemId}" + (count > 1 ? $" x{count}" : ""), count);
             }
+            catch (System.Exception e) when (IsItemNotFound(e))
+            {
+                // an item the api does not know has no price, so it adds no cost
+                logger.LogDebug("no craft cost for unknown item {item}", item.ItemId);
+            }
             catch (System.Exception e)
             {
                 logger.LogError(e, $"could not find craft cost for {item.ItemId}");
@@ -500,6 +505,14 @@ public class ProfitChangeService
                 logger.LogInformation($"upgraded rarity of {buy.Uuid} due to craft");
             }
         }
+    }
+
+    internal static bool IsItemNotFound(System.Exception e)
+    {
+        for (var current = e; current != null; current = current.InnerException)
+            if (current.Message.Contains("item_not_found"))
+                return true;
+        return false;
     }
 
     private async IAsyncEnumerable<PastFlip.ProfitChange> GetRemainingDifference(Core.SaveAuction buy, Core.SaveAuction sell, KeyValuePair<string, string> item, IPriceProvider priceProvider)

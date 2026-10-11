@@ -393,9 +393,19 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     logger.LogInformation($"Already stored {item.sell.Uuid}");
                     return;
                 }
-                var buy = item.batchBuy == null
-                    ? await GetAuction(item.buy.Uuid, item.sell, token).ConfigureAwait(false)
-                    : CopyAsApiAuction(item.batchBuy);
+                ApiSaveAuction buy;
+                try
+                {
+                    buy = item.batchBuy == null
+                        ? await GetAuction(item.buy.Uuid, item.sell, token).ConfigureAwait(false)
+                        : CopyAsApiAuction(item.batchBuy);
+                }
+                catch (NoTradeItemException e)
+                {
+                    // nothing to attribute a cost to, retrying or splitting the batch can not change that
+                    logger.LogWarning("Skipping sell {sellUuid} {tag}: {reason}", item.sell.Uuid, item.sell.Tag, e.Message);
+                    return;
+                }
                 try
                 {
                     var sell = item.sell;
@@ -493,6 +503,14 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 }
             });
             await noUidTask;
+        }
+
+        /// <summary>
+        /// The trade a sell points at contains only coins, there is no item to take a purchase from
+        /// </summary>
+        internal class NoTradeItemException : Exception
+        {
+            public NoTradeItemException(string message) : base(message) { }
         }
 
         private static string GetItemUid(SaveAuction auction)
@@ -1101,7 +1119,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             (tradeEstimate, var tradeFlags) = await GetCostShare(relevantTradeEntry, items, tradeEstimate);
             var potentialItems = items.Where(i => i.ItemId > COIN_ID + 100).ToList();
             if (potentialItems.Count == 0)
-                throw new Exception($"No item in trade for {uuid}");
+                throw new NoTradeItemException($"No item in trade for {uuid}");
             var itemInfo = await itemsApi.ApiItemsIdGetAsync(long.Parse(uuid), 0);
             var auction = representationConverter.FromItemRepresent(itemInfo);
             auction.HighestBidAmount = tradeEstimate;
