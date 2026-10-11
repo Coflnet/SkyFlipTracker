@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Coflnet.Sky.Api.Client.Api;
 using Coflnet.Sky.Core;
 using Coflnet.Sky.SkyAuctionTracker.Models;
+using Coflnet.Sky.SkyAuctionTracker.Models.Investigation;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -202,7 +203,22 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             var count = await db.SaveChangesAsync();
             if (count > 0)
                 Console.WriteLine($"Saved sells {count}");
+            RecordPlayerIds(sells);
             await flipStorageService.DeleteActiveBasedOnStartTime(sells.Where(s => s.Bin && s.Bids.Count > 0).Select(s => s.Start));
+        }
+
+        private void RecordPlayerIds(IEnumerable<SaveAuction> sells)
+        {
+            try
+            {
+                var uuids = sells.Where(s => s.Bin && s.Bids.Count > 0)
+                    .SelectMany(s => new[] { s.Bids.MaxBy(b => b.Amount).Bidder, s.AuctioneerId });
+                PlayerIdRecorder.Shared.Record(uuids, flipStorageService, logger);
+            }
+            catch (Exception e)
+            {
+                logger.LogWarning(e, "Could not record player ids of sells");
+            }
         }
 
         public async Task PutBuySpeedOnBoard(IEnumerable<SaveAuction> sells)
@@ -485,7 +501,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
 
                     if (flipFound == default && changes.Count <= 1 && profit > 1_500_000 && buy.End > DateTime.UtcNow - TimeSpan.FromDays(1))
                     {
-                        logger.LogInformation($"Flip {flip.PurchaseAuctionId:n} not found for {flip.Profit}");
+                        logger.LogInformation(VerdictLogTemplate, flip.PurchaseAuctionId.ToString("N"), FunnelVerdict.NotFound, "none", flip.Profit,
+                            0, 0, false, null, null, GetId(buy.Bids?.OrderByDescending(b => b.Amount).FirstOrDefault()?.Bidder));
                         await MissedFlip(flip, "Flip not found at all", buy);
                     }
                     if (flipFound != default && changes.Count <= 1 && profit > 600_000 && buy.End > DateTime.UtcNow - TimeSpan.FromDays(1))
@@ -556,6 +573,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
         {
             if (flip.PurchaseCost < 0 || flip.Flags.HasFlag(FlipFlags.UnknownCost) || flip.Flags.HasFlag(FlipFlags.UncertainCost))
                 return;
+            logger.LogInformation(MissedLogTemplate, flip.PurchaseAuctionId.ToString("N"), v, flip.Profit);
             using var scope = scopeFactory.CreateScope();
             var configuration = scope.ServiceProvider.GetRequiredService<IConfiguration>();
             var webhook = configuration["UNFOUND_FLIP_WEBHOOK"];
@@ -587,6 +605,9 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             await flipStorageService.SaveUnknownFlip(flip);
         }
 
+        internal const string VerdictLogTemplate = "Flip {AuctionUuid} verdict {Verdict} finder {Finder} profit {Profit} receivers {ReceiverCount} clicks {ClickCount} buyerReceived {BuyerReceived} leadSeconds {FoundToSold} sendLeadSeconds {FirstReceiveToSold} buyer {BuyerHash}";
+        internal const string MissedLogTemplate = "Flip {AuctionUuid} missed reason {Reason} profit {Profit}";
+
         private async Task LogFoundFlips(ApiSaveAuction buy, PastFlip flip)
         {
             using var scope = scopeFactory.CreateScope();
@@ -599,39 +620,56 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             var sendEvents = await dbScoped.FlipEvents.Where(f => purchaseUid == f.AuctionId).ToListAsync();
             if (sendEvents.Count <= 1)
             {
-                logger.LogInformation($"Flip {flip.PurchaseAuctionId:n} ({buy.UId}) found for {flip.Profit} not sent to anybody");
+                logger.LogInformation(VerdictLogTemplate, flip.PurchaseAuctionId.ToString("N"), FunnelVerdict.FoundNotSent, "unknown", flip.Profit,
+                    sendEvents.Count(e => e.Type == FlipEventType.FLIP_RECEIVE), 0, false, null, null, playerId);
                 await MissedFlip(flip, "Flip not sent to anybody (blocked)", buy);
                 return;
             }
             var user = await userTask;
             var userIds = user?.Accounts?.Select(a => GetId(a.AccountUuid)).ToHashSet() ?? [];
-            var sentToPurchaser = sendEvents.Where(e => e.Type == FlipEventType.FLIP_RECEIVE && userIds.Contains(e.PlayerId)).Any();
-            var boughtAt = sendEvents.Where(e => e.Type == FlipEventType.AUCTION_SOLD).FirstOrDefault();
-            var firstSend = sendEvents.Where(e => e.Type == FlipEventType.FLIP_RECEIVE).OrderBy(e => e.Timestamp).FirstOrDefault();
-            var diff = boughtAt?.Timestamp - firstSend?.Timestamp;
-            logger.LogInformation($"Flip {flip.PurchaseAuctionId:n} found for {flip.Profit} by us {sentToPurchaser} bought {boughtAt?.Timestamp} {sendEvents.Count} diff {diff}");
-            if (!sentToPurchaser && diff > TimeSpan.FromSeconds(-4) && (diff < TimeSpan.FromSeconds(-3.2) || flip.Profit > 50_000_000 && diff < TimeSpan.FromSeconds(-0.1)))
+            // only used for the verdict log line, a failure here must not fail the consumer
+            List<FinderContext> contexts = null;
+            var flips = new List<Flip>();
+            try
             {
-                // todo store
-                var all = await flipStorageService.GetFinderContexts(flip.PurchaseAuctionId);
-                var medianSniperFinder = all.Where(f => f.Finder == LowPricedAuction.FinderType.SNIPER_MEDIAN).FirstOrDefault();
+                contexts = (await flipStorageService.GetFinderContexts(flip.PurchaseAuctionId)).ToList();
+                flips = await dbScoped.Flips.Where(f => f.AuctionId == purchaseUid).ToListAsync();
+            }
+            catch (Exception e)
+            {
+                logger.LogWarning(e, "Could not load finder data of {AuctionUuid} for the verdict", flip.PurchaseAuctionId.ToString("N"));
+                flips = new List<Flip>();
+            }
+            var result = FunnelClassifier.Classify(new FunnelInput
+            {
+                Contexts = contexts ?? [],
+                Flips = flips,
+                Profit = flip.Profit,
+                Now = DateTime.UtcNow
+            }, sendEvents, userIds);
+            var stats = EventStats.FromEvents(sendEvents, userIds);
+            logger.LogInformation(VerdictLogTemplate, flip.PurchaseAuctionId.ToString("N"), result.Verdict,
+                result.Findings.FirstOrDefault()?.Finder.ToString() ?? "none", flip.Profit, stats.ReceiveCount, stats.ClickCount, result.BuyerReceived,
+                result.Timings.FoundToSoldSeconds, result.Timings.FirstReceiveToSoldSeconds, playerId);
+            if (result.QualifiesForExempt)
+            {
+                // like before the classifier existed: loaded here without catch so this branch fails the same way
+                contexts ??= (await flipStorageService.GetFinderContexts(flip.PurchaseAuctionId)).ToList();
+                var medianSniperFinder = contexts.Where(f => f.Finder == LowPricedAuction.FinderType.SNIPER_MEDIAN).FirstOrDefault();
                 if (medianSniperFinder == null)
                 {
-                    logger.LogInformation($"Not found context {flip.PurchaseAuctionId:n} ({buy.UId}) found for {flip.Profit} not sent to us");
+                    logger.LogInformation("Flip {AuctionUuid} exempt skipped, no sniper median context profit {Profit}", flip.PurchaseAuctionId.ToString("N"), flip.Profit);
                     return;
                 }
                 var key = medianSniperFinder.Context.GetValueOrDefault("key");
                 if (key == null)
                 {
-                    logger.LogInformation($"Not found key {flip.PurchaseAuctionId:n} ({buy.UId}) found for {flip.Profit} not sent to us");
+                    logger.LogInformation("Flip {AuctionUuid} exempt skipped, no key profit {Profit}", flip.PurchaseAuctionId.ToString("N"), flip.Profit);
                     return;
                 }
                 await flipStorageService.SaveOutspedFlip(buy.Tag, key, flip.PurchaseAuctionId);
-                logger.LogInformation($"Flip {flip.PurchaseAuctionId:n} ({buy.UId}) found for {flip.Profit} noew excempt");
                 await MissedFlip(flip, "Excempted now", buy);
             }
-
-
         }
 
         private static List<Guid> GetItemUuids(IEnumerable<SaveAuction> sells)
@@ -1167,7 +1205,12 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             return float.Parse(value, NumberStyles.Float | NumberStyles.AllowThousands, System.Globalization.CultureInfo.InvariantCulture);
         }
 
-        internal long GetId(string uuid)
+        internal long GetId(string uuid) => HashId(uuid);
+
+        /// <summary>
+        /// The lossy hash used for player and auction ids in events. Expects uuids in "N" format.
+        /// </summary>
+        internal static long HashId(string uuid)
         {
             if (uuid == null)
                 return -1;

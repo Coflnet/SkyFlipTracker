@@ -73,6 +73,8 @@ class CassandraSmokeTests
             ?? throw new MissingMethodException(nameof(FlipStorageService), "EnsureUnknownFlipsTable");
         await (Task)ensureTable.Invoke(service, [session]);
 
+        await VerifyPlayerIdLookup(service, session);
+
         var start = new DateTime(2026, 8, 31, 10, 0, 0, DateTimeKind.Utc);
         var end = start.AddMinutes(10);
         var unknown = LowPricedAuction.FinderType.UNKOWN;
@@ -100,6 +102,46 @@ class CassandraSmokeTests
             Assert.That(limitedNonzeroResult, Has.Count.EqualTo(1));
             AssertRoundTrip(limitedUnknownResult.Single(), expectedUnknown);
             AssertRoundTrip(limitedNonzeroResult.Single(), expectedNonzero);
+        });
+    }
+
+    private static async Task VerifyPlayerIdLookup(FlipStorageService service, ISession session)
+    {
+        await service.EnsurePlayerIdTable(session);
+        await service.EnsurePlayerIdTable(session); // idempotent, the field is assigned on every start
+        var ttl = session.Execute(
+            "SELECT default_time_to_live FROM system_schema.tables WHERE keyspace_name = 'smoke' AND table_name = 'player_id_lookup'")
+            .Single().GetValue<int>("default_time_to_live");
+
+        var first = Guid.Parse("11111111-1111-1111-1111-111111111111");
+        var second = Guid.Parse("22222222-2222-2222-2222-222222222222");
+        var third = Guid.Parse("33333333-3333-3333-3333-333333333333");
+        var optedOut = Guid.Parse("f3c19fb5-3ea9-40f3-921e-90faab8e2b30");
+        PlayerOptOut.ResetMemory();
+        await service.SavePlayerIds([(-4056057242988594664L, first), (42L, second), (long.MaxValue, third), (7L, optedOut)]);
+
+        var found = await service.LookupPlayerIds([-4056057242988594664L, 42L, long.MaxValue, 7L, 999L, 42L]);
+        var afterDelete = await service.LookupPlayerIds([-4056057242988594664L, 42L]);
+        await service.DeletePlayerId(first);
+        var afterDeleteFirst = await service.LookupPlayerIds([-4056057242988594664L, 42L]);
+        // production hash of the deleted player is what DeletePlayerId removes, so use a row stored under it
+        var hashed = TrackerService.HashId(second.ToString("N"));
+        await service.SavePlayerIds([(hashed, second)]);
+        await service.DeletePlayerId(second);
+        var afterHashedDelete = await service.LookupPlayerIds([hashed]);
+        Assert.Multiple(() =>
+        {
+            Assert.That(ttl, Is.EqualTo(7776000));
+            Assert.That(found, Has.Count.EqualTo(3));
+            Assert.That(found[-4056057242988594664L], Is.EqualTo(first));
+            Assert.That(found[42L], Is.EqualTo(second));
+            Assert.That(found[long.MaxValue], Is.EqualTo(third));
+            Assert.That(found.ContainsKey(7L), Is.False, "opted out player must not be stored");
+            Assert.That(found.ContainsKey(999L), Is.False);
+            Assert.That(afterDelete, Has.Count.EqualTo(2));
+            // the stored hash 42 is not the production hash of the uuid, so DeletePlayerId (hash based) leaves it alone
+            Assert.That(afterDeleteFirst, Has.Count.EqualTo(2));
+            Assert.That(afterHashedDelete, Is.Empty, "DeletePlayerId must remove the row of the player's production hash");
         });
     }
 

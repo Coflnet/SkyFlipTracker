@@ -28,6 +28,7 @@ public class FlipStorageService
     private Table<ComplicatedFlip> complicatedFlips;
     private Table<PastFlip> unknownFlips;
     private Table<UnsoldFlip> unsoldFlips;
+    private Table<PlayerIdLookup> playerIds;
     private ISession session;
     public FlipStorageService(ILogger<FlipStorageService> logger, IConfiguration config, ISession session)
     {
@@ -222,6 +223,8 @@ public class FlipStorageService
         var session = await GetSession();
         var table = GetFlipsTable(session);
         await table.CreateIfNotExistsAsync();
+        // before the early return below, otherwise the table field stays null on every start that returns early
+        await EnsurePlayerIdTable(session);
 
         var tableName = "unsold_flips";
         var checkQuery = new SimpleStatement($"SELECT default_time_to_live FROM system_schema.tables WHERE keyspace_name = '{session.Keyspace}' AND table_name = '{tableName.ToLower()}'");
@@ -288,6 +291,71 @@ public class FlipStorageService
         await unsoldFlips.CreateIfNotExistsAsync();
         session.Execute("ALTER TABLE unsold_flips WITH default_time_to_live = 7200 AND compaction = { 'class' : 'TimeWindowCompactionStrategy', 'compaction_window_size' : 30, 'compaction_window_unit' : 'MINUTES' }");
         logger.LogInformation("Migration complete, all tables created and configured.");
+    }
+
+    /// <summary>
+    /// Creates the hash to uuid table (90 day ttl) and assigns the table field
+    /// </summary>
+    internal async Task EnsurePlayerIdTable(ISession tableSession)
+    {
+        playerIds = new Table<PlayerIdLookup>(tableSession, new MappingConfiguration().Define(new Map<PlayerIdLookup>()
+            .PartitionKey(c => c.Hash)
+            .Column(c => c.Hash, cm => cm.WithName("hash").WithDbType<long>())
+            .Column(c => c.Uuid, cm => cm.WithName("uuid").WithDbType<Guid>())
+            .Column(c => c.LastSeen, cm => cm.WithName("last_seen").WithDbType<DateTime>())
+            ), "player_id_lookup");
+        await tableSession.ExecuteAsync(new SimpleStatement("CREATE TABLE IF NOT EXISTS player_id_lookup (hash bigint PRIMARY KEY, uuid uuid, last_seen timestamp)"
+            + " WITH default_time_to_live = 7776000"));
+    }
+
+    /// <summary>
+    /// Stores hash to uuid mappings, opted out players are skipped
+    /// </summary>
+    public virtual async Task SavePlayerIds(IEnumerable<(long, Guid)> ids)
+    {
+        if (playerIds == null)
+            return;
+        var now = DateTime.UtcNow;
+        var rows = ids.Where(i => ShouldStore(i.Item2)).Select(i => new PlayerIdLookup { Hash = i.Item1, Uuid = i.Item2, LastSeen = now }).ToList();
+        await Task.WhenAll(rows.Select(r => playerIds.Insert(r).ExecuteAsync()));
+    }
+
+    /// <summary>
+    /// Looks up uuids of player hashes, unknown hashes are missing from the result. Does not filter opted out players.
+    /// </summary>
+    public virtual async Task<Dictionary<long, Guid>> LookupPlayerIds(IEnumerable<long> hashes)
+    {
+        var result = new Dictionary<long, Guid>();
+        if (playerIds == null)
+            return result;
+        foreach (var chunk in hashes.Distinct().Chunk(100))
+        {
+            var list = chunk.ToList();
+            foreach (var row in await playerIds.Where(p => list.Contains(p.Hash)).ExecuteAsync())
+                result[row.Hash] = row.Uuid;
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// Removes the hash to uuid mapping of a player (opt-out and erasure)
+    /// </summary>
+    public virtual async Task DeletePlayerId(Guid player)
+    {
+        if (playerIds == null)
+            return;
+        var hash = TrackerService.HashId(player.ToString("N"));
+        await playerIds.Where(p => p.Hash == hash).Delete().ExecuteAsync();
+    }
+
+    /// <summary>
+    /// The stored unsold flip of an auction (kept 2 hours), null when none
+    /// </summary>
+    public virtual async Task<UnsoldFlip> GetUnsoldFlip(long uid)
+    {
+        if (unsoldFlips == null)
+            return null;
+        return (await unsoldFlips.Where(f => f.Uid == uid).ExecuteAsync()).FirstOrDefault();
     }
 
     internal async Task EnsureUnknownFlipsTable(ISession tableSession)

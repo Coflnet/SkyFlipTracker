@@ -49,6 +49,7 @@ public class PrivacyService
                     if (!Guid.TryParse(uuid, out var guid))
                         continue;
                     await storage.DeleteAllFlips(guid);
+                    await storage.DeletePlayerId(guid);
                     cleaned[uuid] = true;
                     removed++;
                 }
@@ -124,6 +125,7 @@ public class PrivacyService
         if (check != EraseCheck.Ok)
             return new EraseResult { Check = check };
         await storage.DeleteAllFlips(player);
+        await storage.DeletePlayerId(player);
         return new EraseResult { Check = check, DeletedFlips = live.Count };
     }
 }

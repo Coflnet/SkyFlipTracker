@@ -86,6 +86,7 @@ namespace Coflnet.Sky.SkyAuctionTracker
             services.AddSingleton<IPriceProviderFactory, PriceProviderFactory>();
             services.AddJaeger(Configuration);
             services.AddTransient<TrackerService>();
+            services.AddScoped<FlipInvestigationService>();
             services.AddSingleton<KafkaCreator>();
             services.AddCoflnetCore();
             // no database access here, the list is loaded from the indexer (INDEXER_BASE_URL); start even if it can't be loaded, stored flips of opted out players are removed whenever it loads

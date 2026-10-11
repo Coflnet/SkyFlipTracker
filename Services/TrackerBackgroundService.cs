@@ -212,6 +212,15 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
         {
             await KafkaConsumer.ConsumeBatch<SaveAuction>(BoundedKafkaConfig.Create(config, "sky-fliptracker", AutoOffsetReset.Latest), config["TOPICS:NEW_AUCTION"], async toUpdate =>
             {
+                try
+                {
+                    using var scope = scopeFactory.CreateScope();
+                    PlayerIdRecorder.Shared.Record(toUpdate.Select(a => a.AuctioneerId), scope.ServiceProvider.GetRequiredService<FlipStorageService>(), logger);
+                }
+                catch (Exception e)
+                {
+                    logger.LogWarning(e, "Could not record auctioneer ids");
+                }
                 foreach (var item in toUpdate)
                 {
                     if (item.StartingBid > 5_000_000 && item.Start > DateTime.UtcNow - TimeSpan.FromMinutes(1))

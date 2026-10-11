@@ -143,4 +143,34 @@ public class PrivacyTests
         await new PrivacyService(storage.Object).RemoveOptedOut();
         storage.Verify(s => s.DeleteAllFlips(OptedOut), Times.Once);
     }
+
+    [Test]
+    public async Task EraseAlsoRemovesPlayerIdMapping()
+    {
+        var storage = new Mock<FlipStorageService>(null, null, null);
+        storage.Setup(s => s.GetAllFlips(OptedOut)).ReturnsAsync(new List<PastFlip> { Flip(OptedOut, 1) });
+        await new PrivacyService(storage.Object).Erase(OptedOut, Export(OptedOut, Flip(OptedOut, 1)));
+        storage.Verify(s => s.DeletePlayerId(OptedOut), Times.Once);
+    }
+
+    [Test]
+    public async Task EraseRejectedKeepsPlayerIdMapping()
+    {
+        var storage = new Mock<FlipStorageService>(null, null, null);
+        await new PrivacyService(storage.Object).Erase(Other, Export(Other, Flip(Other)));
+        storage.Verify(s => s.DeletePlayerId(It.IsAny<Guid>()), Times.Never);
+    }
+
+    [Test]
+    public async Task RemoveOptedOutAlsoRemovesPlayerIdMapping()
+    {
+        var storage = new Mock<FlipStorageService>(null, null, null);
+        await new PrivacyService(storage.Object).RemoveOptedOut(new[] { A, B });
+        storage.Verify(s => s.DeletePlayerId(Guid.Parse(A)), Times.Once);
+        storage.Verify(s => s.DeletePlayerId(Guid.Parse(B)), Times.Once);
+    }
+
+    [Test]
+    public async Task DeletePlayerIdWithoutTableIsNoop()
+        => await new FlipStorageService(null, null, null).DeletePlayerId(Other);
 }
