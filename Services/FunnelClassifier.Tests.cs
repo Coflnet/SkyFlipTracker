@@ -98,6 +98,47 @@ public class FunnelClassifierTests
         result.Verdict.Should().Be(FunnelVerdict.FoundNotSent);
     }
 
+    [TestCase(LowPricedAuction.FinderType.EXTERNAL)]
+    [TestCase(LowPricedAuction.FinderType.Rust)]
+    public void ReportedFinderKeepsItsOwnTimestamp(LowPricedAuction.FinderType finder)
+    {
+        var input = new FunnelInput
+        {
+            AuctionSold = true,
+            Flips = [new Flip { FinderType = finder, Timestamp = Sold.AddSeconds(-5), TargetPrice = 5 }]
+        };
+        var finding = FunnelClassifier.Classify(input, [SoldEvent()], BuyerSet).Findings.Single();
+        finding.FoundTime.Should().Be(Sold.AddSeconds(-5));
+        finding.TimeSource.Should().Be("reported");
+    }
+
+    [Test]
+    public void SniperFlipWithoutContextStillSubtractsStoreDelay()
+    {
+        var input = new FunnelInput
+        {
+            AuctionSold = true,
+            Flips = [new Flip { FinderType = LowPricedAuction.FinderType.SNIPER, Timestamp = Sold.AddSeconds(-5) }]
+        };
+        var finding = FunnelClassifier.Classify(input, [SoldEvent()], BuyerSet).Findings.Single();
+        finding.FoundTime.Should().Be(Sold.AddSeconds(-8));
+        finding.TimeSource.Should().Be("flip");
+    }
+
+    [Test]
+    public void ExternalWithContextKeepsContextTime()
+    {
+        var input = new FunnelInput
+        {
+            AuctionSold = true,
+            Contexts = [new FinderContext { Finder = LowPricedAuction.FinderType.EXTERNAL, FoundTime = Sold.AddSeconds(-6) }],
+            Flips = [new Flip { FinderType = LowPricedAuction.FinderType.EXTERNAL, Timestamp = Sold.AddSeconds(-5) }]
+        };
+        var finding = FunnelClassifier.Classify(input, [SoldEvent()], BuyerSet).Findings.Single();
+        finding.TimeSource.Should().Be("finder_context");
+        finding.FoundTime.Should().Be(Sold.AddSeconds(-6));
+    }
+
     [Test]
     public void FinderContextIsPreferredOverFlipTimestamp()
     {

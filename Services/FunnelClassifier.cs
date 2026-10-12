@@ -300,7 +300,17 @@ public static class FunnelClassifier
     private static DateTime Utc(DateTime time) => DateTime.SpecifyKind(time, DateTimeKind.Utc);
 
     /// <summary>
-    /// Prefers finder contexts (closest to the real found time), falls back to the flip store time minus 3 seconds
+    /// True for finders whose flips are posted to the tracker api (POST flip/{AuctionId}) with the finder's own found time
+    /// as <see cref="Flip.Timestamp"/> instead of being stored by the LOW_PRICED consumer (which stamps store time, 3 s after finding).
+    /// EXTERNAL is what our own edge instances report, Rust is the third party finder.
+    /// </summary>
+    internal static bool IsReportedWithOwnTimestamp(LowPricedAuction.FinderType finder)
+        => finder == LowPricedAuction.FinderType.EXTERNAL || finder == LowPricedAuction.FinderType.Rust;
+
+    /// <summary>
+    /// Prefers finder contexts (closest to the real found time). Without a context the stored flip is used:
+    /// finders that report through the tracker api (<see cref="IsReportedWithOwnTimestamp"/>) carry their own found time
+    /// ("reported"), all others were stored by the consumer 3 seconds after being found ("flip", store time minus 3 seconds).
     /// </summary>
     internal static List<FinderFinding> BuildFindings(FunnelInput input)
     {
@@ -322,11 +332,12 @@ public static class FunnelClassifier
         {
             if (result.Any(r => r.Finder == flip.FinderType))
                 continue;
+            var reported = IsReportedWithOwnTimestamp(flip.FinderType);
             result.Add(new FinderFinding
             {
                 Finder = flip.FinderType,
-                FoundTime = Utc(flip.Timestamp) - StoreDelay,
-                TimeSource = "flip",
+                FoundTime = reported ? Utc(flip.Timestamp) : Utc(flip.Timestamp) - StoreDelay,
+                TimeSource = reported ? "reported" : "flip",
                 TargetPrice = flip.TargetPrice
             });
         }

@@ -36,9 +36,13 @@ public class FinderFinding
     /// <summary>Finder that reported it</summary>
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public LowPricedAuction.FinderType Finder { get; set; }
-    /// <summary>Approximate found time (finder context found time or flip store time minus 3 seconds)</summary>
+    /// <summary>Approximate found time, see <see cref="TimeSource"/></summary>
     public DateTime FoundTime { get; set; }
-    /// <summary>"finder_context" or "flip" (store time based)</summary>
+    /// <summary>
+    /// Where <see cref="FoundTime"/> comes from: "finder_context" (tracker consume time of our own finder's message),
+    /// "flip" (flip store time minus 3 seconds), "reported" (time sent by the reporting finder itself:
+    /// EXTERNAL is what our own BFCS edge instances report with finder=test, Rust is the third party finder)
+    /// </summary>
     public string TimeSource { get; set; }
     /// <summary>Target price of the finder if known</summary>
     public long? TargetPrice { get; set; }
