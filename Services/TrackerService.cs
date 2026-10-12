@@ -90,9 +90,15 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             {
                 flip.Timestamp = DateTime.Now;
             }
-            var flipAlreadyExists = await db.Flips.Where(f => f.AuctionId == flip.AuctionId && f.FinderType == flip.FinderType).AnyAsync();
-            if (flipAlreadyExists)
+            var existing = await db.Flips.Where(f => f.AuctionId == flip.AuctionId && f.FinderType == flip.FinderType).FirstOrDefaultAsync();
+            if (existing != null)
             {
+                if (IsEarlierReport(existing, flip))
+                {
+                    existing.Timestamp = flip.Timestamp;
+                    existing.TargetPrice = flip.TargetPrice;
+                    await db.SaveChangesAsync();
+                }
                 return flip;
             }
             if (flip.FinderType == LowPricedAuction.FinderType.TFM)
@@ -102,6 +108,14 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             db.Flips.Add(flip);
             await db.SaveChangesAsync();
             return flip;
+        }
+
+        /// <summary>
+        /// Whether the incoming report found the flip earlier than the stored one
+        /// </summary>
+        internal static bool IsEarlierReport(Flip existing, Flip incoming)
+        {
+            return incoming.Timestamp < existing.Timestamp;
         }
 
         /// <summary>

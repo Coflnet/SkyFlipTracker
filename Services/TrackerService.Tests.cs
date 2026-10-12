@@ -18,6 +18,27 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services;
 public class TrackerServiceTests
 {
     /// <summary>
+    /// The first arriving report won even when another instance found the flip earlier, so the stored found time was late
+    /// </summary>
+    [Test]
+    public void EarlierTimestampReplacesStoredReport()
+    {
+        var stored = new Flip { Timestamp = new DateTime(2026, 6, 27, 14, 55, 5, 200) };
+        var incoming = new Flip { Timestamp = new DateTime(2026, 6, 27, 14, 55, 5, 100) };
+
+        TrackerService.IsEarlierReport(stored, incoming).Should().BeTrue();
+    }
+
+    [Test]
+    public void EqualOrLaterTimestampKeepsStoredReport()
+    {
+        var stored = new Flip { Timestamp = new DateTime(2026, 6, 27, 14, 55, 5, 200) };
+
+        TrackerService.IsEarlierReport(stored, new Flip { Timestamp = stored.Timestamp }).Should().BeFalse();
+        TrackerService.IsEarlierReport(stored, new Flip { Timestamp = stored.Timestamp.AddMilliseconds(80) }).Should().BeFalse();
+    }
+
+    /// <summary>
     /// Verifies that unavailable estimates fall back across every item in a multi-item trade.
     /// </summary>
     [Test]
