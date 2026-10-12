@@ -183,6 +183,11 @@ public class FlipInvestigationService
         timeline.PurchaseStartCount = stats.PurchaseStartCount;
         timeline.PurchaseConfirmCount = stats.PurchaseConfirmCount;
         timeline.ReceiversNearSold = stats.ReceiversNearSold;
+        timeline.FirstClick = stats.FirstClick;
+        timeline.FirstPurchaseStart = stats.FirstPurchaseStart;
+        timeline.FirstPurchaseConfirm = stats.FirstPurchaseConfirm;
+        timeline.ReceiverCount = result.ReceiverCount;
+        timeline.Receivers = result.Receivers;
 
         if (includeOutsped)
         {

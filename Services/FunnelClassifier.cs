@@ -25,6 +25,11 @@ public class EventStats
     public int BuyerClickCount { get; set; }
     public DateTime? BuyerFirstReceive { get; set; }
     public int? ReceiversNearSold { get; set; }
+    public DateTime? FirstClick { get; set; }
+    public DateTime? FirstPurchaseStart { get; set; }
+    public DateTime? FirstPurchaseConfirm { get; set; }
+    /// <summary>Per user reaction (all users, ordered by receive time), null for aggregate based stats</summary>
+    public List<FunnelReceiver> Receivers { get; set; }
 
     /// <summary>
     /// Builds the stats from SQL aggregates (one row per type) plus the raw events of the buyer accounts
@@ -79,10 +84,47 @@ public class EventStats
         stats.BuyerClickCount = clicks.Count(e => buyerHashes.Contains(e.PlayerId));
         if (buyerReceives.Count > 0)
             stats.BuyerFirstReceive = buyerReceives.Min(e => e.Timestamp);
+        stats.FirstClick = FirstOf(events, FlipEventType.FLIP_CLICK);
+        stats.FirstPurchaseStart = FirstOf(events, FlipEventType.PURCHASE_START);
+        stats.FirstPurchaseConfirm = FirstOf(events, FlipEventType.PURCHASE_CONFIRM);
+        stats.Receivers = BuildReceivers(events);
         if (sold != null)
             stats.ReceiversNearSold = receives.Count(f => f.Timestamp - TimeSpan.FromSeconds(3.8) < sold.Timestamp
                 && f.Timestamp + TimeSpan.FromSeconds(3.9) > sold.Timestamp);
         return stats;
+    }
+
+    private static DateTime? FirstOf(IEnumerable<FlipEvent> events, FlipEventType type)
+    {
+        DateTime? min = null;
+        foreach (var e in events)
+            if (e.Type == type && (min == null || e.Timestamp < min))
+                min = e.Timestamp;
+        return min;
+    }
+
+    private static List<FunnelReceiver> BuildReceivers(IEnumerable<FlipEvent> events)
+    {
+        DateTime? Min(IEnumerable<FlipEvent> list) => list.Any() ? list.Min(e => e.Timestamp) : null;
+        return events.Where(e => e.Type is FlipEventType.FLIP_RECEIVE or FlipEventType.FLIP_CLICK or FlipEventType.PURCHASE_START)
+            .GroupBy(e => e.PlayerId)
+            .Select(g =>
+            {
+                var receive = Min(g.Where(e => e.Type == FlipEventType.FLIP_RECEIVE));
+                var click = Min(g.Where(e => e.Type == FlipEventType.FLIP_CLICK));
+                var start = Min(g.Where(e => e.Type == FlipEventType.PURCHASE_START));
+                var receivedAt = receive ?? click ?? start.Value;
+                return new FunnelReceiver
+                {
+                    Hash = g.Key,
+                    ReceivedAt = receivedAt,
+                    ClickedAt = click,
+                    PurchaseStartedAt = start,
+                    ReceiveToClickSeconds = click == null ? null : Math.Round((click.Value - receivedAt).TotalSeconds, 3)
+                };
+            })
+            .OrderBy(r => r.ReceivedAt).ThenBy(r => r.Hash)
+            .ToList();
     }
 }
 
@@ -131,6 +173,10 @@ public class FunnelResult
     public bool BuyerClicked { get; set; }
     /// <summary>Seconds between the buyer receiving the flip and the sale</summary>
     public double? BuyerSendLeadSeconds { get; set; }
+    /// <summary>The first 50 receivers, empty when only aggregates were available</summary>
+    public List<FunnelReceiver> Receivers { get; set; } = new();
+    /// <summary>Distinct receivers, null when only aggregates were available</summary>
+    public int? ReceiverCount { get; set; }
 }
 
 /// <summary>
@@ -138,6 +184,8 @@ public class FunnelResult
 /// </summary>
 public static class FunnelClassifier
 {
+    /// <summary>Maximum receivers listed in the funnel</summary>
+    public const int MaxReceivers = 50;
     private static readonly TimeSpan StoreDelay = TimeSpan.FromSeconds(3);
 
     /// <summary>
@@ -164,6 +212,28 @@ public static class FunnelClassifier
         timings.FoundToFirstReceiveSeconds = Seconds(stats.FirstReceive, result.FirstFound);
         timings.FoundToSoldSeconds = Seconds(soldAt, result.FirstFound);
         timings.FirstReceiveToSoldSeconds = Seconds(soldAt, stats.FirstReceive);
+
+        if (stats.Receivers != null)
+        {
+            var all = stats.Receivers;
+            result.ReceiverCount = all.Count;
+            result.Receivers = all.Take(MaxReceivers).Select(r => new FunnelReceiver
+            {
+                Hash = r.Hash,
+                ReceivedAt = r.ReceivedAt,
+                ClickedAt = r.ClickedAt,
+                PurchaseStartedAt = r.PurchaseStartedAt,
+                ReceiveToClickSeconds = r.ReceiveToClickSeconds,
+                ReceiveToSoldSeconds = Seconds(soldAt, r.ReceivedAt)
+            }).ToList();
+            timings.FirstReceiveToFirstClickSeconds = Seconds(stats.FirstClick, stats.FirstReceive);
+            var clickTimes = all.Where(r => r.ReceiveToClickSeconds != null).Select(r => r.ReceiveToClickSeconds.Value).OrderBy(v => v).ToList();
+            if (clickTimes.Count > 0)
+            {
+                var mid = clickTimes.Count / 2;
+                timings.MedianReceiveToClickSeconds = clickTimes.Count % 2 == 1 ? clickTimes[mid] : Math.Round((clickTimes[mid - 1] + clickTimes[mid]) / 2, 3);
+            }
+        }
 
         var diff = soldAt - stats.FirstReceive;
         // exact predicate the tracker used to decide to exempt a flip

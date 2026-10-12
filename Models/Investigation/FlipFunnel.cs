@@ -69,10 +69,36 @@ public class FunnelTimeline
     public int ClickCount { get; set; }
     public int PurchaseStartCount { get; set; }
     public int PurchaseConfirmCount { get; set; }
+    /// <summary>Earliest FLIP_CLICK</summary>
+    public DateTime? FirstClick { get; set; }
+    /// <summary>Earliest PURCHASE_START</summary>
+    public DateTime? FirstPurchaseStart { get; set; }
+    /// <summary>Earliest PURCHASE_CONFIRM</summary>
+    public DateTime? FirstPurchaseConfirm { get; set; }
+    /// <summary>Distinct users that received (or clicked) the flip, null when only aggregates were available</summary>
+    public int? ReceiverCount { get; set; }
+    /// <summary>The first 50 receivers ordered by receive time</summary>
+    public List<FunnelReceiver> Receivers { get; set; } = new();
     /// <summary>Users that received the flip within -3.8s/+3.9s of the sale</summary>
     public int? ReceiversNearSold { get; set; }
     /// <summary>True when more than 5000 events existed and only the first were read</summary>
     public bool Truncated { get; set; }
+}
+
+/// <summary>
+/// Reaction of one user that received an auction
+/// </summary>
+public class FunnelReceiver
+{
+    /// <summary>Lossy hash of the user</summary>
+    public long Hash { get; set; }
+    /// <summary>Time of the first FLIP_RECEIVE, the first click time when no receive event exists</summary>
+    public DateTime ReceivedAt { get; set; }
+    public DateTime? ClickedAt { get; set; }
+    public DateTime? PurchaseStartedAt { get; set; }
+    public double? ReceiveToClickSeconds { get; set; }
+    /// <summary>Sold time minus receive time, positive when received before the sale</summary>
+    public double? ReceiveToSoldSeconds { get; set; }
 }
 
 /// <summary>
@@ -84,6 +110,9 @@ public class FunnelTimings
     public double? FoundToFirstReceiveSeconds { get; set; }
     public double? FoundToSoldSeconds { get; set; }
     public double? FirstReceiveToSoldSeconds { get; set; }
+    public double? FirstReceiveToFirstClickSeconds { get; set; }
+    /// <summary>Median over the receivers that clicked</summary>
+    public double? MedianReceiveToClickSeconds { get; set; }
 }
 
 /// <summary>
