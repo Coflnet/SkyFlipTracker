@@ -1,12 +1,37 @@
 #!/usr/bin/env bash
 set -euo pipefail
+cd "$(dirname "${BASH_SOURCE[0]}")"
 
+# Single source of truth for the published client version. Bump this (and merge to main) to
+# cut a release: the Package GitHub Actions workflow triggers on changes to this file.
 VERSION=0.16.4
 PACKAGE_NAME=Coflnet.Sky.FlipTracker.Client
 
-docker run --rm -v "${PWD}:/local" --network host -u $(id -u ${USER}):$(id -g ${USER}) openapitools/openapi-generator-cli:v7.14.0 generate \
-    -i http://localhost:5017/api/openapi/v1/openapi.json \
+# Where to read the OpenAPI document from. Defaults to a locally running API (the historical
+# workflow: start the app with `dotnet run`, then run this script). Can also be a file path,
+# e.g. one produced without starting any dependent services (used by CI).
+SWAGGER_INPUT="${SWAGGER_INPUT:-http://localhost:5017/api/openapi/v1/openapi.json}"
+# Generator image pinned by tag AND digest so output is reproducible; override only for testing.
+GENERATOR_IMAGE="${GENERATOR_IMAGE:-openapitools/openapi-generator-cli:v7.14.0@sha256:a620610d9fabf7ce05310c648417ba168125aac2f4517580030e115921ac1a52}"
+
+docker_mounts=(-v "${PWD}:/local")
+if [[ "$SWAGGER_INPUT" =~ ^https?:// ]]; then
+  generator_input="$SWAGGER_INPUT"
+else
+  # Local file: bind-mount it at a fixed in-container path so its location on the host (which
+  # may be outside $PWD, e.g. a file produced elsewhere in a CI job) doesn't matter.
+  swagger_abs="$(cd "$(dirname "$SWAGGER_INPUT")" && pwd)/$(basename "$SWAGGER_INPUT")"
+  docker_mounts+=(-v "${swagger_abs}:/swagger-input.json:ro")
+  generator_input="/swagger-input.json"
+fi
+
+# --skip-validate-spec: InvestigationController.GetFlip and TrackerController.GetFlip share the
+# operationId "GetFlip", which the generator's validator rejects. They land in different API classes
+# (InvestigationApi / TrackerApi) via their tags, so the generated client compiles and has no clash.
+docker run --rm "${docker_mounts[@]}" --network host -u "$(id -u):$(id -g)" "$GENERATOR_IMAGE" generate \
+    -i "$generator_input" \
     -g csharp \
+    --skip-validate-spec \
     -o /local/out --additional-properties=packageName=$PACKAGE_NAME,packageVersion=$VERSION,licenseId=MIT,targetFramework=net8.0,library=restsharp
 
 cd out
@@ -22,11 +47,29 @@ sed -i 's/UnknownCost = 5/UnknownCost = 8/g' src/$PACKAGE_NAME/Model/FlipFlags.c
 sed -i 's/UncertainCost = 6/UncertainCost = 16/g' src/$PACKAGE_NAME/Model/FlipFlags.cs
 sed -i 's/))]/))]\n    [Flags]/g' src/$PACKAGE_NAME/Model/FlipFlags.cs
 
-sed -i 's@annotations</Nullable>@annotations</Nullable>\n    <PackageReadmeFile>README.md</PackageReadmeFile>@g' $path
-sed -i '34i    <None Include="../../../../README.md" Pack="true" PackagePath="\"/>' $path
+sed -i 's@annotations</Nullable>@annotations</Nullable>\n    <PackageReadmeFile>README.md</PackageReadmeFile>\n    <PublishRepositoryUrl>true</PublishRepositoryUrl>@g' $path
+# Force the exact repository URL a verifier reads from the .nuspec (RepositoryType is already
+# "git" via the generator's own GIT_USER_ID/GIT_REPO_ID template above).
+sed -i 's@<RepositoryUrl>.*</RepositoryUrl>@<RepositoryUrl>https://github.com/Coflnet/SkyFlipTracker</RepositoryUrl>@' $path
+# Pack the README. Anchored on the (always-present, unique) closing </PropertyGroup> tag instead
+# of a line number: the generator rewrites this file from scratch on every run, so a line number
+# drifts the moment the template gains or loses a line, silently dropping the README from the package.
+sed -i '/<\/PropertyGroup>/a\
+\
+  <ItemGroup>\
+    <None Include="..\/..\/..\/..\/README.md" Pack="true" PackagePath="\\"\/>\
+  </ItemGroup>' $path
 
-dotnet pack
-cp src/$PACKAGE_NAME/bin/Release/$PACKAGE_NAME.*.nupkg ..
-if [[ ${PUBLISH:-true} == true ]]; then
-    dotnet nuget push ../$PACKAGE_NAME.$VERSION.nupkg --api-key "$NUGET_API_KEY" --source "nuget.org" --skip-duplicate
+pack_args=()
+if [[ -n "${GITHUB_SHA:-}" ]]; then
+  # Embeds <repository type="git" url="..." commit="$GITHUB_SHA"/> in the .nuspec so a verifier
+  # can tie the published package back to the exact commit it was built from.
+  pack_args+=(-p:RepositoryCommit="$GITHUB_SHA")
 fi
+dotnet pack "${pack_args[@]}"
+cp src/$PACKAGE_NAME/bin/Release/$PACKAGE_NAME.*.nupkg ..
+rm -r *.sln
+
+# This script only packs. Releases are pushed by the Package workflow
+# (.github/workflows/package.yml) using NuGet trusted publishing; no API key is used here.
+echo "Packed $PACKAGE_NAME.$VERSION into $PWD/.. only; the Package workflow publishes it on merge to main."
