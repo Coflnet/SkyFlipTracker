@@ -30,11 +30,14 @@ public class FlipStorageService
     private Table<UnsoldFlip> unsoldFlips;
     private Table<PlayerIdLookup> playerIds;
     private ISession session;
-    public FlipStorageService(ILogger<FlipStorageService> logger, IConfiguration config, ISession session)
+    private readonly ProfitMetricProjection profitMetrics;
+    public FlipStorageService(ILogger<FlipStorageService> logger, IConfiguration config, ISession session) : this(logger, config, session, null) { }
+    public FlipStorageService(ILogger<FlipStorageService> logger, IConfiguration config, ISession session, ProfitMetricProjection profitMetrics)
     {
         this.logger = logger;
         this.config = config;
         this.session = session;
+        this.profitMetrics = profitMetrics;
     }
 
     public async Task<ISession> GetSession(string keyspace = null)
@@ -64,7 +67,8 @@ public class FlipStorageService
     {
         var session = await GetSession();
         var table = GetFlipsTable(session);
-        await table.Where(f => f.Flipper == flipper).Delete().ExecuteAsync();
+        if (profitMetrics == null) await table.Where(f => f.Flipper == flipper).Delete().ExecuteAsync();
+        else await profitMetrics.Erase(flipper, () => table.Where(f => f.Flipper == flipper).Delete().ExecuteAsync());
     }
 
     public virtual async Task SaveFlip(PastFlip flip)
@@ -75,7 +79,9 @@ public class FlipStorageService
         var table = GetFlipsTable(session);
         try
         {
-            await table.Insert(NormalizeFlipTimestamps(flip)).ExecuteAsync();
+            var insert = table.Insert(NormalizeFlipTimestamps(flip));
+            if (profitMetrics == null) await insert.ExecuteAsync();
+            else await profitMetrics.Write(flip, insert);
         }
         catch (InvalidQueryException e)
         {
@@ -137,7 +143,9 @@ public class FlipStorageService
             return;
         var session = await GetSession();
         var table = GetFlipsTable(session);
-        await Task.WhenAll(flips.Select(f => table.Insert(NormalizeFlipTimestamps(f)).ExecuteAsync()));
+        await Task.WhenAll(flips.Select(f => profitMetrics == null
+            ? table.Insert(NormalizeFlipTimestamps(f)).ExecuteAsync()
+            : profitMetrics.Write(NormalizeFlipTimestamps(f), table.Insert(f))));
     }
 
     private static DateTime NormalizeUtc(DateTime value)

@@ -83,6 +83,8 @@ namespace Coflnet.Sky.SkyAuctionTracker
 
             services.AddSingleton<ProfitChangeService>();
             services.AddSingleton<FlipStorageService>();
+            services.AddSingleton<ProfitMetricProjection>();
+            services.AddHostedService<ProfitMetricExporter>();
             services.AddSingleton<IPriceProviderFactory, PriceProviderFactory>();
             services.AddJaeger(Configuration);
             services.AddTransient<TrackerService>();
@@ -90,7 +92,11 @@ namespace Coflnet.Sky.SkyAuctionTracker
             services.AddSingleton<KafkaCreator>();
             services.AddCoflnetCore();
             // no database access here, the list is loaded from the indexer (INDEXER_BASE_URL); start even if it can't be loaded, stored flips of opted out players are removed whenever it loads
-            services.AddPlayerOptOut(required: false, onLoaded: (sp, token) => sp.GetRequiredService<PrivacyService>().RemoveOptedOut(token), fromIndexer: true);
+            services.AddPlayerOptOut(required: false, onLoaded: async (sp, token) =>
+            {
+                await sp.GetRequiredService<PrivacyService>().RemoveOptedOut(token);
+                sp.GetRequiredService<ProfitMetricProjection>().PrivacyLoaded();
+            }, fromIndexer: true);
             services.AddSingleton<PrivacyService>();
             services.AddSingleton<FlipSumaryEventProducer>();
             services.AddSingleton<HypixelItemService>();

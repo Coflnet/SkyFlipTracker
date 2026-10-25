@@ -113,11 +113,16 @@ fi
 cd "${PROJECT_DIRECTORY}"
 test_status=0
 CASSANDRA_SMOKE_HOST=127.0.0.1 CASSANDRA_SMOKE_PORT="${published_port}" \
-    dotnet test --filter "FullyQualifiedName=${TEST_NAME}" >"${test_output_file}" 2>&1 || test_status=$?
+    dotnet test --no-restore --filter "FullyQualifiedName=${TEST_NAME}|FullyQualifiedName=Coflnet.Sky.SkyAuctionTracker.Services.ProfitMetricProjectionTests.CassandraServerRoundTrip" >"${test_output_file}" 2>&1 || test_status=$?
 if [[ "${test_status}" != "0" ]]; then
     printf '%s\n' "Cassandra smoke test failed; final test output:"
+    sed -n '/  Failed /,/  Stack Trace:/p' "${test_output_file}" | head -30
     tail -40 "${test_output_file}"
     exit "${test_status}"
 fi
 grep -E 'Passed!.*Total:' "${test_output_file}" | tail -n 1 || true
 printf '%s\n' "Cassandra mapping smoke passed."
+if [[ -n "${CASSANDRA_SMOKE_EXTRA_PROJECT:-}" ]]; then
+    CASSANDRA_SMOKE_HOST=127.0.0.1 CASSANDRA_SMOKE_PORT="${published_port}" \
+        dotnet run --project "${CASSANDRA_SMOKE_EXTRA_PROJECT}" --no-restore
+fi
