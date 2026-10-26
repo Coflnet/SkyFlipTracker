@@ -44,6 +44,20 @@ public class MemoryBoundsTests
     }
 
     [Test]
+    public void PollIntervalOutlastsTheInfrastructureRetry()
+    {
+        // librdkafka evicts the member after 300s without a poll, ProcessResilient retries for MaxInfrastructureRetry inside the poll loop
+        var created = BoundedKafkaConfig.Create(KafkaSettings(), "sky-fliptracker");
+        var bound = BoundedKafkaConfig.Bound(new Confluent.Kafka.ConsumerConfig { GroupId = "sky-fliptracker-sell", SessionTimeoutMs = 10000 }, KafkaSettings());
+
+        foreach (var consumerConfig in new[] { created, bound })
+        {
+            consumerConfig.MaxPollIntervalMs.Should().BeGreaterThan((int)TrackerBackgroundService.MaxInfrastructureRetry.TotalMilliseconds);
+            consumerConfig.MaxPollIntervalMs.Should().BeGreaterThan(consumerConfig.SessionTimeoutMs ?? 0);
+        }
+    }
+
+    [Test]
     public void BoundKeepsOtherSettingsAndHonoursOverride()
     {
         var original = new Confluent.Kafka.ConsumerConfig { GroupId = "g", SessionTimeoutMs = 65000 };

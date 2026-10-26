@@ -78,8 +78,8 @@ namespace Coflnet.Sky.SkyAuctionTracker
             services.AddSingleton<ISniperApi>(sp => new SniperApi(Configuration["SNIPER_BASE_URL"]));
             services.AddSingleton<ISniperClient, SniperClient>();
             services.AddSingleton<RepresentationConverter>();
-            services.AddSingleton<PlayerState.Client.Api.IItemsApi>(sp => new PlayerState.Client.Api.ItemsApi(Configuration["PLAYERSTATE_BASE_URL"]));
-            services.AddSingleton<PlayerState.Client.Api.ITransactionApi>(sp => new PlayerState.Client.Api.TransactionApi(Configuration["PLAYERSTATE_BASE_URL"]));
+            services.AddSingleton<PlayerState.Client.Api.IItemsApi>(sp => PlayerStateClients.CreateItemsApi(Configuration));
+            services.AddSingleton<PlayerState.Client.Api.ITransactionApi>(sp => PlayerStateClients.CreateTransactionApi(Configuration));
 
             services.AddSingleton<ProfitChangeService>();
             services.AddSingleton<FlipStorageService>();

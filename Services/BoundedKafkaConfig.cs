@@ -1,3 +1,4 @@
+using System;
 using Coflnet.Sky.Kafka;
 using Confluent.Kafka;
 using Microsoft.Extensions.Configuration;
@@ -19,6 +20,9 @@ public static class BoundedKafkaConfig
     /// <summary>Largest amount fetched per partition and request in bytes</summary>
     public const int DefaultPartitionFetchBytes = 1024 * 1024;
 
+    /// <summary>Time one batch may take on top of the infrastructure retry window before the poll interval is exceeded</summary>
+    public static readonly TimeSpan PollIntervalMargin = TimeSpan.FromMinutes(5);
+
     /// <summary>
     /// Same settings as the shared <c>KafkaConsumer.ConsumeBatch</c> overload that takes an <see cref="IConfiguration"/>, plus the memory bounds.
     /// </summary>
@@ -34,6 +38,11 @@ public static class BoundedKafkaConfig
     }
 
     /// <summary>
+    /// The poll interval that outlasts the infrastructure retry window of <c>ProcessResilient</c> plus one batch
+    /// </summary>
+    public static int MaxPollIntervalMs() => (int)(TrackerBackgroundService.MaxInfrastructureRetry + PollIntervalMargin).TotalMilliseconds;
+
+    /// <summary>
     /// Applies the memory bounds to an existing config. <c>KAFKA_CONSUMER_QUEUE_KBYTES</c> overrides the read-ahead size.
     /// </summary>
     public static ConsumerConfig Bound(ConsumerConfig consumerConfig, IConfiguration config = null)
@@ -45,6 +54,8 @@ public static class BoundedKafkaConfig
         consumerConfig.QueuedMinMessages = 1000;
         consumerConfig.FetchMaxBytes = DefaultFetchMaxBytes;
         consumerConfig.MaxPartitionFetchBytes = DefaultPartitionFetchBytes;
+        // batches are processed inside the poll loop and retried for up to MaxInfrastructureRetry, the default 300s would evict the member in the middle of that
+        consumerConfig.MaxPollIntervalMs = MaxPollIntervalMs();
         return consumerConfig;
     }
 }

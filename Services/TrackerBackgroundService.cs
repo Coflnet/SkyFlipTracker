@@ -90,6 +90,9 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 case global::Cassandra.OperationTimedOutException:
                 case global::Cassandra.QueryExecutionException:
                     return true;
+                // the generated client reports a timed out or unreachable player-state as ErrorCode 0 without an inner exception, other codes are answers
+                case PlayerState.Client.Client.ApiException { ErrorCode: 0 or 408 or 502 or 503 or 504 }:
+                    return true;
             }
             return IsInfrastructureError(e.InnerException);
         }
