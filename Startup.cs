@@ -23,6 +23,7 @@ using Coflnet.Sky.Kafka;
 using StackExchange.Redis;
 using Coflnet.Sky.Sniper.Client.Api;
 using Coflnet.Sky.McConnect.Api;
+using Swashbuckle.AspNetCore.SwaggerGen;
 
 namespace Coflnet.Sky.SkyAuctionTracker
 {
@@ -35,6 +36,11 @@ namespace Coflnet.Sky.SkyAuctionTracker
         }
 
         private IConfiguration Configuration { get; }
+
+        public static void ConfigureSwagger(SwaggerGenOptions options)
+        {
+            options.OperationFilter<HttpOnlyOperationFilter>();
+        }
 
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
@@ -91,6 +97,8 @@ namespace Coflnet.Sky.SkyAuctionTracker
             services.AddScoped<FlipInvestigationService>();
             services.AddSingleton<KafkaCreator>();
             services.AddCoflnetCore();
+            // investigation endpoints are HTTP only, keep them out of the generated client
+            services.ConfigureSwaggerGen(ConfigureSwagger);
             // no database access here, the list is loaded from the indexer (INDEXER_BASE_URL); start even if it can't be loaded, stored flips of opted out players are removed whenever it loads
             services.AddPlayerOptOut(required: false, onLoaded: async (sp, token) =>
             {
