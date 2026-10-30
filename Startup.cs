@@ -19,6 +19,8 @@ using Coflnet.Sky.Settings.Client.Api;
 using Coflnet.Leaderboard.Client.Api;
 using Coflnet.Sky.Core.Services;
 using Coflnet.Core;
+using Coflnet.Core.Security;
+using Coflnet.Sky.SkyAuctionTracker.Infrastructure;
 using Coflnet.Sky.Kafka;
 using StackExchange.Redis;
 using Coflnet.Sky.Sniper.Client.Api;
@@ -48,15 +50,21 @@ namespace Coflnet.Sky.SkyAuctionTracker
             // For common usages, see pull request #1233.
             var serverVersion = new MariaDbServerVersion(new Version(Configuration["MARIADB_VERSION"]));
 
-            // Replace 'YourDbContext' with the name of your own DbContext derived class.
-            services.AddDbContext<TrackerDbContext>(
-                dbContextOptions => dbContextOptions
-                    .UseMySql(Configuration["DB_CONNECTION"], serverVersion,
-                     opt => opt.CommandTimeout(5))
-
+            var connectionString = DatabaseTls.ConnectionString(Configuration);
+            var sqlTlsEnabled = Configuration.GetSection("DB:TLS").Exists();
+            if (sqlTlsEnabled)
+            {
+                services.AddSingleton(_ => PemTlsOptions.FromConfiguration(Configuration.GetSection("DB:TLS")));
+                services.AddSingleton<DatabaseTlsInterceptor>();
+            }
+            services.AddDbContext<TrackerDbContext>((provider, dbContextOptions) =>
+            {
+                dbContextOptions.UseMySql(connectionString, serverVersion, opt => opt.CommandTimeout(5))
                     .EnableSensitiveDataLogging() // <-- These two calls are optional but help
-                    .EnableDetailedErrors()       // <-- with debugging (remove for production).
-            );
+                    .EnableDetailedErrors();      // <-- with debugging (remove for production).
+                if (sqlTlsEnabled)
+                    dbContextOptions.AddInterceptors(provider.GetRequiredService<DatabaseTlsInterceptor>());
+            });
             if (Configuration["OLD_CASSANDRA:HOSTS"] != null)
             {
                 services.AddHostedService<MigrationService>();
@@ -125,6 +133,18 @@ namespace Coflnet.Sky.SkyAuctionTracker
             {
                 endpoints.MapMetrics();
                 endpoints.MapControllers();
+                endpoints.MapGet("/health/ready", async context =>
+                {
+                    try
+                    {
+                        await DatabaseReadiness.CheckAsync(context.RequestServices, context.RequestAborted);
+                        context.Response.StatusCode = 200;
+                    }
+                    catch (Exception)
+                    {
+                        context.Response.StatusCode = 503;
+                    }
+                });
             });
         }
     }
