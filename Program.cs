@@ -12,6 +12,8 @@ namespace Coflnet.Sky.SkyAuctionTracker
     {
         public static void Main(string[] args)
         {
+            if (PublicClientCertificateInfo.TryRun(args, System.Console.Out))
+                return;
             CreateHostBuilder(args).Build().Run();
         }
 
