@@ -323,6 +323,137 @@ public class TrackerServiceTests
         trackedSale.Flags.Should().NotHaveFlag(FlipFlags.ViaTrade);
     }
 
+    /// <summary>
+    /// Issue #174: a quick claw bought as the held item of a pet is counted in the pet flip,
+    /// it must not be matched to an older standalone purchase of the same claw.
+    /// </summary>
+    [Test]
+    public async Task PetItemLastBoughtOnPetIsNotMatchedToOlderPurchase()
+    {
+        var savedFlips = new List<PastFlip>();
+        var items = new Mock<PlayerState.Client.Api.IItemsApi>();
+        items.Setup(x => x.ApiItemsFindUuidPostAsync(It.IsAny<List<PlayerState.Client.Model.ItemIdSearch>>(), It.IsAny<int>(), It.IsAny<System.Threading.CancellationToken>()))
+            .ReturnsAsync(new List<PlayerState.Client.Model.Item>());
+        var tracker = QuickClawTracker(savedFlips, items, new Mock<PlayerState.Client.Api.ITransactionApi>());
+
+        await tracker.IndexCassandra(new[] { QuickClawSell() });
+
+        savedFlips.Should().BeEmpty("the claw was last bought on the PET_SNAIL whose flip already counts its sale");
+    }
+
+    /// <summary>
+    /// Same recorded claw history, but the seller traded the claw away and paid for it in a later trade:
+    /// that trade is the acquisition the flip has to be priced against, the pet purchase no longer counts.
+    /// </summary>
+    [Test]
+    public async Task PetItemReacquiredByTradeAfterPetPurchaseKeepsTradeFlip()
+    {
+        const long clawItemId = 1_200_000_000_000_001;
+        var tradeTime = new DateTime(2026, 11, 6, 22, 13, 0);
+        var savedFlips = new List<PastFlip>();
+        var items = new Mock<PlayerState.Client.Api.IItemsApi>();
+        items.Setup(x => x.ApiItemsFindUuidPostAsync(It.IsAny<List<PlayerState.Client.Model.ItemIdSearch>>(), It.IsAny<int>(), It.IsAny<System.Threading.CancellationToken>()))
+            .ReturnsAsync(JsonConvert.DeserializeObject<List<PlayerState.Client.Model.Item>>(
+                """[{"id":1200000000000001,"itemName":"Quick Claw","tag":"PET_ITEM_QUICK_CLAW","extraAttributes":{"uid":"fd9ebad77415","uuid":"b1ea4976-a0e6-4a29-86c3-fd9ebad77415"}}]"""));
+        var transactions = new Mock<PlayerState.Client.Api.ITransactionApi>();
+        // the seller received the claw (type 33) and gave 50m coins (type 34, amount in tenths) in one trade
+        var tradeWindow = JsonConvert.DeserializeObject<List<PlayerState.Client.Model.Transaction>>(
+            """[{"playerUuid":"10000000-0000-0000-0000-000000000001","type":33,"itemId":1200000000000001,"amount":1,"timeStamp":"2026-11-06T22:13:00"},{"playerUuid":"10000000-0000-0000-0000-000000000001","type":34,"itemId":1000001,"amount":500000000,"timeStamp":"2026-11-06T22:13:00"}]""");
+        transactions.Setup(x => x.TransactionItemItemIdGetAsync(clawItemId, It.IsAny<int>(), It.IsAny<int>(), It.IsAny<System.Threading.CancellationToken>()))
+            .ReturnsAsync(tradeWindow.Where(t => t.ItemId == clawItemId).ToList());
+        transactions.Setup(x => x.TransactionPlayerPlayerUuidGetAsync(Guid.Parse("10000000000000000000000000000001"), 1, tradeTime, It.IsAny<int>(), It.IsAny<System.Threading.CancellationToken>()))
+            .ReturnsAsync(tradeWindow);
+        var tracker = QuickClawTracker(savedFlips, items, transactions);
+
+        await tracker.IndexCassandra(new[] { QuickClawSell() });
+
+        var flip = savedFlips.Should().ContainSingle("the trade after the pet purchase is the real acquisition").Subject;
+        flip.Flags.Should().HaveFlag(FlipFlags.ViaTrade);
+        flip.PurchaseCost.Should().Be(50_000_000);
+    }
+
+    private const string QuickClawOwner = "10000000000000000000000000000001";
+    private const string OldQuickClawPurchase = "89d57151966a47f482d64d9e2fb364e6";
+    private const string SnailWithClawPurchase = "21ee3986ff4a4d3b828151952dd08143";
+
+    /// <summary>
+    /// The recorded quick claw sell of issue #174; player identities are replaced with pseudonyms
+    /// </summary>
+    private static SaveAuction QuickClawSell()
+    {
+        return new SaveAuction
+        {
+            Uuid = "3429e7d5ace4475cb3613116e3899811",
+            Tag = "PET_ITEM_QUICK_CLAW",
+            ItemName = "Quick Claw",
+            AuctioneerId = QuickClawOwner,
+            Start = new DateTime(2026, 11, 6, 22, 13, 54),
+            End = new DateTime(2026, 11, 6, 22, 16, 53),
+            StartingBid = 87_460_499,
+            HighestBidAmount = 87_460_499,
+            Tier = Tier.LEGENDARY,
+            Bin = true,
+            Bids = new() { new() { Bidder = "30000000000000000000000000000003", Amount = 87_460_499, Timestamp = new DateTime(2026, 11, 6, 22, 16, 53) } },
+            FlatenedNBT = new() { { "uid", "fd9ebad77415" }, { "uuid", "b1ea4976-a0e6-4a29-86c3-fd9ebad77415" } }
+        };
+    }
+
+    /// <summary>
+    /// Tracker whose auction api knows the recorded sale history of the claw: an older standalone purchase by
+    /// someone else, the PET_SNAIL holding it that the seller bought, and the sell itself
+    /// </summary>
+    private static TrackerService QuickClawTracker(List<PastFlip> savedFlips, Mock<PlayerState.Client.Api.IItemsApi> items, Mock<PlayerState.Client.Api.ITransactionApi> transactions)
+    {
+        var sell = QuickClawSell();
+        var history = new List<Api.Client.Model.ItemSell>
+        {
+            new(seller: "20000000000000000000000000000002", uuid: OldQuickClawPurchase, buyer: "40000000000000000000000000000004", itemTag: "PET_ITEM_QUICK_CLAW", highestBid: 75_999_998, timestamp: new DateTime(2026, 10, 28, 0, 11, 24)),
+            new(seller: "50000000000000000000000000000005", uuid: SnailWithClawPurchase, buyer: QuickClawOwner, itemTag: "PET_SNAIL", highestBid: 34_000_000, timestamp: new DateTime(2026, 11, 6, 22, 11, 31)),
+            new(seller: QuickClawOwner, uuid: sell.Uuid, buyer: "30000000000000000000000000000003", itemTag: "PET_ITEM_QUICK_CLAW", highestBid: 87_460_499, timestamp: sell.End)
+        };
+        var storage = new Mock<FlipStorageService>(null, null, null);
+        storage.Setup(x => x.SaveFlip(It.IsAny<PastFlip>())).Callback<PastFlip>(savedFlips.Add).Returns(Task.CompletedTask);
+        storage.Setup(x => x.GetFlips(It.IsAny<Guid>(), It.IsAny<DateTime>(), It.IsAny<DateTime>())).ReturnsAsync(new List<PastFlip>());
+        var changes = new Mock<ProfitChangeService>(null, null, null, null, null, null, null, null, null);
+        changes.Setup(x => x.GetChanges(It.IsAny<SaveAuction>(), It.IsAny<SaveAuction>()))
+            .ReturnsAsync(new List<PastFlip.ProfitChange> { new("ah tax", -2_625_014) });
+        transactions.Setup(x => x.TransactionUuidItemIdPostAsync(It.IsAny<List<Guid>>(), It.IsAny<int>(), It.IsAny<System.Threading.CancellationToken>()))
+            .ReturnsAsync(new Dictionary<string, List<long>>());
+        var auctions = new Mock<Api.Client.Api.IAuctionsApi>();
+        // the batch lookup only matches the uid key, not heldItemUuid, so the pet purchase is missing there
+        auctions.Setup(x => x.ApiAuctionsUidsSoldPostWithHttpInfoAsync(It.IsAny<Api.Client.Model.InventoryBatchLookup>(), It.IsAny<int>(), It.IsAny<System.Threading.CancellationToken>()))
+            .ReturnsAsync(new Api.Client.Client.ApiResponse<Dictionary<string, List<Api.Client.Model.ItemSell>>>(
+                System.Net.HttpStatusCode.OK, null, new Dictionary<string, List<Api.Client.Model.ItemSell>>
+                {
+                    { "fd9ebad77415", history.Where(s => s.ItemTag == "PET_ITEM_QUICK_CLAW").ToList() }
+                }));
+        auctions.Setup(x => x.ApiAuctionsUidUidSoldGetAsync("fd9ebad77415", It.IsAny<int>(), It.IsAny<System.Threading.CancellationToken>()))
+            .ReturnsAsync(history);
+        auctions.Setup(x => x.ApiAuctionAuctionUuidGetWithHttpInfoAsync(OldQuickClawPurchase, It.IsAny<int>(), It.IsAny<System.Threading.CancellationToken>()))
+            .ReturnsAsync(new Api.Client.Client.ApiResponse<Api.Client.Model.ColorSaveAuction>(
+                System.Net.HttpStatusCode.OK, new Api.Client.Client.Multimap<string, string>(), null, OldQuickClawBuy));
+        auctions.Setup(x => x.ApiAuctionAuctionUuidGetWithHttpInfoAsync(SnailWithClawPurchase, It.IsAny<int>(), It.IsAny<System.Threading.CancellationToken>()))
+            .ReturnsAsync(new Api.Client.Client.ApiResponse<Api.Client.Model.ColorSaveAuction>(
+                System.Net.HttpStatusCode.OK, new Api.Client.Client.Multimap<string, string>(), null, SnailWithClawBuy));
+
+        return new TrackerService(null, NullLogger<TrackerService>.Instance, auctions.Object, null, null,
+            changes.Object, storage.Object, new ActivitySource("test"), null, null,
+            new Mock<Settings.Client.Api.ISettingsApi>().Object,
+            items.Object, transactions.Object,
+            new RepresentationConverter(NullLogger<RepresentationConverter>.Instance, null));
+    }
+
+    private static string OldQuickClawBuy = """
+    {"enchantments":[],"uuid":"89d57151966a47f482d64d9e2fb364e6","count":1,"startingBid":75999998,"tag":"PET_ITEM_QUICK_CLAW","itemName":"Quick Claw","start":"2026-10-27T23:51:26","end":"2026-10-28T00:11:24","auctioneerId":"20000000000000000000000000000002","highestBidAmount":75999998,"bids":[{"bidder":"40000000000000000000000000000004","amount":75999998,"timestamp":"2026-10-28T00:11:24"}],"anvilUses":0,"reforge":"None","category":"MISC","tier":"LEGENDARY","bin":true,"flatNbt":{"uid":"fd9ebad77415","uuid":"b1ea4976-a0e6-4a29-86c3-fd9ebad77415"}}
+    """;
+
+    /// <summary>
+    /// The pet auction the seller bought holding the quick claw (flat NBT as recorded, pet uuid fields left out)
+    /// </summary>
+    private static string SnailWithClawBuy = """
+    {"enchantments":[],"uuid":"21ee3986ff4a4d3b828151952dd08143","count":1,"startingBid":34000000,"tag":"PET_SNAIL","start":"2026-11-06T22:10:56","end":"2026-11-06T22:11:31","auctioneerId":"50000000000000000000000000000005","highestBidAmount":34000000,"bids":[{"bidder":"10000000000000000000000000000001","amount":34000000,"timestamp":"2026-11-06T22:11:31"}],"anvilUses":0,"reforge":"None","category":"MISC","tier":"LEGENDARY","bin":true,"flatNbt":{"active":"False","candyUsed":"0","exp":"37583455.36937953","heldItem":"PET_ITEM_QUICK_CLAW","hideInfo":"False","hideRightClick":"False","noMove":"False","petSoulbound":"False","tier":"LEGENDARY","type":"SNAIL","uid":"84b941b1ce4e","uuid":"c8701ef0-4bd2-4ab2-884a-84b941b1ce4e"}}
+    """;
+
     private static string GriffinBuy = """
     {"enchantments":[],"uuid":"eb67974a5dd3400dbe6e31773177763e","count":1,"startingBid":150000000,"tag":"PET_GRIFFIN","itemName":"[Lvl 99] Griffin","start":"2026-06-25T05:30:56","end":"2026-06-25T05:33:07","auctioneerId":"a00cd46615d94bcf8b9688c17d67c85b","profileId":"cae80da3a69944ce871fbdbafd382286","highestBidAmount":150000000,"bids":[{"bidder":"c9ae33b7f1a24ecc8f11194e34bcd2e1","profileId":"0efc3901ea93453fb44b824106f45a32","amount":150000000,"timestamp":"2026-06-25T05:33:07"}],"anvilUses":0,"reforge":"None","category":"MISC","tier":"MYTHIC","bin":true,"flatNbt":{"type":"GRIFFIN","active":"False","exp":"24662721.152631305","tier":"MYTHIC","heldItem":"PET_ITEM_LUCKY_CLOVER","candyUsed":"0","uid":"2c9f22da49c2","uuid":"7aa35889-dcf6-485c-86fb-2c9f22da49c2"}}
     """;
@@ -920,19 +1051,20 @@ public class TrackerServiceTests
         
         var mockFlipStorageService = new Mock<FlipStorageService>(null, null, null);
         mockFlipStorageService.Setup(x => x.SaveFlip(It.IsAny<PastFlip>()))
-            .Callback<PastFlip>(flip => savedFlips.Add(flip))
+            // the three items are saved concurrently, List<T>.Add is not thread safe
+            .Callback<PastFlip>(flip => { lock (savedFlips) savedFlips.Add(flip); })
             .Returns(Task.CompletedTask);
         mockFlipStorageService.Setup(x => x.GetFlips(It.IsAny<Guid>(), It.IsAny<DateTime>(), It.IsAny<DateTime>()))
             .ReturnsAsync(new List<PastFlip>());
-        
+
         var mockProfitChangeService = new Mock<ProfitChangeService>(null, null, null, null, null, null, null, null, null);
         mockProfitChangeService.Setup(x => x.GetChanges(It.IsAny<SaveAuction>(), It.IsAny<SaveAuction>()))
             .ReturnsAsync(new List<PastFlip.ProfitChange>());
-        
+
         var mockTransactionApi = new Mock<PlayerState.Client.Api.ITransactionApi>();
         mockTransactionApi.Setup(x => x.TransactionUuidItemIdPostAsync(It.IsAny<List<Guid>>(), It.IsAny<int>(), It.IsAny<System.Threading.CancellationToken>()))
             .ReturnsAsync(new Dictionary<string, List<long>>());
-        
+
         var mockAuctionsApi = new Mock<Api.Client.Api.IAuctionsApi>();
         // Map UIDs from trade items to purchase UUIDs (without dashes for GetId compatibility)
         var uidToPurchaseUuid = new Dictionary<string, string>
