@@ -1051,20 +1051,19 @@ public class TrackerServiceTests
         
         var mockFlipStorageService = new Mock<FlipStorageService>(null, null, null);
         mockFlipStorageService.Setup(x => x.SaveFlip(It.IsAny<PastFlip>()))
-            // the three items are saved concurrently, List<T>.Add is not thread safe
-            .Callback<PastFlip>(flip => { lock (savedFlips) savedFlips.Add(flip); })
+            .Callback<PastFlip>(flip => savedFlips.Add(flip))
             .Returns(Task.CompletedTask);
         mockFlipStorageService.Setup(x => x.GetFlips(It.IsAny<Guid>(), It.IsAny<DateTime>(), It.IsAny<DateTime>()))
             .ReturnsAsync(new List<PastFlip>());
-
+        
         var mockProfitChangeService = new Mock<ProfitChangeService>(null, null, null, null, null, null, null, null, null);
         mockProfitChangeService.Setup(x => x.GetChanges(It.IsAny<SaveAuction>(), It.IsAny<SaveAuction>()))
             .ReturnsAsync(new List<PastFlip.ProfitChange>());
-
+        
         var mockTransactionApi = new Mock<PlayerState.Client.Api.ITransactionApi>();
         mockTransactionApi.Setup(x => x.TransactionUuidItemIdPostAsync(It.IsAny<List<Guid>>(), It.IsAny<int>(), It.IsAny<System.Threading.CancellationToken>()))
             .ReturnsAsync(new Dictionary<string, List<long>>());
-
+        
         var mockAuctionsApi = new Mock<Api.Client.Api.IAuctionsApi>();
         // Map UIDs from trade items to purchase UUIDs (without dashes for GetId compatibility)
         var uidToPurchaseUuid = new Dictionary<string, string>
