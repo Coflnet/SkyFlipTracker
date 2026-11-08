@@ -131,7 +131,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                         await process(toProcess);
                         return null;
                     }
-                    // a store that stays unreachable ends the consumer (and with it the host) so the restart and its alert show it
+                    // a store that stays unreachable ends this consume attempt; ConsumeRetryLoop restarts it and the uncommitted batch replays
                     catch (Exception e) when (IsInfrastructureError(e) && !stoppingToken.IsCancellationRequested && DateTime.UtcNow - started < MaxInfrastructureRetry)
                     {
                         logger.LogError(e, "store unavailable while consuming {topic}, retrying in {backoff}", topic, backoff);
@@ -168,6 +168,20 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             }
         }
 
+        /// <summary>
+        /// Consumes batches in a retry loop so a failed startup preflight, assignment timeout or failed
+        /// certificate recovery restarts this consumer with backoff instead of ending it silently.
+        /// </summary>
+        private Task ConsumeWithRetry<T>(string name, ConsumerConfig consumerConfig, string topic, Func<IEnumerable<T>, Task> handler,
+            CancellationToken stoppingToken, int batchSize)
+        {
+            var backoff = new ConsumeBackoff();
+            var resetting = ConsumeRetryLoop.ResetAfterBatch(backoff, handler);
+            return ConsumeRetryLoop.RunAsync(name,
+                () => KafkaConsumer.ConsumeBatch<T>(consumerConfig, topic, resetting, stoppingToken, batchSize),
+                backoff, logger, stoppingToken);
+        }
+
         private async Task Run(Task task, string message)
         {
             try
@@ -200,7 +214,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
 
         private async Task ConsumeTryCatch<T>(Func<IEnumerable<T>, TrackerService, Task> NewMethod, string topicName, int batchSize, CancellationToken stoppingToken)
         {
-            await KafkaConsumer.ConsumeBatch<T>(BoundedKafkaConfig.Create(config, "sky-fliptracker"), config[topicName], async elements =>
+            await ConsumeWithRetry<T>("fliptracker " + topicName, BoundedKafkaConfig.Create(config, "sky-fliptracker"), config[topicName], async elements =>
             {
                 await ProcessResilient(elements.ToList(), async batch =>
                 {
@@ -213,7 +227,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
 
         private async Task NewAuctions(CancellationToken stoppingToken)
         {
-            await KafkaConsumer.ConsumeBatch<SaveAuction>(BoundedKafkaConfig.Create(config, "sky-fliptracker", AutoOffsetReset.Latest), config["TOPICS:NEW_AUCTION"], async toUpdate =>
+            await ConsumeWithRetry<SaveAuction>("fliptracker new auctions", BoundedKafkaConfig.Create(config, "sky-fliptracker", AutoOffsetReset.Latest), config["TOPICS:NEW_AUCTION"], async toUpdate =>
             {
                 try
                 {
@@ -285,7 +299,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             };
             await kafkaCreator.CreateTopicIfNotExist(config["TOPICS:SOLD_AUCTION"], 9);
 
-            var sellConsume = KafkaConsumer.ConsumeBatch<SaveAuction>(sellConsumeConfig, config["TOPICS:SOLD_AUCTION"], async sells =>
+            var sellConsume = ConsumeWithRetry<SaveAuction>("fliptracker sells", sellConsumeConfig, config["TOPICS:SOLD_AUCTION"], async sells =>
             {
                 if (sells.All(e => e.End < DateTime.UtcNow - TimeSpan.FromHours(8)))
                 {
@@ -302,7 +316,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     await service.PutBuySpeedOnBoard(batch);
                 }, config["TOPICS:SOLD_AUCTION"], logger, stoppingToken);
             }, stoppingToken, 50);
-            await KafkaConsumer.ConsumeBatch<SaveAuction>(consumeConfig, config["TOPICS:SOLD_AUCTION"], async flipEvents =>
+            var indexConsume = ConsumeWithRetry<SaveAuction>("fliptracker sold index", consumeConfig, config["TOPICS:SOLD_AUCTION"], async flipEvents =>
             {
                 if (flipEvents.All(e => e.End < DateTime.UtcNow - TimeSpan.FromDays(2)))
                 {
@@ -324,11 +338,11 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     await service.IndexCassandra(batch);
                 }, config["TOPICS:SOLD_AUCTION"], logger, stoppingToken);
             }, stoppingToken, 32);
-            throw new Exception("consuming sells stopped");
+            await Task.WhenAll(sellConsume, indexConsume);
         }
         private async Task LoadFlip(CancellationToken stoppingToken)
         {
-            await KafkaConsumer.ConsumeBatch<SaveAuction>(BoundedKafkaConfig.Create(config, "sky-fliptracker"), config["TOPICS:LOAD_FLIPS"], async toUpdate =>
+            await ConsumeWithRetry<SaveAuction>("fliptracker load flips", BoundedKafkaConfig.Create(config, "sky-fliptracker"), config["TOPICS:LOAD_FLIPS"], async toUpdate =>
             {
                 await ProcessResilient(toUpdate.ToList(), async batch =>
                 {
@@ -343,7 +357,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
 
         private async Task ConsumeFlips(CancellationToken stoppingToken)
         {
-            await KafkaConsumer.ConsumeBatch<LowPricedAuction>(BoundedKafkaConfig.Create(config, "sky-fliptracker"), config["TOPICS:LOW_PRICED"], async lps =>
+            await ConsumeWithRetry<LowPricedAuction>("fliptracker low priced", BoundedKafkaConfig.Create(config, "sky-fliptracker"), config["TOPICS:LOW_PRICED"], async lps =>
             {
                 if (lps.Count() == 0)
                     return;
