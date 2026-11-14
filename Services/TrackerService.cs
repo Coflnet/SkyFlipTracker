@@ -450,6 +450,12 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     if (buy.AuctioneerId == null)
                         logger.LogInformation($"trade check {item.buy.ItemTag}");
                     (FlipFlags flags, var change) = await CheckTrade(buy, sell);
+                    // a trade acquisition after the pet purchase is a real cost of its own, only skip without one
+                    if (!flags.HasFlag(FlipFlags.ViaTrade) && await WasLastBoughtOnPet(sell, item.buy, token))
+                    {
+                        logger.LogInformation("Skipping sell {sellUuid} {tag}: last bought as held item, counted in the pet flip", sell.Uuid, sell.Tag);
+                        return;
+                    }
                     var purchaseId = GetId(buy.Uuid);
                     var flipFound = finders.Where(f => f != null && f.AuctionId == purchaseId).OrderBy(f => f.Timestamp).FirstOrDefault();
                     var unmeasured = buy.HighestBidAmount < 0 || flags.HasFlag(FlipFlags.UncertainCost);
@@ -547,6 +553,47 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
         private static string GetItemUid(SaveAuction auction)
         {
             return auction.FlatenedNBT.First(n => n.Key == "uid").Value;
+        }
+
+        /// <summary>
+        /// True when the seller's latest acquisition of this pet item before the sell was a pet auction holding it.
+        /// The batch uid lookup ignores heldItemUuid, so such a sell is matched to an older standalone purchase
+        /// (<paramref name="buy"/>), while the pet's own flip already credits the item removal.
+        /// </summary>
+        private async Task<bool> WasLastBoughtOnPet(SaveAuction sell, Api.Client.Model.ItemSell buy, CancellationToken token)
+        {
+            if (sell.Tag == null || !sell.Tag.StartsWith("PET_ITEM_"))
+                return false;
+            try
+            {
+                var latest = await GetLatestAcquisition(sell);
+                if (latest == null || latest.Timestamp < buy.Timestamp || !IsPetBoughtBy(latest, sell.AuctioneerId))
+                    return false;
+                var pet = await GetAuction(latest.Uuid, sell, token);
+                return pet.FlatenedNBT.Any(n => n.Key == "heldItem" && n.Value == sell.Tag);
+            }
+            catch (Exception e)
+            {
+                logger.LogWarning(e, "Could not check pet purchases of {sellUuid}", sell.Uuid);
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Newest recorded sale of the sold item before the sell itself, including pet auctions holding it via heldItemUuid
+        /// </summary>
+        private async Task<Api.Client.Model.ItemSell> GetLatestAcquisition(SaveAuction sell)
+        {
+            var history = await auctionsApi.ApiAuctionsUidUidSoldGetAsync(GetItemUid(sell));
+            return history?.Where(s => s.Uuid != sell.Uuid && s.Timestamp < sell.End)
+                .OrderByDescending(s => s.Timestamp).FirstOrDefault();
+        }
+
+        private static bool IsPetBoughtBy(Api.Client.Model.ItemSell sale, string playerId)
+        {
+            var tag = sale.ItemTag ?? "";
+            var isPet = tag.StartsWith("PET_") && !tag.StartsWith("PET_ITEM") && !tag.StartsWith("PET_SKIN_");
+            return isPet && string.Equals(sale.Buyer, playerId, StringComparison.OrdinalIgnoreCase);
         }
 
         private static List<(SaveAuction sell, Api.Client.Model.ItemSell buy, SaveAuction batchBuy)> MatchPurchases(
