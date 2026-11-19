@@ -782,15 +782,8 @@ public class ProfitChangeService
             var upgradeCost = (double?)cost?.CoreData?.Cost;
             var tierName = (i >= (int)Core.Tier.LEGENDARY) ? sell.Tier.ToString() : ((Core.Tier)i + 1).ToString();
             var materialTitle = $"Kat materials for {tierName}";
-            var level = 1;
-            try
-            {
-                level = string.IsNullOrEmpty(buy.ItemName) ? 1 : int.Parse(Regex.Replace(buy.ItemName?.Split(' ')[1], @"[^\d]", ""));
-            }
-            catch (Exception)
-            {
-                logger.LogWarning($"could not parse level from {buy.ItemName}");
-            }
+            // the pet is levelled anyway (exp cost is counted separately), upgrading at the higher level gets the bigger kat discount
+            var level = Math.Max(ParsePetLevel(buy.ItemName), ParsePetLevel(sell.ItemName));
             var costAdded = false;
             if (cost == null || cost.MaterialCost >= 1_000_000 || level > 2)
             {
@@ -861,6 +854,19 @@ public class ProfitChangeService
                 break;
         }
 
+    }
+
+    private int ParsePetLevel(string itemName)
+    {
+        try
+        {
+            return string.IsNullOrEmpty(itemName) ? 1 : int.Parse(Regex.Replace(itemName.Split(' ')[1], @"[^\d]", ""));
+        }
+        catch (Exception)
+        {
+            logger.LogWarning($"could not parse level from {itemName}");
+            return 1;
+        }
     }
 
     private float ParseFloat(string value)
