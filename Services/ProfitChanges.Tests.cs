@@ -268,6 +268,50 @@ public class ProfitChangeTests
         Assert.That(changes.Sum(c => c.Amount), Is.EqualTo(-195626200));
     }
 
+    /// <summary>
+    /// A pet bought at level 1 and sold at level 100 was levelled before the kat upgrade, so the level 100 discount applies (issue #176)
+    /// </summary>
+    [Test]
+    public async Task ScathaLevelledBeforeUpgradeGetsLevelDiscount()
+    {
+        var buy = new Core.SaveAuction()
+        {
+            Uuid = Guid.NewGuid().ToString("N"),
+            Tag = "PET_SCATHA",
+            HighestBidAmount = 79_700_000,
+            FlatenedNBT = new(),
+            ItemName = "[Lvl 1] Scatha",
+            Tier = Core.Tier.RARE
+        };
+        var sell = new Core.SaveAuction()
+        {
+            Uuid = Guid.NewGuid().ToString("N"),
+            Tag = "PET_SCATHA",
+            HighestBidAmount = 427_000_000,
+            FlatenedNBT = new(),
+            ItemName = "[Lvl 100] Scatha",
+            Tier = Core.Tier.EPIC
+        };
+        katApi.Setup(k => k.GetAllKatAsync(0, default)).ReturnsAsync(KatResponse("PET_ENDER_DRAGON"));
+        katApi.Setup(k => k.GetUpgradeDataAsync(0, default)).ReturnsAsync(new List<Crafts.Client.Model.KatUpgradeCost>()
+        {
+            new Crafts.Client.Model.KatUpgradeCost()
+            {
+                Name = "Scatha",
+                BaseRarity = Crafts.Client.Model.Tier.RARE,
+                Hours = 168,
+                Cost = 125000000,
+                Material = "ENCHANTED_HARD_STONE",
+                Amount = 64
+            }
+        });
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync(It.IsAny<string>(), null, 0, default))
+                .ReturnsAsync(() => new() { Median = 1_000 });
+        var changes = await service.GetChanges(buy, sell);
+        var katCost = changes.Single(c => c.Label == "Kat cost for EPIC");
+        Assert.That(katCost.Amount, Is.EqualTo(-87_500_000), JsonConvert.SerializeObject(changes, Formatting.Indented));
+    }
+
     [Test]
     public async Task BatUpgrade()
     {
