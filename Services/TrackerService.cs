@@ -1097,7 +1097,8 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     }
                     var profit = sell.HighestBidAmount - buyPrice;
                     profit += tax.Amount;
-                    if (previousAuction != null)
+                    // a later purchase only belongs to this sale when this purchase alone can't fill the sold stack
+                    if (previousAuction != null && sell.Count > buyResp.Count)
                     {
                         profit -= previousAuction.HighestBid;
                         var purchaseCost = new PastFlip.ProfitChange($"Item purchase (combined stack)", -previousAuction.HighestBid)
