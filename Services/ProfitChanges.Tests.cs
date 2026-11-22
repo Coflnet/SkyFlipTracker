@@ -226,8 +226,8 @@ public class ProfitChangeTests
     }
 
 
-    [TestCase("2025-11-29T03:14:59Z", true, 280_000_000)]
-    [TestCase("2025-11-29T03:15:00Z", true, 420_000_000)]
+    [TestCase("2025-11-29T04:00:00Z", true, 280_000_000)]
+    [TestCase("2025-11-29T17:21:59Z", true, 420_000_000)]
     [TestCase("2025-12-15", true, 420_000_000)]
     [TestCase("2026-01-19T19:14:59Z", true, 420_000_000)]
     [TestCase("2026-01-19T19:15:00Z", true, 280_000_000)]

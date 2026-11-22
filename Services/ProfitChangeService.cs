@@ -322,8 +322,8 @@ public class ProfitChangeService
     /// </summary>
     public virtual bool ApplyTemporaryEventFees => true;
     private readonly static DateTime AuraStart = new DateTime(2025, 11, 22);
-    // Kat's Fundraising surcharge began when Aura took office in SkyBlock Year 458.
-    private static readonly DateTime AuraKatStart = new(2025, 11, 29, 3, 15, 0, DateTimeKind.Utc);
+    // Fundraising was interrupted at launch. Use the first dated report of it working again.
+    private static readonly DateTime AuraKatStart = new(2025, 11, 29, 17, 21, 59, DateTimeKind.Utc);
     private readonly static DateTime AuraEnd = new DateTime(2026, 1, 19, 19, 15, 0, DateTimeKind.Utc);
 
     public PastFlip.ProfitChange GetAhTax(long highestBid, long startingBid = 0, DateTime? timeOfSale = null)
