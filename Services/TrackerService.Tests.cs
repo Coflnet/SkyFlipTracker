@@ -372,6 +372,344 @@ public class TrackerServiceTests
         flip.PurchaseCost.Should().Be(50_000_000);
     }
 
+    /// <summary>
+    /// Issue #180: a sinker taken out of a bought rod costs what the rod flip credited for it, not its last auction sale.
+    /// Synthetic figures in the reported shape.
+    /// </summary>
+    [Test]
+    public async Task RemovedRodPartUsesRodCreditAsPurchase()
+    {
+        var savedFlips = new List<PastFlip>();
+        var rod = RodFlip(RodPurchase);
+        var tracker = RodPartTracker(savedFlips, new[] { rod }, (RodPurchase, """{"uid":"aaaaaaaaaaaa","sinker.part":"stingy_sinker","sinker.uuid":"2de65430-0769-4ac6-a26a-7e3a645e0ff6"}"""));
+
+        await tracker.IndexCassandra(new[] { RodPartSell() });
+
+        var flip = savedFlips.Should().ContainSingle().Subject;
+        flip.PurchaseCost.Should().Be(3_375_020);
+        flip.PurchaseAuctionId.Should().Be(Guid.Parse(RodPurchase));
+        flip.Profit.Should().Be(3_382_998 - 3_375_020 - 68_859);
+        flip.Flags.Should().NotHaveFlag(FlipFlags.DifferentBuyer);
+    }
+
+    /// <summary>
+    /// Two rods without a part uuid could both have held the sinker, so the recorded sale keeps pricing it.
+    /// </summary>
+    [Test]
+    public async Task RemovedRodPartKeepsLastSaleWhenRodIsAmbiguous()
+    {
+        var savedFlips = new List<PastFlip>();
+        const string otherRod = "dddddddddddd4ddd8ddddddddddddddd";
+        var noPartUuid = """{"uid":"aaaaaaaaaaaa","sinker.part":"stingy_sinker"}""";
+        var tracker = RodPartTracker(savedFlips, new[] { RodFlip(RodPurchase), RodFlip(otherRod) }, (RodPurchase, noPartUuid), (otherRod, noPartUuid));
+
+        await tracker.IndexCassandra(new[] { RodPartSell() });
+
+        savedFlips.Should().ContainSingle().Which.PurchaseCost.Should().Be(3_900_000);
+    }
+
+    /// <summary>
+    /// The sinker sold before the rod: storing the rod flip replaces the part's ghost purchase.
+    /// </summary>
+    [Test]
+    public async Task RemovedRodPartSoldBeforeRodIsRepriced()
+    {
+        var savedFlips = new List<PastFlip>();
+        var ghost = new PastFlip
+        {
+            Flipper = Guid.Parse(RodPartOwner), ItemTag = "STINGY_SINKER", Uid = 7, Flags = FlipFlags.DifferentBuyer,
+            PurchaseAuctionId = Guid.Parse(StandalonePartSale), PurchaseCost = 3_900_000, PurchaseTime = RodPartSoldAt.AddDays(-2),
+            SellAuctionId = Guid.Parse(RodPartSell().Uuid), SellPrice = 3_382_998, SellTime = RodPartSoldAt, Profit = -585_861,
+            ProfitChanges = new List<PastFlip.ProfitChange> { new("ah tax", -68_859) }
+        };
+        var tracker = RodPartTracker(savedFlips, new[] { ghost }, (RodPurchase, LinkedRodNbt));
+
+        await tracker.IndexCassandra(new[] { RodSell() });
+
+        var part = savedFlips.Should().ContainSingle(f => f.ItemTag == "STINGY_SINKER").Subject;
+        part.PurchaseCost.Should().Be(3_375_020);
+        part.PurchaseAuctionId.Should().Be(Guid.Parse(RodPurchase));
+        part.Profit.Should().Be(3_382_998 - 3_375_020 - 68_859);
+        part.Flags.Should().NotHaveFlag(FlipFlags.DifferentBuyer);
+    }
+
+    /// <summary>
+    /// Two sinkers in one parallel batch compete for one rod without a part uuid, neither may take its credit.
+    /// </summary>
+    [Test]
+    public async Task RemovedRodPartsInOneBatchDoNotShareRodCredit()
+    {
+        var savedFlips = new List<PastFlip>();
+        var tracker = RodPartTracker(savedFlips, new[] { RodFlip(RodPurchase) }, (RodPurchase, """{"uid":"aaaaaaaaaaaa","sinker.part":"stingy_sinker"}"""));
+
+        await tracker.IndexCassandra(new[] { RodPartSell(), SecondRodPartSell() });
+
+        savedFlips.Should().HaveCount(2).And.OnlyContain(f => f.PurchaseCost == 3_900_000);
+    }
+
+    /// <summary>
+    /// The part went through two rods. The rod acquired last prices it, even though the older rod sold later.
+    /// </summary>
+    [Test]
+    public async Task RemovedRodPartUsesLatestRodAcquisition()
+    {
+        var savedFlips = new List<PastFlip>();
+        const string newerRod = "dddddddddddd4ddd8ddddddddddddddd";
+        var older = RodFlip(RodPurchase, purchasedHoursAgo: 3, soldMinutesAgo: 1);
+        var newer = RodFlip(newerRod, purchasedHoursAgo: 1, soldMinutesAgo: 30, credit: 3_500_000);
+        var tracker = RodPartTracker(savedFlips, new[] { older, newer }, (RodPurchase, LinkedRodNbt), (newerRod, LinkedRodNbt));
+
+        await tracker.IndexCassandra(new[] { RodPartSell() });
+
+        var flip = savedFlips.Should().ContainSingle().Subject;
+        flip.PurchaseCost.Should().Be(3_500_000);
+        flip.PurchaseAuctionId.Should().Be(Guid.Parse(newerRod));
+    }
+
+    /// <summary>
+    /// An older rod already priced the sinker when the rod acquired later is stored: the newer credit replaces it.
+    /// </summary>
+    [Test]
+    public async Task RemovedRodPartMovesToNewerRodStoredLater()
+    {
+        var savedFlips = new List<PastFlip>();
+        const string olderRod = "dddddddddddd4ddd8ddddddddddddddd";
+        var older = RodFlip(olderRod, purchasedHoursAgo: 3, soldMinutesAgo: 30, credit: 3_500_000);
+        var part = new PastFlip
+        {
+            Flipper = Guid.Parse(RodPartOwner), ItemTag = "STINGY_SINKER", Uid = 7,
+            PurchaseAuctionId = Guid.Parse(olderRod), PurchaseCost = 3_500_000, PurchaseTime = older.PurchaseTime,
+            SellAuctionId = Guid.Parse(RodPartSell().Uuid), SellPrice = 3_382_998, SellTime = RodPartSoldAt,
+            ProfitChanges = new List<PastFlip.ProfitChange> { new("ah tax", -68_859) }
+        };
+        var tracker = RodPartTracker(savedFlips, new[] { older, part }, (olderRod, LinkedRodNbt), (RodPurchase, LinkedRodNbt));
+
+        await tracker.IndexCassandra(new[] { RodSell() });
+
+        part.PurchaseCost.Should().Be(3_375_020);
+        part.PurchaseAuctionId.Should().Be(Guid.Parse(RodPurchase));
+        part.Profit.Should().Be(3_382_998 - 3_375_020 - 68_859);
+    }
+
+    /// <summary>
+    /// Two batches work from stale reads that never show the other's save: the atomic claim gives the credit to one sinker.
+    /// </summary>
+    [Test]
+    public async Task RemovedRodPartsInConcurrentBatchesDoNotShareRodCredit()
+    {
+        var savedFlips = new List<PastFlip>();
+        var tracker = RodPartTracker(savedFlips, new[] { RodFlip(RodPurchase) }, new RodPartFaults(StaleReads: true), (RodPurchase, UnlinkedRodNbt));
+
+        await Task.WhenAll(tracker.IndexCassandra(new[] { RodPartSell() }), tracker.IndexCassandra(new[] { SecondRodPartSell() }));
+
+        savedFlips.Should().HaveCount(2);
+        savedFlips.Should().ContainSingle(f => f.PurchaseCost == 3_375_020);
+        savedFlips.Should().ContainSingle(f => f.PurchaseCost == 3_900_000 && f.Flags.HasFlag(FlipFlags.DifferentBuyer));
+    }
+
+    /// <summary>
+    /// A save failing after the claim leaves the credit reserved: another sinker can not take it and the retry still gets it.
+    /// </summary>
+    [Test]
+    public async Task RemovedRodPartRetryKeepsItsClaimAfterFailedSave()
+    {
+        var savedFlips = new List<PastFlip>();
+        var failures = 1;
+        var faults = new RodPartFaults(StaleReads: true, BeforeSave: () =>
+        {
+            if (System.Threading.Interlocked.Decrement(ref failures) == 0)
+                throw new InvalidOperationException("save failed");
+        });
+        var tracker = RodPartTracker(savedFlips, new[] { RodFlip(RodPurchase) }, faults, (RodPurchase, UnlinkedRodNbt));
+
+        Assert.ThrowsAsync<CoflnetException>(() => tracker.IndexCassandra(new[] { RodPartSell() }));
+        await tracker.IndexCassandra(new[] { SecondRodPartSell() });
+        await tracker.IndexCassandra(new[] { RodPartSell() });
+
+        savedFlips.Single(f => f.SellAuctionId == Guid.Parse(SecondRodPartSell().Uuid)).PurchaseCost.Should().Be(3_900_000);
+        savedFlips.Single(f => f.SellAuctionId == Guid.Parse(RodPartSell().Uuid)).PurchaseCost.Should().Be(3_375_020);
+    }
+
+    /// <summary>
+    /// Without a working claim store the rod credit is not used at all.
+    /// </summary>
+    [Test]
+    public async Task RemovedRodPartKeepsLastSaleWhenClaimFails()
+    {
+        var savedFlips = new List<PastFlip>();
+        var faults = new RodPartFaults(BeforeClaim: () => throw new InvalidOperationException("claim unavailable"));
+        var tracker = RodPartTracker(savedFlips, new[] { RodFlip(RodPurchase) }, faults, (RodPurchase, UnlinkedRodNbt));
+
+        await tracker.IndexCassandra(new[] { RodPartSell() });
+
+        savedFlips.Should().ContainSingle().Which.PurchaseCost.Should().Be(3_900_000);
+    }
+
+    /// <summary>
+    /// The claim of a rod without part uuid is one bound single-partition lightweight transaction.
+    /// </summary>
+    [Test]
+    public async Task RemovedRodPartClaimIsBoundLightweightTransaction()
+    {
+        var statements = new List<global::Cassandra.SimpleStatement>();
+        var tracker = RodPartTracker(new List<PastFlip>(), new[] { RodFlip(RodPurchase) }, new RodPartFaults(Statements: statements), (RodPurchase, UnlinkedRodNbt));
+
+        await tracker.IndexCassandra(new[] { RodPartSell() });
+
+        var claim = statements.Should().ContainSingle().Subject;
+        claim.QueryString.Should().Be("INSERT INTO rod_part_credit_claims (rod_purchase, part_tag, part_sale) VALUES (?, ?, ?) IF NOT EXISTS");
+        claim.QueryString.Should().NotContain("ALLOW FILTERING");
+        claim.QueryValues.Should().Equal(Guid.Parse(RodPurchase), "STINGY_SINKER", Guid.Parse(RodPartSell().Uuid));
+        claim.QueryValues.Select(value => value.GetType()).Should().Equal(typeof(Guid), typeof(string), typeof(Guid));
+        claim.ConsistencyLevel.Should().Be(global::Cassandra.ConsistencyLevel.Quorum);
+        claim.SerialConsistencyLevel.Should().Be(global::Cassandra.ConsistencyLevel.Serial);
+    }
+
+    private sealed record RodPartFaults(bool StaleReads = false, Action BeforeSave = null, Action BeforeClaim = null, List<global::Cassandra.SimpleStatement> Statements = null);
+    private const string UnlinkedRodNbt = """{"uid":"aaaaaaaaaaaa","sinker.part":"stingy_sinker"}""";
+
+    private static SaveAuction SecondRodPartSell()
+    {
+        var second = RodPartSell();
+        second.Uuid = "ffffffffffff4fff8fffffffffffffff";
+        second.End = RodPartSoldAt.AddSeconds(5);
+        second.FlatenedNBT = new() { { "uid", SecondPartUid }, { "uuid", $"11111111-1111-4111-8111-{SecondPartUid}" } };
+        return second;
+    }
+
+    private const string SecondPartUid = "123456789abc";
+    private const string LinkedRodNbt = """{"uid":"aaaaaaaaaaaa","sinker.part":"stingy_sinker","sinker.uuid":"2de65430-0769-4ac6-a26a-7e3a645e0ff6"}""";
+
+    private static SaveAuction RodSell() => new()
+    {
+        Uuid = "abababababab4bab8babababababab01",
+        Tag = "ROD_OF_THE_SEA",
+        ItemName = "Pitchin' Rod of the Sea",
+        AuctioneerId = RodPartOwner,
+        Start = RodPartSoldAt.AddMinutes(5),
+        End = RodPartSoldAt.AddMinutes(10),
+        StartingBid = 37_000_000,
+        HighestBidAmount = 37_000_000,
+        Tier = Tier.MYTHIC,
+        Bin = true,
+        FlatenedNBT = new() { { "uid", "aaaaaaaaaaaa" } }
+    };
+
+    private const string RodPartOwner = "10000000000000000000000000000001";
+    private const string RodPurchase = "cccccccccccc4ccc8ccccccccccccccc";
+    private const string StandalonePartSale = "bbbbbbbbbbbb4bbb8bbbbbbbbbbbbbbb";
+    private static readonly DateTime RodPartSoldAt = new(2026, 11, 21, 16, 30, 0);
+
+    private static SaveAuction RodPartSell() => new()
+    {
+        Uuid = "eeeeeeeeeeee4eee8eeeeeeeeeeeeeee",
+        Tag = "STINGY_SINKER",
+        ItemName = "Stingy Sinker",
+        AuctioneerId = RodPartOwner,
+        Start = RodPartSoldAt.AddMinutes(-5),
+        End = RodPartSoldAt,
+        StartingBid = 3_382_998,
+        HighestBidAmount = 3_382_998,
+        Tier = Tier.EPIC,
+        Bin = true,
+        FlatenedNBT = new() { { "uid", "7e3a645e0ff6" }, { "uuid", "2de65430-0769-4ac6-a26a-7e3a645e0ff6" } }
+    };
+
+    private static PastFlip RodFlip(string purchase, int purchasedHoursAgo = 1, int soldMinutesAgo = 1, long credit = 3_375_020) => new()
+    {
+        Flipper = Guid.Parse(RodPartOwner),
+        ItemTag = "ROD_OF_THE_SEA",
+        Uid = Guid.Parse(purchase).GetHashCode(),
+        PurchaseAuctionId = Guid.Parse(purchase),
+        PurchaseCost = 40_000_000,
+        PurchaseTime = RodPartSoldAt.AddHours(-purchasedHoursAgo),
+        SellPrice = 37_000_000,
+        SellTime = RodPartSoldAt.AddMinutes(-soldMinutesAgo),
+        ProfitChanges = new List<PastFlip.ProfitChange> { new("stingy_sinker sinker.part removed", credit) }
+    };
+
+    private static TrackerService RodPartTracker(List<PastFlip> savedFlips, IEnumerable<PastFlip> storedFlips, params (string uuid, string flatNbt)[] rods)
+        => RodPartTracker(savedFlips, storedFlips, new RodPartFaults(), rods);
+
+    private static TrackerService RodPartTracker(List<PastFlip> savedFlips, IEnumerable<PastFlip> storedFlips, RodPartFaults faults, params (string uuid, string flatNbt)[] rods)
+    {
+        const string uid = "7e3a645e0ff6";
+        var lastSale = new Api.Client.Model.ItemSell(seller: "20000000000000000000000000000002", uuid: StandalonePartSale, buyer: "40000000000000000000000000000004",
+            itemTag: "STINGY_SINKER", highestBid: 3_900_000, timestamp: RodPartSoldAt.AddDays(-2));
+        var storage = new Mock<FlipStorageService>(null, null, RodClaimSession(faults).Object);
+        var stored = new System.Collections.Concurrent.ConcurrentDictionary<(DateTime, long), PastFlip>(storedFlips.ToDictionary(f => (f.SellTime, f.Uid)));
+        var staleSnapshot = storedFlips.ToList();
+        storage.Setup(x => x.SaveFlip(It.IsAny<PastFlip>())).Callback<PastFlip>(flip =>
+        {
+            faults.BeforeSave?.Invoke();
+            stored[(flip.SellTime, flip.Uid)] = flip;
+            lock (savedFlips) savedFlips.Add(flip);
+        }).Returns(Task.CompletedTask);
+        storage.Setup(x => x.GetFlips(It.IsAny<Guid>(), It.IsAny<DateTime>(), It.IsAny<DateTime>()))
+            .ReturnsAsync((Guid _, DateTime start, DateTime end) =>
+                (IEnumerable<PastFlip>)(faults.StaleReads ? staleSnapshot : stored.Values).Where(f => f.SellTime >= start && f.SellTime <= end).ToList());
+        var changes = new Mock<ProfitChangeService>(null, null, null, null, null, null, null, null, null);
+        changes.Setup(x => x.GetChanges(It.IsAny<SaveAuction>(), It.IsAny<SaveAuction>()))
+            .ReturnsAsync((SaveAuction _, SaveAuction sold) => sold.Tag == "ROD_OF_THE_SEA"
+                ? new List<PastFlip.ProfitChange> { new("stingy_sinker sinker.part removed", 3_375_020) }
+                : new List<PastFlip.ProfitChange> { new("ah tax", -68_859) });
+        var transactions = new Mock<PlayerState.Client.Api.ITransactionApi>();
+        transactions.Setup(x => x.TransactionUuidItemIdPostAsync(It.IsAny<List<Guid>>(), It.IsAny<int>(), It.IsAny<System.Threading.CancellationToken>()))
+            .ReturnsAsync(new Dictionary<string, List<long>>());
+        var items = new Mock<PlayerState.Client.Api.IItemsApi>();
+        items.Setup(x => x.ApiItemsFindUuidPostAsync(It.IsAny<List<PlayerState.Client.Model.ItemIdSearch>>(), It.IsAny<int>(), It.IsAny<System.Threading.CancellationToken>()))
+            .ReturnsAsync(new List<PlayerState.Client.Model.Item>());
+        var auctions = new Mock<Api.Client.Api.IAuctionsApi>();
+        auctions.Setup(x => x.ApiAuctionsUidsSoldPostWithHttpInfoAsync(It.IsAny<Api.Client.Model.InventoryBatchLookup>(), It.IsAny<int>(), It.IsAny<System.Threading.CancellationToken>()))
+            .ReturnsAsync(new Api.Client.Client.ApiResponse<Dictionary<string, List<Api.Client.Model.ItemSell>>>(
+                System.Net.HttpStatusCode.OK, null, new Dictionary<string, List<Api.Client.Model.ItemSell>>
+                {
+                    { uid, new() { lastSale } },
+                    { SecondPartUid, new() { lastSale } },
+                    { "aaaaaaaaaaaa", new() { new(seller: "50000000000000000000000000000005", uuid: RodPurchase, buyer: RodPartOwner, itemTag: "ROD_OF_THE_SEA", highestBid: 40_000_000, timestamp: RodPartSoldAt.AddHours(-1)) } }
+                }));
+        SetupRawAuction(auctions, RodPartSell().Uuid, JsonConvert.SerializeObject(new { uuid = RodPartSell().Uuid, tag = "STINGY_SINKER", flatNbt = RodPartSell().FlatenedNBT }));
+        SetupRawAuction(auctions, StandalonePartSale, """{"uuid":"PART","tag":"STINGY_SINKER","itemName":"Stingy Sinker","end":"2026-11-19T16:30:00","auctioneerId":"20000000000000000000000000000002","highestBidAmount":3900000,"bids":[{"bidder":"40000000000000000000000000000004","amount":3900000,"timestamp":"2026-11-19T16:30:00"}],"tier":"EPIC","bin":true,"flatNbt":{"uid":"7e3a645e0ff6"}}""".Replace("PART", StandalonePartSale));
+        foreach (var (uuid, flatNbt) in rods)
+            SetupRawAuction(auctions, uuid, """{"uuid":"RODID","tag":"ROD_OF_THE_SEA","itemName":"Pitchin Rod of the Sea","end":"2026-11-21T15:30:00","auctioneerId":"50000000000000000000000000000005","highestBidAmount":40000000,"bids":[{"bidder":"10000000000000000000000000000001","amount":40000000,"timestamp":"2026-11-21T15:30:00"}],"tier":"MYTHIC","bin":true,"flatNbt":NBT}""".Replace("RODID", uuid).Replace("NBT", flatNbt));
+        return new TrackerService(null, NullLogger<TrackerService>.Instance, auctions.Object, null, null,
+            changes.Object, storage.Object, new ActivitySource("test"), null, null,
+            new Mock<Settings.Client.Api.ISettingsApi>().Object,
+            items.Object, transactions.Object,
+            new RepresentationConverter(NullLogger<RepresentationConverter>.Instance, null));
+    }
+
+    /// <summary>
+    /// Session answering the claim like Cassandra: the first sale wins and a loser sees the stored winner
+    /// </summary>
+    private static Mock<global::Cassandra.ISession> RodClaimSession(RodPartFaults faults)
+    {
+        var claims = new System.Collections.Concurrent.ConcurrentDictionary<(Guid, string), Guid>();
+        var session = new Mock<global::Cassandra.ISession>();
+        session.Setup(x => x.ExecuteAsync(It.IsAny<global::Cassandra.IStatement>())).Returns((global::Cassandra.IStatement statement) =>
+        {
+            faults.BeforeClaim?.Invoke();
+            var claim = (global::Cassandra.SimpleStatement)statement;
+            faults.Statements?.Add(claim);
+            var sale = (Guid)claim.QueryValues[2];
+            var holder = claims.GetOrAdd(((Guid)claim.QueryValues[0], (string)claim.QueryValues[1]), sale);
+            var row = new Mock<global::Cassandra.Row>();
+            row.Setup(x => x.GetValue<bool>("[applied]")).Returns(holder == sale);
+            row.Setup(x => x.GetValue<Guid>("part_sale")).Returns(holder);
+            var rows = new Mock<global::Cassandra.RowSet>();
+            rows.Setup(x => x.GetEnumerator()).Returns(() => new List<global::Cassandra.Row> { row.Object }.GetEnumerator());
+            return Task.FromResult(rows.Object);
+        });
+        return session;
+    }
+
+    private static void SetupRawAuction(Mock<Api.Client.Api.IAuctionsApi> auctions, string uuid, string json)
+    {
+        auctions.Setup(x => x.ApiAuctionAuctionUuidGetWithHttpInfoAsync(uuid, It.IsAny<int>(), It.IsAny<System.Threading.CancellationToken>()))
+            .ReturnsAsync(new Api.Client.Client.ApiResponse<Api.Client.Model.ColorSaveAuction>(
+                System.Net.HttpStatusCode.OK, new Api.Client.Client.Multimap<string, string>(), null, json));
+    }
+
     private const string QuickClawOwner = "10000000000000000000000000000001";
     private const string OldQuickClawPurchase = "89d57151966a47f482d64d9e2fb364e6";
     private const string SnailWithClawPurchase = "21ee3986ff4a4d3b828151952dd08143";

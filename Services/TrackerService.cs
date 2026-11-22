@@ -26,6 +26,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
     {
         private readonly TrackerDbContext db;
         private readonly ILogger<TrackerService> logger;
+        private static readonly TimeSpan RodCreditWindow = TimeSpan.FromDays(14);
         private readonly IAuctionsApi auctionsApi;
         private readonly FlipSumaryEventProducer flipSumaryEventProducer;
         private readonly IServiceScopeFactory scopeFactory;
@@ -416,6 +417,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                 CancellationToken = new CancellationTokenSource(20000).Token
             };
             var noUidTask = CheckNoIdAuctions(sells, parallelOptions);
+            var savedRods = new ConcurrentBag<PastFlip>();
             await Parallel.ForEachAsync(soldAuctions, parallelOptions, async (item, token) =>
             {
                 if (flipIds.Contains(item.sell.UId))
@@ -456,10 +458,13 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                         logger.LogInformation("Skipping sell {sellUuid} {tag}: last bought as held item, counted in the pet flip", sell.Uuid, sell.Tag);
                         return;
                     }
+                    var removedFromRod = !flags.HasFlag(FlipFlags.ViaTrade) && await UseRodRemovalAsPurchase(buy, sell, item.buy, orderedSells, token);
+                    if (removedFromRod)
+                        flags &= ~FlipFlags.DifferentBuyer; // the purchase is now the seller's own rod
                     var purchaseId = GetId(buy.Uuid);
                     var flipFound = finders.Where(f => f != null && f.AuctionId == purchaseId).OrderBy(f => f.Timestamp).FirstOrDefault();
                     var unmeasured = buy.HighestBidAmount < 0 || flags.HasFlag(FlipFlags.UncertainCost);
-                    if (!unmeasured)
+                    if (!unmeasured && !removedFromRod)
                         flipSumaryEventProducer?.Produce(new FlipSumaryEvent()
                         {
                             Flipper = item.sell.AuctioneerId,
@@ -516,10 +521,12 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     };
                     await flipStorageService.SaveFlip(flip);
                     userFlipCounter.Inc();
+                    if (GetRemovedPartTags(flip).Any())
+                        savedRods.Add(flip);
                     if (extraLog)
                         logger.LogInformation($"Saved flip {flip.Uid} {JsonConvert.SerializeObject(flip)}");
 
-                    if (flipFound == default && changes.Count <= 1 && profit > 1_500_000 && buy.End > DateTime.UtcNow - TimeSpan.FromDays(1))
+                    if (!removedFromRod && flipFound == default && changes.Count <= 1 && profit > 1_500_000 && buy.End > DateTime.UtcNow - TimeSpan.FromDays(1))
                     {
                         logger.LogInformation(VerdictLogTemplate, flip.PurchaseAuctionId.ToString("N"), FunnelVerdict.NotFound, "none", flip.Profit,
                             0, 0, false, null, null, GetId(buy.Bids?.OrderByDescending(b => b.Amount).FirstOrDefault()?.Bidder));
@@ -539,6 +546,7 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
                     throw;
                 }
             });
+            await ReconcileRemovedParts(savedRods);
             await noUidTask;
         }
 
@@ -594,6 +602,192 @@ namespace Coflnet.Sky.SkyAuctionTracker.Services
             var tag = sale.ItemTag ?? "";
             var isPet = tag.StartsWith("PET_") && !tag.StartsWith("PET_ITEM") && !tag.StartsWith("PET_SKIN_");
             return isPet && string.Equals(sale.Buyer, playerId, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private sealed record RodPartSale(Guid Seller, string Tag, string Uid, Guid SellId, DateTime AcquiredAt, DateTime SoldAt, bool Contested);
+        private sealed record RodCredit(PastFlip Rod, long Amount, bool ExactLink);
+
+        /// <summary>
+        /// Prices a rod part the seller took out of a rod at the value the rod's flip credited for it,
+        /// so the part's last standalone sale does not count as a purchase and the value is counted once.
+        /// </summary>
+        private async Task<bool> UseRodRemovalAsPurchase(ApiSaveAuction buy, SaveAuction sell, Api.Client.Model.ItemSell lastSale, List<SaveAuction> batch, CancellationToken token)
+        {
+            if (GetRodPartKind(sell.Tag) == null || string.Equals(lastSale.Buyer, sell.AuctioneerId, StringComparison.OrdinalIgnoreCase))
+                return false;
+            try
+            {
+                var uid = GetItemUid(sell);
+                var contested = batch.Any(other => other.AuctioneerId == sell.AuctioneerId && other.Tag == sell.Tag && GetItemUid(other) != uid);
+                var sale = new RodPartSale(Guid.Parse(sell.AuctioneerId), sell.Tag, uid, Guid.Parse(sell.Uuid), lastSale.Timestamp, sell.End, contested);
+                var credit = await FindRodCredit(sale, token);
+                if (credit == null || !await ClaimRodCredit(credit, sale))
+                    return false;
+                buy.Uuid = credit.Rod.PurchaseAuctionId.ToString("N");
+                buy.HighestBidAmount = credit.Amount;
+                buy.End = credit.Rod.PurchaseTime;
+                return true;
+            }
+            catch (Exception e)
+            {
+                logger.LogWarning(e, "Could not check rod removals of {sellUuid}", sell.Uuid);
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// A part uuid identifies one part. A rod without one is reserved atomically before anything is saved,
+        /// and a retry of the same sale gets its reservation back.
+        /// </summary>
+        private async Task<bool> ClaimRodCredit(RodCredit credit, RodPartSale sale)
+        {
+            return credit.ExactLink || await flipStorageService.TryClaimRodCredit(credit.Rod.PurchaseAuctionId, sale.Tag, sale.SellId);
+        }
+
+        /// <summary>
+        /// Parts can sell before their rod, so once a rod flip is stored the parts it credits are repriced.
+        /// Runs after a batch so that rods and parts saved in parallel see each other.
+        /// </summary>
+        private async Task ReconcileRemovedParts(IEnumerable<PastFlip> rods)
+        {
+            using var timeout = new CancellationTokenSource(20000);
+            foreach (var rod in rods)
+            {
+                try
+                {
+                    foreach (var tag in GetRemovedPartTags(rod))
+                        await RepricePartsOfRod(rod, tag, timeout.Token);
+                }
+                catch (Exception e)
+                {
+                    logger.LogWarning(e, "Could not reconcile parts removed from {rodSale}", rod.SellAuctionId);
+                }
+            }
+        }
+
+        private async Task RepricePartsOfRod(PastFlip rod, string tag, CancellationToken token)
+        {
+            var start = rod.SellTime - RodCreditWindow > rod.PurchaseTime ? rod.SellTime - RodCreditWindow : rod.PurchaseTime;
+            var end = rod.PurchaseTime + RodCreditWindow;
+            if (start > end)
+                return;
+            var flips = await flipStorageService.GetFlips(rod.Flipper, start, end);
+            foreach (var part in flips.Where(f => f.ItemTag == tag && f.PurchaseTime <= rod.PurchaseTime && f.PurchaseAuctionId != rod.PurchaseAuctionId).ToList())
+            {
+                if (!IsGhostPartPurchase(part) && !await IsPricedFromRod(part, token))
+                    continue;
+                var sold = await GetAuction(part.SellAuctionId.ToString("N"), null, token);
+                var sale = new RodPartSale(rod.Flipper, tag, GetItemUid(sold), part.SellAuctionId, part.PurchaseTime, part.SellTime, false);
+                var credit = await FindRodCredit(sale, token);
+                if (credit?.Rod.PurchaseAuctionId != rod.PurchaseAuctionId || !await ClaimRodCredit(credit, sale))
+                    continue;
+                ApplyRodCredit(part, credit);
+                await flipStorageService.SaveFlip(part);
+            }
+        }
+
+        /// <summary>
+        /// An earlier rod already priced this part, so a newer rod holding it may replace that credit
+        /// </summary>
+        private async Task<bool> IsPricedFromRod(PastFlip part, CancellationToken token)
+        {
+            if (part.Flags.HasFlag(FlipFlags.ViaTrade) || part.PurchaseAuctionId == Guid.Empty)
+                return false;
+            var purchase = await GetAuction(part.PurchaseAuctionId.ToString("N"), null, token);
+            return purchase.Tag != part.ItemTag
+                && purchase.FlatenedNBT.TryGetValue($"{GetRodPartKind(part.ItemTag)}.part", out var held)
+                && string.Equals(held, part.ItemTag, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static void ApplyRodCredit(PastFlip part, RodCredit credit)
+        {
+            part.PurchaseAuctionId = credit.Rod.PurchaseAuctionId;
+            part.PurchaseCost = credit.Amount;
+            part.PurchaseTime = credit.Rod.PurchaseTime;
+            part.TargetPrice = 0;
+            part.FinderType = LowPricedAuction.FinderType.UNKOWN;
+            part.Flags &= ~FlipFlags.DifferentBuyer;
+            part.Profit = GetPartProfit(part);
+        }
+
+        private static long GetPartProfit(PastFlip part)
+        {
+            return part.SellTime - part.PurchaseTime > RodCreditWindow
+                ? 0
+                : part.SellPrice - part.PurchaseCost + (part.ProfitChanges?.Sum(c => c.Amount) ?? 0);
+        }
+
+        private async Task<RodCredit> FindRodCredit(RodPartSale sale, CancellationToken token)
+        {
+            var kind = GetRodPartKind(sale.Tag);
+            var label = $"{sale.Tag.ToLowerInvariant()} {kind}.part removed";
+            var flips = (await flipStorageService.GetFlips(sale.Seller, sale.SoldAt - RodCreditWindow, sale.SoldAt + RodCreditWindow)).ToList();
+            var candidates = flips.Where(f => CreditsRodPart(f, label, sale.AcquiredAt, sale.SoldAt) && !IsRodCreditClaimed(flips, f, sale))
+                .OrderByDescending(f => f.PurchaseTime).ToList();
+            if (candidates.Count == 0)
+                return null;
+            var earliest = candidates[^1].PurchaseTime;
+            var contested = sale.Contested || flips.Any(f => f.ItemTag == sale.Tag && f.SellAuctionId != sale.SellId && f.SellTime > earliest && IsGhostPartPurchase(f));
+            var (rod, exact) = await SelectRodHoldingPart(candidates, sale, kind, contested, token);
+            return rod == null ? null : new(rod, rod.ProfitChanges.First(c => c.Label == label).Amount, exact);
+        }
+
+        private static string GetRodPartKind(string tag)
+        {
+            return tag?.Split('_').Last() switch
+            {
+                "HOOK" => "hook",
+                "LINE" => "line",
+                "SINKER" => "sinker",
+                _ => null
+            };
+        }
+
+        private static IEnumerable<string> GetRemovedPartTags(PastFlip flip)
+        {
+            return (flip.ProfitChanges ?? Enumerable.Empty<PastFlip.ProfitChange>())
+                .Where(c => c.Label?.EndsWith(".part removed") == true)
+                .Select(c => c.Label.Split(' ')[0].ToUpperInvariant())
+                .Where(tag => GetRodPartKind(tag) != null)
+                .Distinct();
+        }
+
+        /// <summary>
+        /// The part's recorded purchase was won by another player and no trade explains how the seller got it
+        /// </summary>
+        private static bool IsGhostPartPurchase(PastFlip flip)
+        {
+            return flip.Flags.HasFlag(FlipFlags.DifferentBuyer) && !flip.Flags.HasFlag(FlipFlags.ViaTrade);
+        }
+
+        private static bool CreditsRodPart(PastFlip flip, string label, DateTime lastSale, DateTime partSold)
+        {
+            return flip.PurchaseAuctionId != Guid.Empty && flip.PurchaseTime >= lastSale && flip.PurchaseTime < partSold
+                && partSold - flip.PurchaseTime <= RodCreditWindow
+                && (flip.ProfitChanges?.Any(c => c.Label == label && c.Amount > 0) ?? false);
+        }
+
+        private static bool IsRodCreditClaimed(List<PastFlip> flips, PastFlip rod, RodPartSale sale)
+        {
+            return flips.Any(f => f.PurchaseAuctionId == rod.PurchaseAuctionId && f.ItemTag == sale.Tag && f.SellAuctionId != sale.SellId);
+        }
+
+        /// <summary>
+        /// Walks the rods newest first. The part uuid in a rod's NBT is an exact link, unless a newer rod without
+        /// a uuid could have held the part. A rod without a uuid is only used when nothing else could claim it.
+        /// </summary>
+        private async Task<(PastFlip rod, bool exact)> SelectRodHoldingPart(List<PastFlip> candidates, RodPartSale sale, string kind, bool contested, CancellationToken token)
+        {
+            var unlinked = new List<PastFlip>();
+            foreach (var candidate in candidates)
+            {
+                var rod = await GetAuction(candidate.PurchaseAuctionId.ToString("N"), null, token);
+                if (!rod.FlatenedNBT.TryGetValue($"{kind}.uuid", out var partUuid))
+                    unlinked.Add(candidate);
+                else if (partUuid.Replace("-", "").EndsWith(sale.Uid, StringComparison.OrdinalIgnoreCase))
+                    return (unlinked.Count == 0 ? candidate : null, true);
+            }
+            return (unlinked.Count == 1 && !contested ? unlinked[0] : null, false);
         }
 
         private static List<(SaveAuction sell, Api.Client.Model.ItemSell buy, SaveAuction batchBuy)> MatchPurchases(
