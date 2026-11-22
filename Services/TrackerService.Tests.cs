@@ -12,6 +12,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System;
 using System.Diagnostics;
+using System.Reflection;
 
 namespace Coflnet.Sky.SkyAuctionTracker.Services;
 
@@ -708,6 +709,89 @@ public class TrackerServiceTests
         auctions.Setup(x => x.ApiAuctionAuctionUuidGetWithHttpInfoAsync(uuid, It.IsAny<int>(), It.IsAny<System.Threading.CancellationToken>()))
             .ReturnsAsync(new Api.Client.Client.ApiResponse<Api.Client.Model.ColorSaveAuction>(
                 System.Net.HttpStatusCode.OK, new Api.Client.Client.Multimap<string, string>(), null, json));
+    }
+
+    /// <summary>
+    /// Issue #177: a stack of 6 golden gifts bought at once and sold at once must not be charged for a
+    /// stack of 3 the seller bought after listing it. Recorded auctions; player identities are pseudonyms.
+    /// </summary>
+    [Test]
+    public async Task FullStackPurchaseIsNotCombinedWithLaterSmallerPurchase()
+    {
+        const string owner = "10000000000000000000000000000001";
+        const string sixStackPurchase = "d97ed449e08d4208a86ed466fd180b04";
+        const string laterThreeStackPurchase = "43843532a2814f69bd8cfd64863345b4";
+        const string olderPurchase = "3dfe4a8ce31d42308d3d81e9ccdfd651";
+        // only sells of the last day are checked, so the recorded times are moved to the recent past
+        var shift = DateTime.UtcNow.AddHours(-1) - new DateTime(2026, 11, 19, 16, 12, 43);
+        DateTime At(int day, int hour, int minute, int second) => new DateTime(2026, 11, day, hour, minute, second) + shift;
+        var sell = new SaveAuction
+        {
+            Uuid = "92f499d8a158447083c140677a6b8704",
+            Tag = "GOLD_GIFT",
+            ItemName = "§cGolden Gift",
+            AuctioneerId = owner,
+            Count = 6,
+            Start = At(19, 15, 7, 6),
+            End = At(19, 16, 12, 43),
+            StartingBid = 14_700_000,
+            HighestBidAmount = 14_700_000,
+            Tier = Tier.SPECIAL,
+            Bin = true,
+            Bids = new() { new() { Bidder = "30000000000000000000000000000003", Amount = 14_700_000, Timestamp = At(19, 16, 12, 43) } },
+            FlatenedNBT = new()
+        };
+        var purchases = new List<Api.Client.Model.BidResult>
+        {
+            new(auctionId: laterThreeStackPurchase, itemName: "Golden Gift", tag: "GOLD_GIFT", highestBid: 4_000_000, end: At(19, 15, 33, 56), bin: true),
+            new(auctionId: sixStackPurchase, itemName: "Golden Gift", tag: "GOLD_GIFT", highestBid: 11_000_000, end: At(19, 15, 6, 56), bin: true),
+            new(auctionId: olderPurchase, itemName: "Golden Gift", tag: "GOLD_GIFT", highestBid: 1_000_000, end: At(17, 17, 1, 56), bin: true)
+        };
+        var players = new Mock<Api.Client.Api.IPlayerApi>();
+        players.Setup(x => x.ApiPlayerPlayerUuidBidsGetAsync(owner, It.IsAny<int?>(), It.IsAny<Dictionary<string, string>>(), It.IsAny<int>(), It.IsAny<System.Threading.CancellationToken>()))
+            .ReturnsAsync(purchases);
+        var auctions = new Mock<Api.Client.Api.IAuctionsApi>();
+        SetupGoldGiftPurchase(auctions, sixStackPurchase, 6, 11_000_000, At(19, 15, 5, 55), At(19, 15, 6, 56));
+        SetupGoldGiftPurchase(auctions, laterThreeStackPurchase, 3, 4_000_000, At(19, 15, 32, 38), At(19, 15, 33, 56));
+        var savedFlips = new List<PastFlip>();
+        var storage = new Mock<FlipStorageService>(null, null, null);
+        storage.Setup(x => x.SaveFlip(It.IsAny<PastFlip>())).Callback<PastFlip>(savedFlips.Add).Returns(Task.CompletedTask);
+        var tracker = new TrackerService(null, NullLogger<TrackerService>.Instance, auctions.Object, null, null,
+            new Mock<ProfitChangeService>(null, null, null, null, null, null, null, null, null).Object, storage.Object,
+            new ActivitySource("test"), players.Object, null,
+            new Mock<Settings.Client.Api.ISettingsApi>().Object,
+            new Mock<PlayerState.Client.Api.IItemsApi>().Object, new Mock<PlayerState.Client.Api.ITransactionApi>().Object,
+            new RepresentationConverter(NullLogger<RepresentationConverter>.Instance, null));
+
+        // a batch without any uid match returns before the no-uid check, so call it directly
+        var checkNoIdAuctions = typeof(TrackerService).GetMethod("CheckNoIdAuctions", BindingFlags.Instance | BindingFlags.NonPublic);
+        await (Task)checkNoIdAuctions.Invoke(tracker, new object[] { new[] { sell }, new ParallelOptions() });
+
+        var flip = savedFlips.Should().ContainSingle().Subject;
+        flip.PurchaseAuctionId.Should().Be(Guid.Parse(sixStackPurchase));
+        flip.ProfitChanges.Should().NotContain(c => c.Label == "Item purchase (combined stack)");
+        flip.Profit.Should().Be(14_700_000 - 11_000_000 - 442_200);
+    }
+
+    private static void SetupGoldGiftPurchase(Mock<Api.Client.Api.IAuctionsApi> auctions, string uuid, int count, long price, DateTime start, DateTime end)
+    {
+        var json = JsonConvert.SerializeObject(new
+        {
+            uuid,
+            count,
+            startingBid = price,
+            highestBidAmount = price,
+            tag = "GOLD_GIFT",
+            start,
+            end,
+            auctioneerId = "20000000000000000000000000000002",
+            bids = new[] { new { bidder = "10000000000000000000000000000001", amount = price, timestamp = end } },
+            reforge = "None",
+            tier = "SPECIAL",
+            bin = true,
+            flatNbt = new Dictionary<string, string>()
+        });
+        SetupRawAuction(auctions, uuid, json);
     }
 
     private const string QuickClawOwner = "10000000000000000000000000000001";

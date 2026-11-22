@@ -1,4 +1,5 @@
 using Coflnet.Sky.Api.Client.Model;
+using System.Globalization;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging.Abstractions;
 using Coflnet.Sky.Api.Client.Api;
@@ -224,6 +225,45 @@ public class ProfitChangeTests
         Assert.That(changes[1].Amount, Is.EqualTo(-40000000 * 0.997), changes[1].Label);
     }
 
+
+    [TestCase("2025-11-29T04:00:00Z", true, 280_000_000)]
+    [TestCase("2025-11-29T17:21:59Z", true, 420_000_000)]
+    [TestCase("2025-12-15", true, 420_000_000)]
+    [TestCase("2026-01-19T19:14:59Z", true, 420_000_000)]
+    [TestCase("2026-01-19T19:15:00Z", true, 280_000_000)]
+    [TestCase("2026-11-29", true, 280_000_000)]
+    [TestCase("2025-11-28", false, 398_800_000)]
+    [TestCase("2025-12-15", false, 598_200_000)]
+    [TestCase("2026-11-29", false, 398_800_000)]
+    public async Task KatAuraSurchargeOnlyAppliesDuringHistoricalEvent(string date, bool rawCost, long expectedCoins)
+    {
+        var level = rawCost ? 100 : 1;
+        var buy = CreateAuction("PET_ENDER_DRAGON", $"[Lvl {level}] Ender Dragon");
+        var sell = CreateAuction("PET_ENDER_DRAGON", $"[Lvl {level}] Ender Dragon", tier: Core.Tier.LEGENDARY);
+        sell.End = DateTime.Parse(date, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal);
+        buy.End = sell.End.AddDays(-1);
+        var costs = KatResponse("PET_ENDER_DRAGON");
+        costs.Single(c => c.TargetRarity == Crafts.Client.Model.Tier.LEGENDARY).CoreData.Cost = 400_000_000;
+        katApi.Setup(k => k.GetAllKatAsync(0, default)).ReturnsAsync(costs);
+        katApi.Setup(k => k.GetUpgradeDataAsync(0, default)).ReturnsAsync(new List<Crafts.Client.Model.KatUpgradeCost>()
+        {
+            new()
+            {
+                Name = "Ender Dragon",
+                BaseRarity = Crafts.Client.Model.Tier.EPIC,
+                Cost = 400_000_000,
+                Material = "SUMMONING_EYE",
+                Amount = 8
+            }
+        });
+        pricesApi.Setup(p => p.ApiItemPriceItemTagGetAsync("SUMMONING_EYE", null, 0, default))
+            .ReturnsAsync(() => new() { Median = 100_000 });
+
+        var changes = await service.GetChanges(buy, sell);
+
+        Assert.That(changes.Single(c => c.Label == "Kat cost for LEGENDARY").Amount, Is.EqualTo(-expectedCoins));
+        Assert.That(changes.Single(c => c.Label == "Kat materials for LEGENDARY").Amount, Is.EqualTo(rawCost ? -800_000 : -50));
+    }
 
     [Test]
     public async Task ScathaUpgrade()

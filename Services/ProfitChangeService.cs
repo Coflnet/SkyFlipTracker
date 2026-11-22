@@ -322,7 +322,9 @@ public class ProfitChangeService
     /// </summary>
     public virtual bool ApplyTemporaryEventFees => true;
     private readonly static DateTime AuraStart = new DateTime(2025, 11, 22);
-    private readonly static DateTime AuraEnd = new DateTime(2026, 1, 19, 19, 15, 0);
+    // Fundraising was interrupted at launch. Use the first dated report of it working again.
+    private static readonly DateTime AuraKatStart = new(2025, 11, 29, 17, 21, 59, DateTimeKind.Utc);
+    private readonly static DateTime AuraEnd = new DateTime(2026, 1, 19, 19, 15, 0, DateTimeKind.Utc);
 
     public PastFlip.ProfitChange GetAhTax(long highestBid, long startingBid = 0, DateTime? timeOfSale = null)
     {
@@ -844,7 +846,10 @@ public class ProfitChangeService
                 }
             }
             else
-                upgradeCost = cost.CoreData.Cost * (1.0 - 0.003 * level); // only adjust for level
+                upgradeCost = cost.CoreData.Cost * (1.0 - 0.003 * level);
+            // The upgrade time is unavailable, so use the recorded sale time on recalculation.
+            if (sell.End >= AuraKatStart && sell.End < AuraEnd)
+                upgradeCost *= 1.5;
             if (upgradeCost > 2_000_000)
                 Console.WriteLine($"kat upgrade cost for {tierName} {sell.Tag} {sell.Uuid} is {upgradeCost} at level {level} {JsonConvert.SerializeObject(cost?.CoreData)}");
             yield return new($"Kat cost for {tierName}", (long)-upgradeCost);
