@@ -50,6 +50,40 @@ class CassandraSmokeTests
     }
 
     [Test]
+    [Explicit("Needs a leased keyspace through CASSANDRA_SMOKE_HOST, _PORT, _KEYSPACE, _USER and _PASSWORD.")]
+    public async Task RodCreditClaimLeasedKeyspaceRoundTrip()
+    {
+        string Required(string name) => Environment.GetEnvironmentVariable(name) ?? throw new InvalidOperationException($"{name} is required.");
+        using var cluster = Cluster.Builder()
+            .AddContactPoint(Required("CASSANDRA_SMOKE_HOST"))
+            .WithPort(int.Parse(Required("CASSANDRA_SMOKE_PORT")))
+            .WithCredentials(Required("CASSANDRA_SMOKE_USER"), Required("CASSANDRA_SMOKE_PASSWORD"))
+            .WithSocketOptions(new SocketOptions().SetConnectTimeoutMillis(30_000).SetReadTimeoutMillis(30_000))
+            .Build();
+        using var session = cluster.Connect(Required("CASSANDRA_SMOKE_KEYSPACE"));
+        var service = new FlipStorageService(NullLogger<FlipStorageService>.Instance, new ConfigurationBuilder().Build(), session);
+        await service.Migrate();
+        Task<bool> Claim(Guid rodId, Guid saleId) => (Task<bool>)((dynamic)service).TryClaimRodCredit(rodId, "STINGY_SINKER", saleId);
+        var rod = Guid.NewGuid();
+        var first = Guid.NewGuid();
+        var second = Guid.NewGuid();
+
+        var racing = await Task.WhenAll(Claim(rod, first), Claim(rod, second));
+        var winner = racing[0] ? first : second;
+        var loser = racing[0] ? second : first;
+
+        var winnerRetry = await Claim(rod, winner);
+        var loserRetry = await Claim(rod, loser);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(racing.Count(won => won), Is.EqualTo(1));
+            Assert.That(winnerRetry, Is.True);
+            Assert.That(loserRetry, Is.False);
+        });
+    }
+
+    [Test]
     [Explicit("Run through scripts/cassandra-smoke.sh; it requires a disposable Cassandra container.")]
     public async Task CassandraServerRoundTrip()
     {

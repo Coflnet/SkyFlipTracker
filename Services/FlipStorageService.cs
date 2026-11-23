@@ -298,7 +298,31 @@ public class FlipStorageService
         // set the table to have a ttl of 2 hours and compact every 30 minutes as it has high insert and delete rate
         await unsoldFlips.CreateIfNotExistsAsync();
         session.Execute("ALTER TABLE unsold_flips WITH default_time_to_live = 7200 AND compaction = { 'class' : 'TimeWindowCompactionStrategy', 'compaction_window_size' : 30, 'compaction_window_unit' : 'MINUTES' }");
+        await session.ExecuteAsync(new SimpleStatement(RodCreditClaimsSchema));
         logger.LogInformation("Migration complete, all tables created and configured.");
+    }
+
+    internal const string RodCreditClaimsSchema = "CREATE TABLE IF NOT EXISTS rod_part_credit_claims "
+        + "(rod_purchase uuid, part_tag text, part_sale uuid, PRIMARY KEY (rod_purchase, part_tag)) WITH default_time_to_live = 7776000";
+
+    internal static SimpleStatement BuildRodCreditClaim(Guid rodPurchase, string partTag, Guid partSale)
+    {
+        var claim = new SimpleStatement("INSERT INTO rod_part_credit_claims (rod_purchase, part_tag, part_sale) VALUES (?, ?, ?) IF NOT EXISTS",
+            rodPurchase, partTag, partSale);
+        claim.SetConsistencyLevel(ConsistencyLevel.Quorum);
+        claim.SetSerialConsistencyLevel(ConsistencyLevel.Serial);
+        return claim;
+    }
+
+    /// <summary>
+    /// Atomically reserves the credit of a rod without part uuid for one part sale.
+    /// True when this sale holds the reservation, also when it already did before a retry.
+    /// </summary>
+    public async Task<bool> TryClaimRodCredit(Guid rodPurchase, string partTag, Guid partSale)
+    {
+        var session = await GetSession();
+        var row = (await session.ExecuteAsync(BuildRodCreditClaim(rodPurchase, partTag, partSale))).Single();
+        return row.GetValue<bool>("[applied]") || row.GetValue<Guid>("part_sale") == partSale;
     }
 
     /// <summary>
