@@ -2,7 +2,7 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /build
 RUN git init dev \
     && git -C dev remote add origin https://github.com/Coflnet/HypixelSkyblock.git \
-    && git -C dev fetch --depth=1 origin d87dbb1a2461deced758dcfc7f4927908b291425 \
+    && git -C dev fetch --depth=1 origin 62999c0ad3ab22921d2319c88d3ae7b5ee656147 \
     && git -C dev checkout --detach FETCH_HEAD
 WORKDIR /build/sky
 COPY SkyFlipTracker.csproj SkyFlipTracker.csproj
