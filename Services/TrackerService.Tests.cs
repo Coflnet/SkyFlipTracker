@@ -40,6 +40,19 @@ public class TrackerServiceTests
     }
 
     /// <summary>
+    /// A purchase with an enchantment the core library did not know could not be read, so its flip was skipped
+    /// </summary>
+    [Test]
+    public void PurchaseWithNewLootingEnchantCanBeRead()
+    {
+        var buy = JsonConvert.DeserializeObject<ApiSaveAuction>("""{"enchantments":[{"type":"looting_new","level":5}]}""");
+
+        buy.Enchantments.Should().ContainSingle();
+        buy.Enchantments[0].Type.ToString().Should().Be("looting_new");
+        buy.Enchantments[0].Level.Should().Be(5);
+    }
+
+    /// <summary>
     /// Verifies that unavailable estimates fall back across every item in a multi-item trade.
     /// </summary>
     [Test]
